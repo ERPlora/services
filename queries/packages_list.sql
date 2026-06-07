@@ -6,4 +6,3 @@ SELECT p.id, p.name, p.slug, p.discount_type, p.discount_value, p.fixed_price, p
         WHERE i.package_id = p.id AND i.is_deleted = 0) AS items
 FROM services_package p
 WHERE p.hub_id = :hub_id AND p.is_deleted = 0
-ORDER BY p.sort_order ASC, p.name ASC;

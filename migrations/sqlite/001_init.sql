@@ -1,7 +1,7 @@
 -- Services · esquema inicial (SQLite). Portado fielmente de old_modules/m_services/models.py.
 -- Modelos: ServicesSettings (singleton), ServiceCategory (jerárquica), Service,
 -- ServiceVariant, ServiceAddon (+ M2M addon↔service), ServicePackage, ServicePackageItem.
--- Contrato de fila estándar de hub-next (§2.5): hub_id + soft-delete + auditoría.
+-- Contrato de fila estándar de hub (§2.5): hub_id + soft-delete + auditoría.
 
 -- Configuración singleton por hub.
 CREATE TABLE IF NOT EXISTS services_settings (

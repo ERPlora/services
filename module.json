@@ -4,7 +4,15 @@
   "version": "1.1.7",
   "agent": {
     "description": "Manages the service catalogue: create, update and delete services, categories, and service packages; list available services and packages; configure module settings.",
-    "keywords": ["service", "catalogue", "category", "package", "booking", "offering", "price"]
+    "keywords": [
+      "service",
+      "catalogue",
+      "category",
+      "package",
+      "booking",
+      "offering",
+      "price"
+    ]
   },
   "depends_on": [],
   "permissions": [
@@ -62,40 +70,211 @@
       "permission": "services.view_service",
       "sql": "queries/services_list.sql",
       "schema": "schemas/services_list.json",
-      "ai": { "description": "Lists the services available in the catalogue" }
+      "list": {
+        "search": [
+          "name"
+        ],
+        "sort": [
+          "id",
+          "name",
+          "price",
+          "pricing_type",
+          "duration_minutes",
+          "is_bookable",
+          "category_id",
+          "category"
+        ],
+        "default_sort": "name",
+        "default_dir": "asc",
+        "filters": {
+          "name": {
+            "op": "eq"
+          },
+          "price": {
+            "op": "range"
+          },
+          "pricing_type": {
+            "op": "eq"
+          },
+          "duration_minutes": {
+            "op": "eq"
+          },
+          "is_bookable": {
+            "op": "eq"
+          },
+          "category_id": {
+            "op": "eq"
+          },
+          "category": {
+            "op": "eq"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists the services available in the catalogue"
+      }
     },
     "services.services.get": {
       "permission": "services.view_service",
       "sql": "queries/service_get.sql",
       "schema": "schemas/service_get.json",
-      "ai": { "description": "Retrieves the full detail of a service by its identifier" }
+      "ai": {
+        "description": "Retrieves the full detail of a service by its identifier"
+      }
     },
     "services.categories.list": {
       "permission": "services.view_category",
       "sql": "queries/categories_list.sql",
-      "ai": { "description": "Lists the defined service categories" }
+      "list": {
+        "search": [
+          "name",
+          "slug"
+        ],
+        "sort": [
+          "id",
+          "name",
+          "slug",
+          "icon",
+          "color",
+          "parent_id",
+          "sort_order",
+          "service_count"
+        ],
+        "default_sort": "name",
+        "default_dir": "asc",
+        "filters": {
+          "name": {
+            "op": "eq"
+          },
+          "slug": {
+            "op": "eq"
+          },
+          "icon": {
+            "op": "eq"
+          },
+          "color": {
+            "op": "eq"
+          },
+          "parent_id": {
+            "op": "eq"
+          },
+          "sort_order": {
+            "op": "eq"
+          },
+          "service_count": {
+            "op": "range"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists the defined service categories"
+      }
     },
     "services.packages.list": {
       "permission": "services.view_package",
       "sql": "queries/packages_list.sql",
-      "ai": { "description": "Lists the available service packages" }
+      "list": {
+        "search": [
+          "name",
+          "slug"
+        ],
+        "sort": [
+          "id",
+          "name",
+          "slug",
+          "discount_type",
+          "discount_value",
+          "fixed_price",
+          "is_active",
+          "items"
+        ],
+        "default_sort": "name",
+        "default_dir": "asc",
+        "filters": {
+          "name": {
+            "op": "eq"
+          },
+          "slug": {
+            "op": "eq"
+          },
+          "discount_type": {
+            "op": "range"
+          },
+          "discount_value": {
+            "op": "range"
+          },
+          "fixed_price": {
+            "op": "range"
+          },
+          "is_active": {
+            "op": "eq"
+          },
+          "items": {
+            "op": "eq"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists the available service packages"
+      }
     },
     "services.packages.get": {
       "permission": "services.view_package",
       "sql": "queries/package_get.sql",
       "schema": "schemas/package_get.json",
-      "ai": { "description": "Retrieves the full detail of a service package by its identifier" }
+      "ai": {
+        "description": "Retrieves the full detail of a service package by its identifier"
+      }
     },
     "services.package_items.list": {
       "permission": "services.view_package",
       "sql": "queries/package_items_list.sql",
       "schema": "schemas/package_items_list.json",
-      "ai": { "description": "Lists the individual services included in a package" }
+      "list": {
+        "search": [
+          "service_name"
+        ],
+        "sort": [
+          "service_id",
+          "quantity",
+          "sort_order",
+          "service_name",
+          "service_price"
+        ],
+        "default_sort": "service_id",
+        "default_dir": "asc",
+        "filters": {
+          "service_id": {
+            "op": "eq"
+          },
+          "quantity": {
+            "op": "range"
+          },
+          "sort_order": {
+            "op": "eq"
+          },
+          "service_name": {
+            "op": "eq"
+          },
+          "service_price": {
+            "op": "range"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists the individual services included in a package"
+      }
     },
     "services.settings.get": {
       "permission": "services.view_service",
       "sql": "queries/settings_get.sql",
-      "ai": { "description": "Retrieves the general settings of the services module" }
+      "ai": {
+        "description": "Retrieves the general settings of the services module"
+      }
     }
   },
   "commands": {
@@ -108,7 +287,9 @@
       "emit": [
         "services.service.created"
       ],
-      "ai": { "description": "Creates a new service in the catalogue" }
+      "ai": {
+        "description": "Creates a new service in the catalogue"
+      }
     },
     "services.services.update": {
       "permission": "services.change_service",
@@ -119,7 +300,9 @@
       "emit": [
         "services.service.updated"
       ],
-      "ai": { "description": "Updates the details of an existing service" }
+      "ai": {
+        "description": "Updates the details of an existing service"
+      }
     },
     "services.services.delete": {
       "permission": "services.delete_service",
@@ -130,7 +313,9 @@
       "emit": [
         "services.service.deleted"
       ],
-      "ai": { "description": "Deletes a service from the catalogue (destructive)" }
+      "ai": {
+        "description": "Deletes a service from the catalogue (destructive)"
+      }
     },
     "services.services.bulk_create": {
       "permission": "services.change_service",
@@ -139,7 +324,9 @@
         "file": "dist/handler.wasm",
         "function": "bulk_create_services"
       },
-      "ai": { "description": "Creates multiple services in a single bulk operation" }
+      "ai": {
+        "description": "Creates multiple services in a single bulk operation"
+      }
     },
     "services._insert_service": {
       "permission": "services.add_service",
@@ -153,7 +340,9 @@
       "sql": [
         "commands/category_create.sql"
       ],
-      "ai": { "description": "Creates a new service category" }
+      "ai": {
+        "description": "Creates a new service category"
+      }
     },
     "services.categories.update": {
       "permission": "services.change_category",
@@ -161,7 +350,9 @@
       "sql": [
         "commands/category_update.sql"
       ],
-      "ai": { "description": "Updates the details of an existing service category" }
+      "ai": {
+        "description": "Updates the details of an existing service category"
+      }
     },
     "services.categories.delete": {
       "permission": "services.delete_category",
@@ -169,7 +360,9 @@
       "sql": [
         "commands/category_delete.sql"
       ],
-      "ai": { "description": "Deletes a service category (destructive)" }
+      "ai": {
+        "description": "Deletes a service category (destructive)"
+      }
     },
     "services.packages.create": {
       "permission": "services.add_package",
@@ -181,7 +374,9 @@
       "emit": [
         "services.package.created"
       ],
-      "ai": { "description": "Creates a new package grouping multiple services together" }
+      "ai": {
+        "description": "Creates a new package grouping multiple services together"
+      }
     },
     "services.packages.update": {
       "permission": "services.change_package",
@@ -192,7 +387,9 @@
       "emit": [
         "services.package.updated"
       ],
-      "ai": { "description": "Updates the details of an existing service package" }
+      "ai": {
+        "description": "Updates the details of an existing service package"
+      }
     },
     "services.packages.delete": {
       "permission": "services.delete_package",
@@ -203,7 +400,9 @@
       "emit": [
         "services.package.deleted"
       ],
-      "ai": { "description": "Deletes a service package (destructive)" }
+      "ai": {
+        "description": "Deletes a service package (destructive)"
+      }
     },
     "services._insert_package": {
       "permission": "services.add_package",
@@ -223,7 +422,9 @@
       "sql": [
         "commands/settings_upsert.sql"
       ],
-      "ai": { "description": "Updates the general settings of the services module" }
+      "ai": {
+        "description": "Updates the general settings of the services module"
+      }
     }
   },
   "ui": {
