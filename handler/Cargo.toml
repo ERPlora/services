@@ -1,0 +1,25 @@
+[package]
+name = "services-handler"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+guest = ["dep:extism-pdk"]
+
+[dependencies]
+# El crate del contrato host↔guest vive en el workspace Cargo del hub
+# (`ERPlora/hub/crates/guest-sdk`); se referencia por su ruta real para que
+# cargo resuelva la herencia (`edition.workspace`) del workspace del hub.
+erplora-guest-sdk = { path = "../../../../hub/crates/guest-sdk" }
+extism-pdk = { version = "1", optional = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = "s"
+
+[workspace]
