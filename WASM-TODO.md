@@ -86,18 +86,16 @@ warning de precio en `update_service`.
  vía `uq_services_service_hub_slug` / `uq_services_package_hub_slug`; el WASM solo compone
  el slug base (la desambiguación por colisión, si se quiere, la resuelve el runtime).
 
-## 5. Cascada de soft-delete de líneas de paquete (`delete_package`)
+## 5. Cascada de soft-delete de líneas de paquete (`delete_package`) — ✅ RESUELTA EN TIER 0 (2026-06-11)
 Origen: `PackageService.delete_package` (comentario "cascade to ServicePackageItem rows").
-- `commands/package_delete.sql` ya hace el soft-delete de la **cabecera**
- (`services_package`), pero NO toca `services_packageitem`. La cascada de soft-delete a las
- líneas debe coordinarse en el handler:
- - Soft-delete de la cabecera (`commands/package_delete.sql`).
- - Soft-delete de **todas** las líneas vivas del paquete
- (`services_packageitem WHERE package_id=:package_id AND hub_id=:hub_id AND is_deleted=0`):
- bien con un `_soft_delete_package_items.sql` (a crear) emitido por el WASM, bien con N
- intenciones de update, en la **misma** transacción que la cabecera.
+- **No necesitó WASM**: el runtime ejecuta todas las sentencias del array `sql` de un
+ command en **una sola transacción** (`crates/runtime/src/commands.rs`), así que la cascada
+ se resolvió añadiendo `commands/package_delete_items.sql` al `sql` de
+ `services.packages.delete` (issue services#3):
+ - `commands/package_delete.sql` — soft-delete de la cabecera (`services_package`).
+ - `commands/package_delete_items.sql` — soft-delete de **todas** las líneas vivas
+ (`services_packageitem WHERE package_id=:package_id AND hub_id=:hub_id AND is_deleted=0`),
+ atómico con la cabecera (cabecera + líneas o nada).
 - Importante (preservar histórico): es soft-delete, no DELETE — cualquier venta/bono ya
  emitido conserva su FK al paquete. El `ON DELETE CASCADE` de la tabla es solo para hard
  delete; aquí no aplica.
-- Razón WASM: el soft-delete declarativo de la cabecera no propaga a la tabla hija; hace
- falta emitir un segundo comando atómicamente ligado al primero (cabecera + líneas o nada).
