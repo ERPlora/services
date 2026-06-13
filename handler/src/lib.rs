@@ -48,7 +48,21 @@ pub fn create_package(input: Json<erplora_guest_sdk::Input>) -> FnResult<Json<Ha
 
 // ── helpers de tipos (mismo criterio que el handler de sales) ───────────────
 
-/// Redondeo a 2 decimales half-even (igual que Decimal.quantize de Python).
+/// Redondea céntimos fraccionarios a céntimos enteros half-even (ADR-0007). `x` ya en
+/// el espacio de céntimos (el dinero de entrada/salida viaja en céntimos).
+fn round_cents(x: f64) -> i64 {
+    let floor = x.floor();
+    let diff = x - floor;
+    let r = if (diff - 0.5).abs() < 1e-9 {
+        if (floor as i64) % 2 == 0 { floor } else { floor + 1.0 }
+    } else {
+        x.round()
+    };
+    r as i64
+}
+
+/// Redondeo a 2 decimales half-even — usado SOLO para `discount_value`, que es
+/// polimórfico (porcentaje | euros) y se almacena como REAL (no es céntimos).
 fn round2(x: f64) -> f64 {
     let scaled = x * 100.0;
     let floor = scaled.floor();
@@ -245,8 +259,8 @@ pub fn bulk_create_services_pure(input: Value) -> HandlerOutput {
             },
         );
         p.insert("pricing_type".into(), json!(pricing_type));
-        p.insert("price".into(), json!(round2(price)));
-        p.insert("cost".into(), json!(round2(cost)));
+        p.insert("price".into(), json!(round_cents(price))); // céntimos (input cents)
+        p.insert("cost".into(), json!(round_cents(cost)));   // céntimos
         p.insert("duration_minutes".into(), json!(duration));
         p.insert("buffer_before".into(), json!(buffer_before));
         p.insert("buffer_after".into(), json!(buffer_after));
@@ -327,10 +341,12 @@ pub fn create_package_pure(input: Value) -> Result<HandlerOutput, String> {
     h.insert("slug".into(), json!(slugify(&name)));
     h.insert("description".into(), json!(str_field(&payload, "description")));
     h.insert("discount_type".into(), json!(discount_type));
+    // discount_value es polimórfico (porcentaje | euros) → REAL, no céntimos.
     h.insert("discount_value".into(), json!(round2(discount_value)));
+    // fixed_price es dinero → céntimos (input cents).
     h.insert(
         "fixed_price".into(),
-        fixed_price.map(|f| json!(round2(f))).unwrap_or(Value::Null),
+        fixed_price.map(|f| json!(round_cents(f))).unwrap_or(Value::Null),
     );
     h.insert("validity_days".into(), validity_days.map(|v| json!(v)).unwrap_or(Value::Null));
     h.insert("max_uses".into(), max_uses.map(|v| json!(v)).unwrap_or(Value::Null));

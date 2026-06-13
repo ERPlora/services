@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS services_settings (
     hub_id               TEXT NOT NULL,
     default_duration     INTEGER NOT NULL DEFAULT 60,
     default_buffer_time  INTEGER NOT NULL DEFAULT 0,
-    default_tax_rate     NUMERIC NOT NULL DEFAULT 21.00,
+    default_tax_rate     REAL NOT NULL DEFAULT 21.00,   -- tasa % (no es dinero)
     show_prices          INTEGER NOT NULL DEFAULT 1,
     show_duration        INTEGER NOT NULL DEFAULT 1,
     allow_online_booking INTEGER NOT NULL DEFAULT 1,
@@ -59,11 +59,11 @@ CREATE TABLE IF NOT EXISTS services_service (
     short_description     TEXT NOT NULL DEFAULT '',
     category_id           TEXT,
     pricing_type          TEXT NOT NULL DEFAULT 'fixed',   -- fixed|hourly|from|variable|free
-    price                 NUMERIC NOT NULL DEFAULT 0.00,
-    min_price             NUMERIC,
-    max_price             NUMERIC,
-    cost                  NUMERIC NOT NULL DEFAULT 0.00,
-    tax_rate              NUMERIC,
+    price                 INTEGER NOT NULL DEFAULT 0,    -- céntimos (ADR-0007)
+    min_price             INTEGER,                       -- céntimos
+    max_price             INTEGER,                       -- céntimos
+    cost                  INTEGER NOT NULL DEFAULT 0,    -- céntimos
+    tax_rate              REAL,                          -- tasa % (no es dinero)
     duration_minutes      INTEGER NOT NULL DEFAULT 60,
     buffer_before         INTEGER NOT NULL DEFAULT 0,
     buffer_after          INTEGER NOT NULL DEFAULT 0,
@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS services_variant (
     service_id          TEXT NOT NULL,
     name                TEXT NOT NULL,
     description         TEXT NOT NULL DEFAULT '',
-    price_adjustment    NUMERIC NOT NULL DEFAULT 0.00,
+    price_adjustment    INTEGER NOT NULL DEFAULT 0,    -- céntimos
     duration_adjustment INTEGER NOT NULL DEFAULT 0,
     sort_order          INTEGER NOT NULL DEFAULT 0,
     is_active           INTEGER NOT NULL DEFAULT 1,
@@ -121,7 +121,7 @@ CREATE TABLE IF NOT EXISTS services_addon (
     hub_id           TEXT NOT NULL,
     name             TEXT NOT NULL,
     description      TEXT NOT NULL DEFAULT '',
-    price            NUMERIC NOT NULL DEFAULT 0.00,
+    price            INTEGER NOT NULL DEFAULT 0,    -- céntimos
     duration_minutes INTEGER NOT NULL DEFAULT 0,
     is_active        INTEGER NOT NULL DEFAULT 1,
     is_deleted       INTEGER NOT NULL DEFAULT 0,
@@ -150,8 +150,8 @@ CREATE TABLE IF NOT EXISTS services_package (
     slug           TEXT NOT NULL,
     description    TEXT NOT NULL DEFAULT '',
     discount_type  TEXT NOT NULL DEFAULT 'percentage',   -- percentage|fixed
-    discount_value NUMERIC NOT NULL DEFAULT 0.00,
-    fixed_price    NUMERIC,
+    discount_value REAL NOT NULL DEFAULT 0,         -- % o euros (polimórfico, no céntimos)
+    fixed_price    INTEGER,                          -- céntimos
     validity_days  INTEGER,
     max_uses       INTEGER,
     image          TEXT NOT NULL DEFAULT '',
