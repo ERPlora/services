@@ -5,12 +5,20 @@ import '@erplora/outfitkit/ok-data-table';
 import type { DataTableColumn, DataTableAction } from '@erplora/outfitkit';
 import { createListController } from '@erplora/module-sdk';
 import type { ListController, ListClient, ListParams, ListPage } from '@erplora/module-sdk';
+// i18n del módulo (ADR-0055): los catálogos `ui` se inlinean en build (esbuild) y los textos
+// internos se resuelven con `erplora.t(CATALOG, 'ui.clave')` (idioma activo, fallback locale→en→clave).
+import esLocale from '../../../locales/es.json';
+import enLocale from '../../../locales/en.json';
+const CATALOG: Record<string, unknown> = { es: esLocale, en: enLocale };
 
 interface ErploraClientLike extends ListClient {
   query<T = unknown>(name: string, params?: Record<string, unknown>): Promise<T>;
   queryPage<R = unknown>(name: string, params: ListParams): Promise<ListPage<R>>;
   command<T = unknown>(name: string, payload?: Record<string, unknown>): Promise<T>;
   on(event: string, cb: (payload: unknown) => void): () => void;
+  /** i18n del módulo (ADR-0055): idioma activo + traducción del catálogo `ui`. */
+  locale: string;
+  t(catalog: Record<string, unknown>, key: string, params?: Record<string, unknown>): string;
 }
 
 interface Service {
@@ -67,29 +75,39 @@ export class ErpServicesList extends LitElement {
 
   private unsub?: () => void;
 
-  private columns: DataTableColumn[] = [
-    { key: 'name', header: 'Nombre', sortable: true, filterable: true, filterType: 'text' },
-    { key: 'category', header: 'Categoría', sortable: true, filterable: true, filterType: 'text', format: (r) => (r.category as string) ?? '—' },
-    { key: 'pricing_type', header: 'Tarifa', sortable: true, filterable: true, filterType: 'text' },
-    {
-      key: 'price',
-      header: 'Precio',
-      align: 'right',
-      sortable: true,
-      filterable: true,
-      filterType: 'range',
-      format: (r) => Number(r.price).toFixed(2),
-    },
-    { key: 'duration_minutes', header: 'Duración (min)', align: 'right', sortable: true, filterable: true, filterType: 'text' },
-  ];
+  private get columns(): DataTableColumn[] {
+    const t = (k: string): string => erplora().t(CATALOG, k);
+    return [
+      { key: 'name', header: t('ui.colName'), sortable: true, filterable: true, filterType: 'text' },
+      { key: 'category', header: t('ui.colCategory'), sortable: true, filterable: true, filterType: 'text', format: (r) => (r.category as string) ?? '—' },
+      { key: 'pricing_type', header: t('ui.colPricingType'), sortable: true, filterable: true, filterType: 'text' },
+      {
+        key: 'price',
+        header: t('ui.colPrice'),
+        align: 'right',
+        sortable: true,
+        filterable: true,
+        filterType: 'range',
+        format: (r) => Number(r.price).toFixed(2),
+      },
+      { key: 'duration_minutes', header: t('ui.colDuration'), align: 'right', sortable: true, filterable: true, filterType: 'text' },
+    ];
+  }
 
-  private actions: DataTableAction[] = [{ id: 'delete', label: 'Eliminar', icon: 'trash', color: 'danger' }];
+  private get actions(): DataTableAction[] {
+    return [{ id: 'delete', label: erplora().t(CATALOG, 'ui.actionDelete'), icon: 'trash', color: 'danger' }];
+  }
 
   // TODO-LIT: componentWillLoad → connectedCallback. Recuerda: connectedCallback se dispara
   // en CADA reconexión al DOM (no solo en el primer montaje). Si la init debe correr una
   // sola vez tras el primer render, considera firstUpdated() en su lugar.
+  // Re-render al cambiar el idioma del shell (ADR-0055): los getters `columns`/`actions` y el
+  // texto del template se re-evalúan con el nuevo `erplora.locale`.
+  private readonly onLocaleChange = (): void => this.requestUpdate();
+
   async connectedCallback() {
     super.connectedCallback();
+    window.addEventListener('erplora:locale-changed', this.onLocaleChange);
     this.ctrl = createListController<Service>(erplora(), 'services.services.list', () => this.requestUpdate(), {
       pageSize: 50,
       sort: 'name',
@@ -112,6 +130,7 @@ export class ErpServicesList extends LitElement {
   }
 
   disconnectedCallback() {
+    window.removeEventListener('erplora:locale-changed', this.onLocaleChange);
     super.disconnectedCallback();
     this.unsub?.();
   }
@@ -157,7 +176,7 @@ export class ErpServicesList extends LitElement {
       this.newCategory = '';
       await this.ctrl.load(); // (además del evento; garantiza refresco inmediato)
     } catch (e) {
-      this.formError = e instanceof Error ? e.message : 'No se pudo crear el servicio';
+      this.formError = e instanceof Error ? e.message : erplora().t(CATALOG, 'ui.errorCreate');
     } finally {
       this.saving = false;
     }
@@ -171,28 +190,29 @@ export class ErpServicesList extends LitElement {
       await erplora().command('services.services.delete', { service_id: row.id });
       await this.ctrl.load();
     } catch (e) {
-      this.formError = e instanceof Error ? e.message : 'No se pudo eliminar el servicio';
+      this.formError = e instanceof Error ? e.message : erplora().t(CATALOG, 'ui.errorDelete');
     }
   }
 
   render() {
+    const t = (k: string): string => erplora().t(CATALOG, k);
     return html`<div>
         <header>
-          <h2>Servicios</h2>
+          <h2>${t('ui.title')}</h2>
         </header>
         <form class="form" @submit=${(e) => this.createService(e)}>
-          <ion-input placeholder="Nombre" .value=${this.newName} @ionInput=${(e: any) => (this.newName = e.target.value)}></ion-input>
-          <ion-input type="number" step="0.01" placeholder="Precio" .value=${this.newPrice} @ionInput=${(e: any) => (this.newPrice = e.target.value)}></ion-input>
-          <ion-input type="number" step="1" placeholder="Duración (min)" .value=${this.newDuration} @ionInput=${(e: any) => (this.newDuration = e.target.value)}></ion-input>
-          <ion-select placeholder="Categoría…" .value=${this.newCategory} @ionChange=${(e: any) => (this.newCategory = e.target.value)}>
-            <ion-select-option value="">Sin categoría</ion-select-option>
+          <ion-input placeholder=${t('ui.placeholderName')} .value=${this.newName} @ionInput=${(e: any) => (this.newName = e.target.value)}></ion-input>
+          <ion-input type="number" step="0.01" placeholder=${t('ui.placeholderPrice')} .value=${this.newPrice} @ionInput=${(e: any) => (this.newPrice = e.target.value)}></ion-input>
+          <ion-input type="number" step="1" placeholder=${t('ui.placeholderDuration')} .value=${this.newDuration} @ionInput=${(e: any) => (this.newDuration = e.target.value)}></ion-input>
+          <ion-select placeholder=${t('ui.placeholderCategory')} .value=${this.newCategory} @ionChange=${(e: any) => (this.newCategory = e.target.value)}>
+            <ion-select-option value="">${t('ui.optionNoCategory')}</ion-select-option>
             ${this.categories.map((c) => html`<ion-select-option .value=${c.id}>${c.name}</ion-select-option>`)}
           </ion-select>
-          <ion-button type="submit" size="small" ?disabled=${this.saving || !this.newName}>${this.saving ? 'Guardando…' : 'Añadir'}</ion-button>
+          <ion-button type="submit" size="small" ?disabled=${this.saving || !this.newName}>${this.saving ? t('ui.btnSaving') : t('ui.btnAdd')}</ion-button>
         </form>
         ${this.formError ? html`<p class="err">${this.formError}</p>` : nothing}
         ${this.ctrl?.error ? html`<p class="err">${this.ctrl.error}</p>` : nothing}
-        <ok-data-table .serverSide=${true} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? 'asc'} .searchable=${true} .searchPlaceholder=${"Buscar servicio…"} .actions=${this.actions} .emptyMessage=${this.ctrl?.loading ? 'Cargando…' : 'Sin servicios.'} @rowAction=${(e: CustomEvent) => this.onRowAction(e)} @pageChange=${(e: CustomEvent<number>) => this.ctrl.setPage(e.detail)} @sortChange=${(e: CustomEvent<{ sort: string; dir: 'asc' | 'desc' }>) => this.ctrl.setSort(e.detail.sort, e.detail.dir)} @searchChange=${(e: CustomEvent<string>) => this.ctrl.setSearch(e.detail)} @filterChange=${(e: CustomEvent<{ col: string; value: unknown }>) => this.ctrl.setFilter(e.detail.col, e.detail.value)}></ok-data-table>
+        <ok-data-table .serverSide=${true} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? 'asc'} .searchable=${true} .searchPlaceholder=${t('ui.searchPlaceholder')} .actions=${this.actions} .emptyMessage=${this.ctrl?.loading ? t('ui.loading') : t('ui.empty')} @rowAction=${(e: CustomEvent) => this.onRowAction(e)} @pageChange=${(e: CustomEvent<number>) => this.ctrl.setPage(e.detail)} @sortChange=${(e: CustomEvent<{ sort: string; dir: 'asc' | 'desc' }>) => this.ctrl.setSort(e.detail.sort, e.detail.dir)} @searchChange=${(e: CustomEvent<string>) => this.ctrl.setSearch(e.detail)} @filterChange=${(e: CustomEvent<{ col: string; value: unknown }>) => this.ctrl.setFilter(e.detail.col, e.detail.value)}></ok-data-table>
       </div>`;
   }
 }

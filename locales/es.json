@@ -4,5 +4,26 @@
     "services": {
       "label": "Servicios"
     }
+  },
+  "ui": {
+    "title": "Servicios",
+    "colName": "Nombre",
+    "colCategory": "Categoría",
+    "colPricingType": "Tarifa",
+    "colPrice": "Precio",
+    "colDuration": "Duración (min)",
+    "actionDelete": "Eliminar",
+    "placeholderName": "Nombre",
+    "placeholderPrice": "Precio",
+    "placeholderDuration": "Duración (min)",
+    "placeholderCategory": "Categoría…",
+    "optionNoCategory": "Sin categoría",
+    "btnSaving": "Guardando…",
+    "btnAdd": "Añadir",
+    "searchPlaceholder": "Buscar servicio…",
+    "loading": "Cargando…",
+    "empty": "Sin servicios.",
+    "errorCreate": "No se pudo crear el servicio",
+    "errorDelete": "No se pudo eliminar el servicio"
   }
 }

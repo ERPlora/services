@@ -4,5 +4,26 @@
     "services": {
       "label": "Services"
     }
+  },
+  "ui": {
+    "title": "Services",
+    "colName": "Name",
+    "colCategory": "Category",
+    "colPricingType": "Pricing",
+    "colPrice": "Price",
+    "colDuration": "Duration (min)",
+    "actionDelete": "Delete",
+    "placeholderName": "Name",
+    "placeholderPrice": "Price",
+    "placeholderDuration": "Duration (min)",
+    "placeholderCategory": "Category…",
+    "optionNoCategory": "No category",
+    "btnSaving": "Saving…",
+    "btnAdd": "Add",
+    "searchPlaceholder": "Search service…",
+    "loading": "Loading…",
+    "empty": "No services.",
+    "errorCreate": "Could not create the service",
+    "errorDelete": "Could not delete the service"
   }
 }
