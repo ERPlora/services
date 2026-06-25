@@ -30,6 +30,7 @@ interface Service {
   is_bookable: number;
   category_id: string | null;
   category: string | null;
+  tax_rate_id: string | null;
 }
 
 interface Category {
@@ -37,6 +38,15 @@ interface Category {
   name: string;
   slug: string;
   service_count: number;
+}
+
+// Fila de `taxes.rates.list` (subconjunto que usa el selector del formulario, ADR-0066/0069).
+interface TaxRate {
+  id: string;
+  code: string;
+  name: string;
+  rate_pct: number;
+  tax_type?: string;
 }
 
 function erplora(): ErploraClientLike {
@@ -57,6 +67,8 @@ export class ErpServicesList extends LitElement {
 
   @state() categories: Category[] = [];
 
+  @state() taxRates: TaxRate[] = [];
+
   @state() formError = '';
 
   @state() newName = '';
@@ -66,6 +78,8 @@ export class ErpServicesList extends LitElement {
   @state() newDuration = '';
 
   @state() newCategory = '';
+
+  @state() newTaxRateId = ''; // '' = tipo por defecto del hub (se envía null)
 
   @state() saving = false;
 
@@ -141,6 +155,27 @@ export class ErpServicesList extends LitElement {
     } catch {
       /* categorías opcionales para el alta */
     }
+    // Tipos de IVA/impuesto para el selector (ADR-0066/0069). Best-effort: si falla (módulo `taxes`
+    // no instalado, sin permiso…) el select queda con solo "— (por defecto)" y el alta sigue.
+    try {
+      this.taxRates = (await erplora().query<TaxRate[]>('taxes.rates.list', { page_size: 200 })) ?? [];
+    } catch {
+      this.taxRates = [];
+    }
+  }
+
+  // Opciones del ion-select del IVA: "— (por defecto)" (valor '') + un tipo por fila.
+  // Etiqueta = "Nombre (21%)"; los grupos añaden " · grupo".
+  private taxOptions() {
+    const t = (k: string): string => erplora().t(CATALOG, k);
+    return html`
+      <ion-select-option value="">${t('ui.taxDefault')}</ion-select-option>
+      ${this.taxRates.map(
+        (r) => html`<ion-select-option .value=${r.id}
+          >${r.name} (${r.rate_pct}%)${r.tax_type === 'group' ? ` · ${t('ui.taxGroup')}` : ''}</ion-select-option
+        >`,
+      )}
+    `;
   }
 
   private async createService(ev: Event) {
@@ -169,11 +204,13 @@ export class ErpServicesList extends LitElement {
         sku: '',
         barcode: '',
         notes: '',
+        tax_rate_id: this.newTaxRateId || null,
       });
       this.newName = '';
       this.newPrice = '';
       this.newDuration = '';
       this.newCategory = '';
+      this.newTaxRateId = '';
       await this.ctrl.load(); // (además del evento; garantiza refresco inmediato)
     } catch (e) {
       this.formError = e instanceof Error ? e.message : erplora().t(CATALOG, 'ui.errorCreate');
@@ -207,6 +244,9 @@ export class ErpServicesList extends LitElement {
           <ion-select fill="outline" label-placement="floating" label=${t('ui.colCategory')} placeholder=${t('ui.placeholderCategory')} .value=${this.newCategory} @ionChange=${(e: any) => (this.newCategory = e.target.value)}>
             <ion-select-option value="">${t('ui.optionNoCategory')}</ion-select-option>
             ${this.categories.map((c) => html`<ion-select-option .value=${c.id}>${c.name}</ion-select-option>`)}
+          </ion-select>
+          <ion-select fill="outline" label-placement="floating" label=${t('ui.colTax')} .value=${this.newTaxRateId} @ionChange=${(e: any) => (this.newTaxRateId = e.target.value)}>
+            ${this.taxOptions()}
           </ion-select>
           <ion-button type="submit" size="small" ?disabled=${this.saving || !this.newName}>${this.saving ? t('ui.btnSaving') : t('ui.btnAdd')}</ion-button>
         </form>

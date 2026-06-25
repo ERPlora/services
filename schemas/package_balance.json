@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "services.packages.balance params",
+  "description": "Parámetros de queries/package_balance.sql. El scope hub_id y :now los inyecta el runtime (§2.5/§2.9).",
+  "type": "object",
+  "properties": {
+    "customer_id": {
+      "type": "string",
+      "description": "Id del cliente cuyo saldo de bonos/paquetes se consulta."
+    }
+  },
+  "required": ["customer_id"],
+  "additionalProperties": false
+}
