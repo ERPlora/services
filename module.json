@@ -68,6 +68,13 @@
       "component": "erp-services-list"
     }
   ],
+  "settings": {
+    "title": "Servicios",
+    "icon": "briefcase-outline",
+    "schema": "schemas/settings_update.json",
+    "get": "services.settings.get",
+    "set": "services.settings.update"
+  },
   "migrations": {
     "sqlite": [
       "migrations/sqlite/001_init.sql",
@@ -488,6 +495,7 @@
       "sql": [
         "commands/settings_upsert.sql"
       ],
+      "schema": "schemas/settings_update.json",
       "ai": {
         "description": "Updates the general settings of the services module"
       }
