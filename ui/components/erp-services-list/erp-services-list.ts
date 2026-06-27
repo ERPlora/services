@@ -40,13 +40,12 @@ interface Category {
   service_count: number;
 }
 
-// Fila de `taxes.rates.list` (subconjunto que usa el selector del formulario, ADR-0066/0069).
-interface TaxRate {
+// Fila de `taxes.categories.list` (la CATEGORÍA fiscal es lo enlazable, ADR-0085).
+interface TaxCategory {
   id: string;
-  code: string;
+  key: string;
   name: string;
-  rate_pct: number;
-  tax_type?: string;
+  is_system?: number;
 }
 
 function erplora(): ErploraClientLike {
@@ -67,7 +66,7 @@ export class ErpServicesList extends LitElement {
 
   @state() categories: Category[] = [];
 
-  @state() taxRates: TaxRate[] = [];
+  @state() taxRates: TaxCategory[] = [];
 
   @state() formError = '';
 
@@ -158,22 +157,20 @@ export class ErpServicesList extends LitElement {
     // Tipos de IVA/impuesto para el selector (ADR-0066/0069). Best-effort: si falla (módulo `taxes`
     // no instalado, sin permiso…) el select queda con solo "— (por defecto)" y el alta sigue.
     try {
-      this.taxRates = (await erplora().query<TaxRate[]>('taxes.rates.list', { page_size: 200 })) ?? [];
+      this.taxRates = (await erplora().query<TaxCategory[]>('taxes.categories.list', { page_size: 200 })) ?? [];
     } catch {
       this.taxRates = [];
     }
   }
 
-  // Opciones del ion-select del IVA: "— (por defecto)" (valor '') + un tipo por fila.
-  // Etiqueta = "Nombre (21%)"; los grupos añaden " · grupo".
+  // Opciones del ion-select de la categoría fiscal: "— (sin categoría)" (valor '') + una categoría
+  // por fila (value = key canónica). El % lo resuelve `taxes` por país+categoría (ADR-0085).
   private taxOptions() {
     const t = (k: string): string => erplora().t(CATALOG, k);
     return html`
       <ion-select-option value="">${t('ui.taxDefault')}</ion-select-option>
       ${this.taxRates.map(
-        (r) => html`<ion-select-option .value=${r.id}
-          >${r.name} (${r.rate_pct}%)${r.tax_type === 'group' ? ` · ${t('ui.taxGroup')}` : ''}</ion-select-option
-        >`,
+        (c) => html`<ion-select-option .value=${c.key}>${c.name} (${c.key})</ion-select-option>`,
       )}
     `;
   }
