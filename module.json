@@ -1,7 +1,7 @@
 {
   "id": "services",
   "name": "Services",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "agent": {
     "description": "Manages the service catalogue: create, update and delete services, categories, and service packages; list available services and packages; configure module settings.",
     "keywords": [
@@ -342,7 +342,15 @@
       "ai": {
         "description": "Creates a new service in the catalogue"
       },
-      "expose_api": true
+      "expose_api": true,
+      "validates": [
+        {
+          "field": "tax_category_key",
+          "query": "taxes.categories.get",
+          "param": "key",
+          "optional": true
+        }
+      ]
     },
     "services.services.update": {
       "permission": "services.change_service",
@@ -356,7 +364,15 @@
       "ai": {
         "description": "Updates the details of an existing service"
       },
-      "expose_api": true
+      "expose_api": true,
+      "validates": [
+        {
+          "field": "tax_category_key",
+          "query": "taxes.categories.get",
+          "param": "key",
+          "optional": true
+        }
+      ]
     },
     "services.services.delete": {
       "permission": "services.delete_service",
@@ -500,7 +516,15 @@
       "schema": "schemas/settings_update.json",
       "ai": {
         "description": "Updates the general settings of the services module"
-      }
+      },
+      "validates": [
+        {
+          "field": "default_tax_category_key",
+          "query": "taxes.categories.get",
+          "param": "key",
+          "optional": true
+        }
+      ]
     }
   },
   "ui": {
