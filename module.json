@@ -78,14 +78,14 @@
   "migrations": {
     "sqlite": [
       "migrations/sqlite/001_init.sql",
-      "migrations/sqlite/002_tax_category_key.sql",
+      "migrations/sqlite/002_tax_rate_id.sql",
       "migrations/sqlite/003_package_redemption.sql",
       "migrations/sqlite/004_discount_split.sql",
       "migrations/sqlite/005_tax_category_key.sql"
     ],
     "postgres": [
       "migrations/postgres/001_init.sql",
-      "migrations/postgres/002_tax_category_key.sql",
+      "migrations/postgres/002_tax_rate_id.sql",
       "migrations/postgres/003_package_redemption.sql",
       "migrations/postgres/004_discount_split.sql",
       "migrations/postgres/005_tax_category_key.sql"
