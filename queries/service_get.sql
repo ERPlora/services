@@ -1,6 +1,6 @@
 -- Un servicio por id (scope hub_id). Portado de ServiceCatalogService.get_service.
 SELECT id, name, slug, description, short_description, category_id,
-       pricing_type, price, min_price, max_price, cost, tax_rate_id,
+       pricing_type, price, min_price, max_price, cost, tax_category_key,
        duration_minutes, buffer_before, buffer_after, max_capacity,
        image, icon, color, is_bookable, requires_confirmation,
        allow_online_booking, sort_order, is_active, is_featured, sku, barcode, notes

@@ -3,17 +3,17 @@
 -- Runtime inyecta :new_id, :hub_id, :current_user_id, :now. La UI/SDK envía SIEMPRE el
 -- conjunto completo de campos (rellenando con los actuales/defaults los no tocados).
 INSERT INTO services_settings
-  (id, hub_id, default_duration, default_buffer_time, default_tax_rate_id,
+  (id, hub_id, default_duration, default_buffer_time, default_tax_category_key,
    show_prices, show_duration, allow_online_booking, include_tax_in_price, currency,
    is_deleted, created_by, updated_by, created_at, updated_at)
 VALUES
-  (:new_id, :hub_id, :default_duration, :default_buffer_time, :default_tax_rate_id,
+  (:new_id, :hub_id, :default_duration, :default_buffer_time, :default_tax_category_key,
    :show_prices, :show_duration, :allow_online_booking, :include_tax_in_price, :currency,
    0, :current_user_id, :current_user_id, :now, :now)
 ON CONFLICT (hub_id) DO UPDATE SET
   default_duration     = :default_duration,
   default_buffer_time  = :default_buffer_time,
-  default_tax_rate_id  = :default_tax_rate_id,
+  default_tax_category_key  = :default_tax_category_key,
   show_prices          = :show_prices,
   show_duration        = :show_duration,
   allow_online_booking = :allow_online_booking,

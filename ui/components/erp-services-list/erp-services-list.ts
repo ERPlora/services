@@ -30,7 +30,7 @@ interface Service {
   is_bookable: number;
   category_id: string | null;
   category: string | null;
-  tax_rate_id: string | null;
+  tax_category_key: string | null;
 }
 
 interface Category {
@@ -204,7 +204,7 @@ export class ErpServicesList extends LitElement {
         sku: '',
         barcode: '',
         notes: '',
-        tax_rate_id: this.newTaxRateId || null,
+        tax_category_key: this.newTaxRateId || null,
       });
       this.newName = '';
       this.newPrice = '';

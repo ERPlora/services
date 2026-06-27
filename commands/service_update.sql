@@ -13,7 +13,7 @@ UPDATE services_service SET
   is_bookable      = :is_bookable,
   is_active        = :is_active,
   sort_order       = :sort_order,
-  tax_rate_id      = :tax_rate_id,
+  tax_category_key      = :tax_category_key,
   updated_by       = :current_user_id,
   updated_at       = :now
 WHERE id = :service_id AND hub_id = :hub_id AND is_deleted = 0;
