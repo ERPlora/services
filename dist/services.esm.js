@@ -3134,7 +3134,7 @@ var ErpServicesList = class extends i3 {
     } catch {
     }
     try {
-      this.taxRates = await erplora().query("taxes.categories.list", { page_size: 200 }) ?? [];
+      this.taxRates = await erplora().queryAll("taxes.categories.list", { sort: "name", dir: "asc" });
     } catch {
       this.taxRates = [];
     }

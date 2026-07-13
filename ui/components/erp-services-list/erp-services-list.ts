@@ -13,6 +13,10 @@ const CATALOG: Record<string, unknown> = { es: esLocale, en: enLocale };
 
 interface ErploraClientLike extends ListClient {
   query<T = unknown>(name: string, params?: Record<string, unknown>): Promise<T>;
+  /** TODAS las filas, sin tope (salvo que pases `limit`). Para lo que no es «una página»: la
+   *  rejilla de productos del TPV, un `<ion-select>` de categorías fiscales, el mapa
+   *  producto↔categoría. El viejo `page_size` NO era un parámetro del runtime: truncaba a 50. */
+  queryAll<T = unknown>(name: string, params?: Record<string, unknown>): Promise<T[]>;
   queryPage<R = unknown>(name: string, params: ListParams): Promise<ListPage<R>>;
   command<T = unknown>(name: string, payload?: Record<string, unknown>): Promise<T>;
   on(event: string, cb: (payload: unknown) => void): () => void;
@@ -157,7 +161,7 @@ export class ErpServicesList extends LitElement {
     // Tipos de IVA/impuesto para el selector (ADR-0066/0069). Best-effort: si falla (módulo `taxes`
     // no instalado, sin permiso…) el select queda con solo "— (por defecto)" y el alta sigue.
     try {
-      this.taxRates = (await erplora().query<TaxCategory[]>('taxes.categories.list', { page_size: 200 })) ?? [];
+      this.taxRates = await erplora().queryAll<TaxCategory>('taxes.categories.list', { sort: 'name', dir: 'asc' });
     } catch {
       this.taxRates = [];
     }
