@@ -1,7 +1,7 @@
 {
   "id": "services",
   "name": "Services",
-  "version": "1.1.10",
+  "version": "1.5.0",
   "agent": {
     "description": "Manages the service catalogue: create, update and delete services, categories, and service packages; list available services and packages; configure module settings.",
     "keywords": [
@@ -14,7 +14,9 @@
       "price"
     ]
   },
-  "depends_on": [],
+  "depends_on": [
+    "taxes"
+  ],
   "permissions": [
     "services.view_service",
     "services.add_service",
@@ -28,6 +30,8 @@
     "services.add_package",
     "services.change_package",
     "services.delete_package",
+    "services.redeem_package",
+    "services.view_package_balance",
     "services.manage_settings"
   ],
   "role_permissions": {
@@ -43,13 +47,17 @@
       "services.change_category",
       "services.view_package",
       "services.add_package",
-      "services.change_package"
+      "services.change_package",
+      "services.redeem_package",
+      "services.view_package_balance"
     ],
     "employee": [
       "services.view_service",
       "services.add_service",
       "services.view_category",
-      "services.view_package"
+      "services.view_package",
+      "services.redeem_package",
+      "services.view_package_balance"
     ]
   },
   "navigation": [
@@ -60,9 +68,27 @@
       "component": "erp-services-list"
     }
   ],
+  "settings": {
+    "title": "Servicios",
+    "icon": "briefcase-outline",
+    "schema": "schemas/settings_update.json",
+    "get": "services.settings.get",
+    "set": "services.settings.update"
+  },
   "migrations": {
     "sqlite": [
-      "migrations/sqlite/001_init.sql"
+      "migrations/sqlite/001_init.sql",
+      "migrations/sqlite/002_tax_rate_id.sql",
+      "migrations/sqlite/003_package_redemption.sql",
+      "migrations/sqlite/004_discount_split.sql",
+      "migrations/sqlite/005_tax_category_key.sql"
+    ],
+    "postgres": [
+      "migrations/postgres/001_init.sql",
+      "migrations/postgres/002_tax_rate_id.sql",
+      "migrations/postgres/003_package_redemption.sql",
+      "migrations/postgres/004_discount_split.sql",
+      "migrations/postgres/005_tax_category_key.sql"
     ]
   },
   "queries": {
@@ -112,7 +138,8 @@
       },
       "ai": {
         "description": "Lists the services available in the catalogue"
-      }
+      },
+      "expose_api": true
     },
     "services.services.get": {
       "permission": "services.view_service",
@@ -120,7 +147,8 @@
       "schema": "schemas/service_get.json",
       "ai": {
         "description": "Retrieves the full detail of a service by its identifier"
-      }
+      },
+      "expose_api": true
     },
     "services.categories.list": {
       "permission": "services.view_category",
@@ -169,7 +197,8 @@
       },
       "ai": {
         "description": "Lists the defined service categories"
-      }
+      },
+      "expose_api": true
     },
     "services.packages.list": {
       "permission": "services.view_package",
@@ -184,7 +213,8 @@
           "name",
           "slug",
           "discount_type",
-          "discount_value",
+          "discount_percent",
+          "discount_amount_cents",
           "fixed_price",
           "is_active",
           "items"
@@ -201,7 +231,10 @@
           "discount_type": {
             "op": "range"
           },
-          "discount_value": {
+          "discount_percent": {
+            "op": "range"
+          },
+          "discount_amount_cents": {
             "op": "range"
           },
           "fixed_price": {
@@ -218,7 +251,8 @@
       },
       "ai": {
         "description": "Lists the available service packages"
-      }
+      },
+      "expose_api": true
     },
     "services.packages.get": {
       "permission": "services.view_package",
@@ -226,7 +260,26 @@
       "schema": "schemas/package_get.json",
       "ai": {
         "description": "Retrieves the full detail of a service package by its identifier"
-      }
+      },
+      "expose_api": true
+    },
+    "services.packages.balance": {
+      "permission": "services.view_package_balance",
+      "sql": "queries/package_balance.sql",
+      "schema": "schemas/package_balance.json",
+      "ai": {
+        "description": "Returns the remaining uses and validity of a customer's service packages (bonos)"
+      },
+      "expose_api": true
+    },
+    "services.packages.redeem_check": {
+      "permission": "services.redeem_package",
+      "sql": "queries/package_redeem_check.sql",
+      "schema": "schemas/package_redeem_check.json",
+      "ai": {
+        "description": "Checks whether one use of a customer's package (bono) could be redeemed and, if not, returns the business reason (package_not_found, no_uses_left or expired) instead of the raw gate error."
+      },
+      "expose_api": true
     },
     "services.package_items.list": {
       "permission": "services.view_package",
@@ -265,7 +318,8 @@
       },
       "ai": {
         "description": "Lists the individual services included in a package"
-      }
+      },
+      "expose_api": true
     },
     "services.settings.get": {
       "permission": "services.view_service",
@@ -287,7 +341,16 @@
       ],
       "ai": {
         "description": "Creates a new service in the catalogue"
-      }
+      },
+      "expose_api": true,
+      "validates": [
+        {
+          "field": "tax_category_key",
+          "query": "taxes.categories.get",
+          "param": "key",
+          "optional": true
+        }
+      ]
     },
     "services.services.update": {
       "permission": "services.change_service",
@@ -300,7 +363,16 @@
       ],
       "ai": {
         "description": "Updates the details of an existing service"
-      }
+      },
+      "expose_api": true,
+      "validates": [
+        {
+          "field": "tax_category_key",
+          "query": "taxes.categories.get",
+          "param": "key",
+          "optional": true
+        }
+      ]
     },
     "services.services.delete": {
       "permission": "services.delete_service",
@@ -340,7 +412,8 @@
       ],
       "ai": {
         "description": "Creates a new service category"
-      }
+      },
+      "expose_api": true
     },
     "services.categories.update": {
       "permission": "services.change_category",
@@ -350,7 +423,8 @@
       ],
       "ai": {
         "description": "Updates the details of an existing service category"
-      }
+      },
+      "expose_api": true
     },
     "services.categories.delete": {
       "permission": "services.delete_category",
@@ -374,7 +448,8 @@
       ],
       "ai": {
         "description": "Creates a new package grouping multiple services together"
-      }
+      },
+      "expose_api": true
     },
     "services.packages.update": {
       "permission": "services.change_package",
@@ -387,7 +462,8 @@
       ],
       "ai": {
         "description": "Updates the details of an existing service package"
-      }
+      },
+      "expose_api": true
     },
     "services.packages.delete": {
       "permission": "services.delete_package",
@@ -401,6 +477,23 @@
       "ai": {
         "description": "Deletes a service package (destructive)"
       }
+    },
+    "services.packages.redeem": {
+      "permission": "services.redeem_package",
+      "transaction": true,
+      "sql": [
+        "commands/_redeem_insert.sql",
+        "commands/_redeem_assert.sql",
+        "commands/_gate_clear.sql"
+      ],
+      "schema": "schemas/package_redeem.json",
+      "emit": [
+        "services.package.redeemed"
+      ],
+      "ai": {
+        "description": "Consumes one use of a customer's service package (bono); rejects if no uses remain or it has expired"
+      },
+      "expose_api": true
     },
     "services._insert_package": {
       "permission": "services.add_package",
@@ -420,9 +513,18 @@
       "sql": [
         "commands/settings_upsert.sql"
       ],
+      "schema": "schemas/settings_update.json",
       "ai": {
         "description": "Updates the general settings of the services module"
-      }
+      },
+      "validates": [
+        {
+          "field": "default_tax_category_key",
+          "query": "taxes.categories.get",
+          "param": "key",
+          "optional": true
+        }
+      ]
     }
   },
   "ui": {

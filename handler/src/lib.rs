@@ -54,8 +54,8 @@ pub fn create_package(input: Json<erplora_guest_sdk::Input>) -> FnResult<Json<Ha
 // El DINERO lo redondea `erplora_guest_sdk::money` (ADR-0123): unidad mínima, HALF_UP, uno solo
 // para todo el hub. Este módulo tenía su propio `round_cents` (half-even sobre `f64`).
 
-/// Redondeo a 2 decimales half-even — usado SOLO para `discount_value`, que es
-/// polimórfico (porcentaje | euros) y se almacena como REAL (no es céntimos).
+/// Redondeo a 2 decimales half-even — usado para `discount_percent` (el %), que se
+/// almacena como REAL (no es céntimos). El importe fijo va por `round_cents` → céntimos.
 fn round2(x: f64) -> f64 {
     let scaled = x * 100.0;
     let floor = scaled.floor();
@@ -311,9 +311,33 @@ pub fn create_package_pure(input: Value) -> Result<HandlerOutput, String> {
         return Err("discount_type must be 'percentage' or 'fixed'".to_string());
     }
 
-    let discount_value = parse_decimal(payload.get("discount_value"))
-        .map_err(|_| "Invalid discount_value".to_string())?
-        .unwrap_or(0.0);
+    // Descuento TIPADO (migración 004): el % y el importe fijo viven en columnas separadas en
+    // vez del antiguo `discount_value` polimórfico.
+    //   * discount_percent      → REAL  (% cuando discount_type = 'percentage').
+    //   * discount_amount_cents → INTEGER céntimos (cuando discount_type = 'fixed').
+    // Compat: si el caller aún manda el legado `discount_value` (% o euros según el tipo) y NO
+    // las columnas nuevas, lo derivamos al campo tipado que corresponda.
+    let legacy_discount_value = parse_decimal(payload.get("discount_value"))
+        .map_err(|_| "Invalid discount_value".to_string())?;
+
+    let discount_percent = match parse_decimal(payload.get("discount_percent"))
+        .map_err(|_| "Invalid discount_percent".to_string())?
+    {
+        Some(p) => p,
+        None if discount_type == "percentage" => legacy_discount_value.unwrap_or(0.0),
+        None => 0.0,
+    };
+
+    let discount_amount_cents = match parse_int(payload.get("discount_amount_cents")).ok().flatten()
+    {
+        Some(c) => c,
+        None if discount_type == "fixed" => {
+            // legado: discount_value venía en EUROS → a céntimos (×100; round_cents espera
+            // el valor ya en el espacio de céntimos, half-even).
+            round_cents(legacy_discount_value.unwrap_or(0.0) * 100.0)
+        }
+        None => 0,
+    };
 
     let fixed_price = parse_decimal(payload.get("fixed_price"))
         .map_err(|_| "Invalid fixed_price".to_string())?;
@@ -334,8 +358,9 @@ pub fn create_package_pure(input: Value) -> Result<HandlerOutput, String> {
     h.insert("slug".into(), json!(slugify(&name)));
     h.insert("description".into(), json!(str_field(&payload, "description")));
     h.insert("discount_type".into(), json!(discount_type));
-    // discount_value es polimórfico (porcentaje | euros) → REAL, no céntimos.
-    h.insert("discount_value".into(), json!(round2(discount_value)));
+    // Descuento tipado (migración 004): % → REAL; importe fijo → céntimos (INTEGER).
+    h.insert("discount_percent".into(), json!(round2(discount_percent)));
+    h.insert("discount_amount_cents".into(), json!(discount_amount_cents));
     // fixed_price es dinero → céntimos (input cents).
     h.insert(
         "fixed_price".into(),
@@ -378,4 +403,77 @@ pub fn create_package_pure(input: Value) -> Result<HandlerOutput, String> {
         events: vec![],
         result: json!({ "id": package_id, "name": name, "created": true }),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn input(payload: Value) -> Value {
+        json!({ "payload": payload, "context": { "new_ids": ["pkg-1", "li-1", "li-2"] } })
+    }
+
+    /// Devuelve los params del primer op (`services._insert_package`).
+    fn header_params(out: &HandlerOutput) -> &Map<String, Value> {
+        assert_eq!(out.operations[0].command, "services._insert_package");
+        &out.operations[0].params
+    }
+
+    #[test]
+    fn split_percentage_goes_to_discount_percent() {
+        let out = create_package_pure(input(json!({
+            "name": "Bono 5 cortes",
+            "discount_type": "percentage",
+            "discount_percent": 10.0
+        })))
+        .unwrap();
+        let p = header_params(&out);
+        assert_eq!(p["discount_type"], json!("percentage"));
+        assert_eq!(p["discount_percent"], json!(10.0));
+        assert_eq!(p["discount_amount_cents"], json!(0));
+        // ya NO se emite el campo polimórfico legado.
+        assert!(p.get("discount_value").is_none());
+    }
+
+    #[test]
+    fn split_fixed_goes_to_amount_cents() {
+        let out = create_package_pure(input(json!({
+            "name": "Bono fijo",
+            "discount_type": "fixed",
+            "discount_amount_cents": 1500
+        })))
+        .unwrap();
+        let p = header_params(&out);
+        assert_eq!(p["discount_type"], json!("fixed"));
+        assert_eq!(p["discount_amount_cents"], json!(1500));
+        assert_eq!(p["discount_percent"], json!(0.0));
+    }
+
+    #[test]
+    fn legacy_discount_value_percentage_is_migrated() {
+        // Caller antiguo: solo manda discount_value (= % porque el tipo es percentage).
+        let out = create_package_pure(input(json!({
+            "name": "Legado %",
+            "discount_type": "percentage",
+            "discount_value": 25.0
+        })))
+        .unwrap();
+        let p = header_params(&out);
+        assert_eq!(p["discount_percent"], json!(25.0));
+        assert_eq!(p["discount_amount_cents"], json!(0));
+    }
+
+    #[test]
+    fn legacy_discount_value_fixed_euros_to_cents() {
+        // Caller antiguo: discount_value = 12.50 EUROS con tipo fixed → 1250 céntimos.
+        let out = create_package_pure(input(json!({
+            "name": "Legado fijo",
+            "discount_type": "fixed",
+            "discount_value": 12.50
+        })))
+        .unwrap();
+        let p = header_params(&out);
+        assert_eq!(p["discount_amount_cents"], json!(1250));
+        assert_eq!(p["discount_percent"], json!(0.0));
+    }
 }

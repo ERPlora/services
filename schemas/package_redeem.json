@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "services.packages.redeem params",
+  "description": "Parámetros del command commands/_redeem_insert.sql: consume 1 uso de un paquete por un cliente. El scope hub_id, :now y :new_id los inyecta el runtime (§2.5/§2.9). El consumo se RECHAZA (revierte) si el paquete no existe/está inactivo, si se superó max_uses o si caducó (validity_days desde el primer uso).",
+  "type": "object",
+  "properties": {
+    "package_id": {
+      "type": "string",
+      "description": "Id del paquete/bono a consumir."
+    },
+    "customer_id": {
+      "type": "string",
+      "description": "Id del cliente que consume el uso."
+    },
+    "appointment_id": {
+      "type": ["string", "null"],
+      "description": "Id de la cita contra la que se consume (opcional)."
+    },
+    "sale_id": {
+      "type": ["string", "null"],
+      "description": "Id de la venta/ticket contra el que se consume (opcional)."
+    },
+    "note": {
+      "type": ["string", "null"],
+      "description": "Nota libre del consumo (opcional)."
+    }
+  },
+  "required": ["package_id", "customer_id"],
+  "additionalProperties": false
+}
