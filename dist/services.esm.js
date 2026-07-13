@@ -2989,6 +2989,13 @@ var es_default = {
     colName: "Nombre",
     colCategory: "Categor\xEDa",
     colPricingType: "Tarifa",
+    pricingType: {
+      fixed: "Precio fijo",
+      hourly: "Por hora",
+      from: "Desde",
+      variable: "Variable",
+      free: "Gratis"
+    },
     colPrice: "Precio",
     colDuration: "Duraci\xF3n (min)",
     actionDelete: "Eliminar",
@@ -3023,6 +3030,13 @@ var en_default = {
     colName: "Name",
     colCategory: "Category",
     colPricingType: "Pricing",
+    pricingType: {
+      fixed: "Fixed price",
+      hourly: "Hourly",
+      from: "From",
+      variable: "Variable",
+      free: "Free"
+    },
     colPrice: "Price",
     colDuration: "Duration (min)",
     actionDelete: "Delete",
@@ -3046,6 +3060,7 @@ var en_default = {
 
 // modules/services/ui/components/erp-services-list/erp-services-list.ts
 var CATALOG = { es: es_default, en: en_default };
+var PRICING_TYPES = ["fixed", "hourly", "from", "variable", "free"];
 function erplora() {
   const c5 = globalThis.erplora;
   if (!c5) throw new Error("erplora SDK no inicializado por el shell");
@@ -3073,11 +3088,13 @@ var ErpServicesList = class extends i3 {
   }
   static {
     this.styles = i`
-    :host { display:block; font-family: system-ui, sans-serif; color: var(--ion-text-color, #1c1b18); }
-    header { display:flex; gap:.5rem; align-items:center; margin-bottom:.75rem; }
-    h2 { margin:0; font-size:1.15rem; flex:1; }
-    .form { display:flex; gap:.75rem; flex-wrap:wrap; align-items:end; margin:.5rem 0 1.25rem; }
-    .form ion-input, .form ion-select { flex:1 1 11rem; min-width:9rem; }
+    :host { display:flex; flex-direction:column; height:100%; min-height:0; font-family: system-ui, sans-serif; color: var(--ion-text-color, #1c1b18); }
+    /* La vista llena el alto: el data-table ocupa todo (scroll interno, pie fijo). */
+    .page { display:flex; flex-direction:column; min-height:0; flex:1 1 auto; }
+    .page > ok-data-table { flex:1 1 auto; min-height:0; }
+    /* El alta vive en el panel lateral de la tabla (estrecho): los campos van APILADOS. */
+    .form { display:flex; flex-direction:column; gap:.7rem; }
+    .form ion-button { align-self:flex-end; }
     .err { color:#d9480f; font-weight:600; }
   `;
   }
@@ -3085,8 +3102,26 @@ var ErpServicesList = class extends i3 {
     const t5 = (k2) => erplora().t(CATALOG, k2);
     return [
       { key: "name", header: t5("ui.colName"), sortable: true, filterable: true, filterType: "text" },
-      { key: "category", header: t5("ui.colCategory"), sortable: true, filterable: true, filterType: "text", format: (r6) => r6.category ?? "\u2014" },
-      { key: "pricing_type", header: t5("ui.colPricingType"), sortable: true, filterable: true, filterType: "text" },
+      {
+        key: "category",
+        header: t5("ui.colCategory"),
+        sortable: true,
+        filterable: true,
+        // Dominio cerrado (las categorías del hub). El servidor filtra por el NOMBRE de la
+        // categoría (`category`, `op: eq`), no por su id: el `value` de la opción es el nombre.
+        filterType: "select",
+        options: this.categories.map((c5) => ({ value: c5.name, label: c5.name })),
+        format: (r6) => r6.category ?? "\u2014"
+      },
+      {
+        key: "pricing_type",
+        header: t5("ui.colPricingType"),
+        sortable: true,
+        filterable: true,
+        filterType: "select",
+        options: PRICING_TYPES.map((v3) => ({ value: v3, label: t5(`ui.pricingType.${v3}`) })),
+        format: (r6) => t5(`ui.pricingType.${String(r6.pricing_type)}`)
+      },
       {
         key: "price",
         header: t5("ui.colPrice"),
@@ -3150,6 +3185,10 @@ var ErpServicesList = class extends i3 {
     )}
     `;
   }
+  // Referencia al ok-data-table para abrir/cerrar su panel lateral (el alta se proyecta dentro).
+  dataTable() {
+    return this.renderRoot.querySelector("ok-data-table");
+  }
   async createService(ev) {
     ev.preventDefault();
     if (!this.newName.trim()) return;
@@ -3183,6 +3222,7 @@ var ErpServicesList = class extends i3 {
       this.newDuration = "";
       this.newCategory = "";
       this.newTaxRateId = "";
+      this.dataTable()?.close();
       await this.ctrl.load();
     } catch (e5) {
       this.formError = e5 instanceof Error ? e5.message : erplora().t(CATALOG, "ui.errorCreate");
@@ -3201,28 +3241,29 @@ var ErpServicesList = class extends i3 {
       this.formError = e5 instanceof Error ? e5.message : erplora().t(CATALOG, "ui.errorDelete");
     }
   }
+  // El título de la vista lo pinta el topbar del shell: repetirlo aquí lo duplicaba en pantalla.
   render() {
     const t5 = (k2) => erplora().t(CATALOG, k2);
-    return b2`<div>
-        <header>
-          <h2>${t5("ui.title")}</h2>
-        </header>
-        <form class="form" @submit=${(e5) => this.createService(e5)}>
-          <ion-input fill="outline" label-placement="floating" label=${t5("ui.colName")} .value=${this.newName} @ionInput=${(e5) => this.newName = e5.target.value}></ion-input>
-          <ion-input fill="outline" label-placement="floating" label=${t5("ui.colPrice")} type="number" step="0.01" .value=${this.newPrice} @ionInput=${(e5) => this.newPrice = e5.target.value}></ion-input>
-          <ion-input fill="outline" label-placement="floating" label=${t5("ui.colDuration")} type="number" step="1" .value=${this.newDuration} @ionInput=${(e5) => this.newDuration = e5.target.value}></ion-input>
-          <ion-select fill="outline" label-placement="floating" label=${t5("ui.colCategory")} placeholder=${t5("ui.placeholderCategory")} .value=${this.newCategory} @ionChange=${(e5) => this.newCategory = e5.target.value}>
-            <ion-select-option value="">${t5("ui.optionNoCategory")}</ion-select-option>
-            ${this.categories.map((c5) => b2`<ion-select-option .value=${c5.id}>${c5.name}</ion-select-option>`)}
-          </ion-select>
-          <ion-select fill="outline" label-placement="floating" label=${t5("ui.colTax")} .value=${this.newTaxRateId} @ionChange=${(e5) => this.newTaxRateId = e5.target.value}>
-            ${this.taxOptions()}
-          </ion-select>
-          <ion-button type="submit" size="small" ?disabled=${this.saving || !this.newName}>${this.saving ? t5("ui.btnSaving") : t5("ui.btnAdd")}</ion-button>
-        </form>
+    return b2`<div class="page">
         ${this.formError ? b2`<p class="err">${this.formError}</p>` : A}
         ${this.ctrl?.error ? b2`<p class="err">${this.ctrl.error}</p>` : A}
-        <ok-data-table .serverSide=${true} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "asc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchPlaceholder")} .actions=${this.actions} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.empty")} @rowAction=${(e5) => this.onRowAction(e5)} @pageChange=${(e5) => this.ctrl.setPage(e5.detail)} @sortChange=${(e5) => this.ctrl.setSort(e5.detail.sort, e5.detail.dir)} @searchChange=${(e5) => this.ctrl.setSearch(e5.detail)} @filterChange=${(e5) => this.ctrl.setFilter(e5.detail.col, e5.detail.value)}></ok-data-table>
+        <ok-data-table .serverSide=${true} .fill=${true} .addable=${true} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "asc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchPlaceholder")} .actions=${this.actions} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.empty")} @rowAction=${(e5) => this.onRowAction(e5)} @pageChange=${(e5) => this.ctrl.setPage(e5.detail)} @pageSizeChange=${(e5) => this.ctrl.setPageSize(e5.detail)} @sortChange=${(e5) => this.ctrl.setSort(e5.detail.sort, e5.detail.dir)} @searchChange=${(e5) => this.ctrl.setSearch(e5.detail)} @filterChange=${(e5) => this.ctrl.setFilter(e5.detail.col, e5.detail.value)}>
+          <!-- Alta: se proyecta SIEMPRE (aunque el panel esté cerrado); si solo se pintara al abrir,
+               el «+» de la barra desplegaría un panel vacío. -->
+          <form slot="create" class="form" @submit=${(e5) => this.createService(e5)}>
+            <ion-input fill="outline" label-placement="floating" label=${t5("ui.colName")} .value=${this.newName} @ionInput=${(e5) => this.newName = e5.target.value}></ion-input>
+            <ion-input fill="outline" label-placement="floating" label=${t5("ui.colPrice")} type="number" step="0.01" .value=${this.newPrice} @ionInput=${(e5) => this.newPrice = e5.target.value}></ion-input>
+            <ion-input fill="outline" label-placement="floating" label=${t5("ui.colDuration")} type="number" step="1" .value=${this.newDuration} @ionInput=${(e5) => this.newDuration = e5.target.value}></ion-input>
+            <ion-select fill="outline" label-placement="floating" label=${t5("ui.colCategory")} placeholder=${t5("ui.placeholderCategory")} .value=${this.newCategory} @ionChange=${(e5) => this.newCategory = e5.target.value}>
+              <ion-select-option value="">${t5("ui.optionNoCategory")}</ion-select-option>
+              ${this.categories.map((c5) => b2`<ion-select-option .value=${c5.id}>${c5.name}</ion-select-option>`)}
+            </ion-select>
+            <ion-select fill="outline" label-placement="floating" label=${t5("ui.colTax")} .value=${this.newTaxRateId} @ionChange=${(e5) => this.newTaxRateId = e5.target.value}>
+              ${this.taxOptions()}
+            </ion-select>
+            <ion-button type="submit" ?disabled=${this.saving || !this.newName}>${this.saving ? t5("ui.btnSaving") : t5("ui.btnAdd")}</ion-button>
+          </form>
+        </ok-data-table>
       </div>`;
   }
 };

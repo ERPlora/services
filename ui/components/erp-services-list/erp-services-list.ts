@@ -52,6 +52,10 @@ interface TaxCategory {
   is_system?: number;
 }
 
+// Dominio cerrado de la tarifa (migrations/*/001_init.sql: fixed|hourly|from|variable|free): se
+// ELIGE, no se teclea, y el servidor lo declara `op: eq` → el filtro `select` es real.
+const PRICING_TYPES = ['fixed', 'hourly', 'from', 'variable', 'free'];
+
 function erplora(): ErploraClientLike {
   const c = (globalThis as { erplora?: ErploraClientLike }).erplora;
   if (!c) throw new Error('erplora SDK no inicializado por el shell');
@@ -60,11 +64,13 @@ function erplora(): ErploraClientLike {
 
 export class ErpServicesList extends LitElement {
   static styles = css`
-    :host { display:block; font-family: system-ui, sans-serif; color: var(--ion-text-color, #1c1b18); }
-    header { display:flex; gap:.5rem; align-items:center; margin-bottom:.75rem; }
-    h2 { margin:0; font-size:1.15rem; flex:1; }
-    .form { display:flex; gap:.75rem; flex-wrap:wrap; align-items:end; margin:.5rem 0 1.25rem; }
-    .form ion-input, .form ion-select { flex:1 1 11rem; min-width:9rem; }
+    :host { display:flex; flex-direction:column; height:100%; min-height:0; font-family: system-ui, sans-serif; color: var(--ion-text-color, #1c1b18); }
+    /* La vista llena el alto: el data-table ocupa todo (scroll interno, pie fijo). */
+    .page { display:flex; flex-direction:column; min-height:0; flex:1 1 auto; }
+    .page > ok-data-table { flex:1 1 auto; min-height:0; }
+    /* El alta vive en el panel lateral de la tabla (estrecho): los campos van APILADOS. */
+    .form { display:flex; flex-direction:column; gap:.7rem; }
+    .form ion-button { align-self:flex-end; }
     .err { color:#d9480f; font-weight:600; }
   `;
 
@@ -96,8 +102,26 @@ export class ErpServicesList extends LitElement {
     const t = (k: string): string => erplora().t(CATALOG, k);
     return [
       { key: 'name', header: t('ui.colName'), sortable: true, filterable: true, filterType: 'text' },
-      { key: 'category', header: t('ui.colCategory'), sortable: true, filterable: true, filterType: 'text', format: (r) => (r.category as string) ?? '—' },
-      { key: 'pricing_type', header: t('ui.colPricingType'), sortable: true, filterable: true, filterType: 'text' },
+      {
+        key: 'category',
+        header: t('ui.colCategory'),
+        sortable: true,
+        filterable: true,
+        // Dominio cerrado (las categorías del hub). El servidor filtra por el NOMBRE de la
+        // categoría (`category`, `op: eq`), no por su id: el `value` de la opción es el nombre.
+        filterType: 'select',
+        options: this.categories.map((c) => ({ value: c.name, label: c.name })),
+        format: (r) => (r.category as string) ?? '—',
+      },
+      {
+        key: 'pricing_type',
+        header: t('ui.colPricingType'),
+        sortable: true,
+        filterable: true,
+        filterType: 'select',
+        options: PRICING_TYPES.map((v) => ({ value: v, label: t(`ui.pricingType.${v}`) })),
+        format: (r) => t(`ui.pricingType.${String(r.pricing_type)}`),
+      },
       {
         key: 'price',
         header: t('ui.colPrice'),
@@ -179,6 +203,13 @@ export class ErpServicesList extends LitElement {
     `;
   }
 
+  // Referencia al ok-data-table para abrir/cerrar su panel lateral (el alta se proyecta dentro).
+  private dataTable(): { open(p?: 'filters' | 'create'): void; close(): void } | null {
+    return this.renderRoot.querySelector('ok-data-table') as
+      | { open(p?: 'filters' | 'create'): void; close(): void }
+      | null;
+  }
+
   private async createService(ev: Event) {
     ev.preventDefault();
     if (!this.newName.trim()) return;
@@ -212,6 +243,7 @@ export class ErpServicesList extends LitElement {
       this.newDuration = '';
       this.newCategory = '';
       this.newTaxRateId = '';
+      this.dataTable()?.close(); // el panel de alta se cierra solo tras crear
       await this.ctrl.load(); // (además del evento; garantiza refresco inmediato)
     } catch (e) {
       this.formError = e instanceof Error ? e.message : erplora().t(CATALOG, 'ui.errorCreate');
@@ -232,28 +264,29 @@ export class ErpServicesList extends LitElement {
     }
   }
 
+  // El título de la vista lo pinta el topbar del shell: repetirlo aquí lo duplicaba en pantalla.
   render() {
     const t = (k: string): string => erplora().t(CATALOG, k);
-    return html`<div>
-        <header>
-          <h2>${t('ui.title')}</h2>
-        </header>
-        <form class="form" @submit=${(e) => this.createService(e)}>
-          <ion-input fill="outline" label-placement="floating" label=${t('ui.colName')} .value=${this.newName} @ionInput=${(e: any) => (this.newName = e.target.value)}></ion-input>
-          <ion-input fill="outline" label-placement="floating" label=${t('ui.colPrice')} type="number" step="0.01" .value=${this.newPrice} @ionInput=${(e: any) => (this.newPrice = e.target.value)}></ion-input>
-          <ion-input fill="outline" label-placement="floating" label=${t('ui.colDuration')} type="number" step="1" .value=${this.newDuration} @ionInput=${(e: any) => (this.newDuration = e.target.value)}></ion-input>
-          <ion-select fill="outline" label-placement="floating" label=${t('ui.colCategory')} placeholder=${t('ui.placeholderCategory')} .value=${this.newCategory} @ionChange=${(e: any) => (this.newCategory = e.target.value)}>
-            <ion-select-option value="">${t('ui.optionNoCategory')}</ion-select-option>
-            ${this.categories.map((c) => html`<ion-select-option .value=${c.id}>${c.name}</ion-select-option>`)}
-          </ion-select>
-          <ion-select fill="outline" label-placement="floating" label=${t('ui.colTax')} .value=${this.newTaxRateId} @ionChange=${(e: any) => (this.newTaxRateId = e.target.value)}>
-            ${this.taxOptions()}
-          </ion-select>
-          <ion-button type="submit" size="small" ?disabled=${this.saving || !this.newName}>${this.saving ? t('ui.btnSaving') : t('ui.btnAdd')}</ion-button>
-        </form>
+    return html`<div class="page">
         ${this.formError ? html`<p class="err">${this.formError}</p>` : nothing}
         ${this.ctrl?.error ? html`<p class="err">${this.ctrl.error}</p>` : nothing}
-        <ok-data-table .serverSide=${true} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? 'asc'} .searchable=${true} .searchPlaceholder=${t('ui.searchPlaceholder')} .actions=${this.actions} .emptyMessage=${this.ctrl?.loading ? t('ui.loading') : t('ui.empty')} @rowAction=${(e: CustomEvent) => this.onRowAction(e)} @pageChange=${(e: CustomEvent<number>) => this.ctrl.setPage(e.detail)} @sortChange=${(e: CustomEvent<{ sort: string; dir: 'asc' | 'desc' }>) => this.ctrl.setSort(e.detail.sort, e.detail.dir)} @searchChange=${(e: CustomEvent<string>) => this.ctrl.setSearch(e.detail)} @filterChange=${(e: CustomEvent<{ col: string; value: unknown }>) => this.ctrl.setFilter(e.detail.col, e.detail.value)}></ok-data-table>
+        <ok-data-table .serverSide=${true} .fill=${true} .addable=${true} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? 'asc'} .searchable=${true} .searchPlaceholder=${t('ui.searchPlaceholder')} .actions=${this.actions} .emptyMessage=${this.ctrl?.loading ? t('ui.loading') : t('ui.empty')} @rowAction=${(e: CustomEvent) => this.onRowAction(e)} @pageChange=${(e: CustomEvent<number>) => this.ctrl.setPage(e.detail)} @pageSizeChange=${(e: CustomEvent<number>) => this.ctrl.setPageSize(e.detail)} @sortChange=${(e: CustomEvent<{ sort: string; dir: 'asc' | 'desc' }>) => this.ctrl.setSort(e.detail.sort, e.detail.dir)} @searchChange=${(e: CustomEvent<string>) => this.ctrl.setSearch(e.detail)} @filterChange=${(e: CustomEvent<{ col: string; value: unknown }>) => this.ctrl.setFilter(e.detail.col, e.detail.value)}>
+          <!-- Alta: se proyecta SIEMPRE (aunque el panel esté cerrado); si solo se pintara al abrir,
+               el «+» de la barra desplegaría un panel vacío. -->
+          <form slot="create" class="form" @submit=${(e: Event) => this.createService(e)}>
+            <ion-input fill="outline" label-placement="floating" label=${t('ui.colName')} .value=${this.newName} @ionInput=${(e: any) => (this.newName = e.target.value)}></ion-input>
+            <ion-input fill="outline" label-placement="floating" label=${t('ui.colPrice')} type="number" step="0.01" .value=${this.newPrice} @ionInput=${(e: any) => (this.newPrice = e.target.value)}></ion-input>
+            <ion-input fill="outline" label-placement="floating" label=${t('ui.colDuration')} type="number" step="1" .value=${this.newDuration} @ionInput=${(e: any) => (this.newDuration = e.target.value)}></ion-input>
+            <ion-select fill="outline" label-placement="floating" label=${t('ui.colCategory')} placeholder=${t('ui.placeholderCategory')} .value=${this.newCategory} @ionChange=${(e: any) => (this.newCategory = e.target.value)}>
+              <ion-select-option value="">${t('ui.optionNoCategory')}</ion-select-option>
+              ${this.categories.map((c) => html`<ion-select-option .value=${c.id}>${c.name}</ion-select-option>`)}
+            </ion-select>
+            <ion-select fill="outline" label-placement="floating" label=${t('ui.colTax')} .value=${this.newTaxRateId} @ionChange=${(e: any) => (this.newTaxRateId = e.target.value)}>
+              ${this.taxOptions()}
+            </ion-select>
+            <ion-button type="submit" ?disabled=${this.saving || !this.newName}>${this.saving ? t('ui.btnSaving') : t('ui.btnAdd')}</ion-button>
+          </form>
+        </ok-data-table>
       </div>`;
   }
 }

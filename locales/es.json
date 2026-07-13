@@ -10,6 +10,13 @@
     "colName": "Nombre",
     "colCategory": "Categoría",
     "colPricingType": "Tarifa",
+    "pricingType": {
+      "fixed": "Precio fijo",
+      "hourly": "Por hora",
+      "from": "Desde",
+      "variable": "Variable",
+      "free": "Gratis"
+    },
     "colPrice": "Precio",
     "colDuration": "Duración (min)",
     "actionDelete": "Eliminar",
