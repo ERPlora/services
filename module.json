@@ -113,7 +113,7 @@
         "default_dir": "asc",
         "filters": {
           "name": {
-            "op": "eq"
+            "op": "like"
           },
           "price": {
             "op": "range"
@@ -172,7 +172,7 @@
         "default_dir": "asc",
         "filters": {
           "name": {
-            "op": "eq"
+            "op": "like"
           },
           "slug": {
             "op": "eq"
@@ -223,7 +223,7 @@
         "default_dir": "asc",
         "filters": {
           "name": {
-            "op": "eq"
+            "op": "like"
           },
           "slug": {
             "op": "eq"
@@ -308,7 +308,7 @@
             "op": "eq"
           },
           "service_name": {
-            "op": "eq"
+            "op": "like"
           },
           "service_price": {
             "op": "range"
