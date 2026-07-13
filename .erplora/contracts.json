@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "module": "services",
+  "consumes": {
+    "queries": [
+      "services.categories.list",
+      "services.services.list",
+      "taxes.categories.list"
+    ],
+    "optional_queries": [],
+    "commands": [
+      "services.services.create",
+      "services.services.delete"
+    ],
+    "events": [
+      "services.service.created",
+      "services.service.deleted",
+      "services.service.updated"
+    ],
+    "slots": []
+  }
+}
