@@ -16,6 +16,7 @@
 //! caller recibe hoy `{ok, operations}` del runtime).
 
 use erplora_guest_sdk::money;
+use erplora_guest_sdk::units::QUANTITY_SCALE;
 use rust_decimal::prelude::FromPrimitive;
 use rust_decimal::Decimal;
 use erplora_guest_sdk::{Event, Operation};
@@ -54,17 +55,11 @@ pub fn create_package(input: Json<erplora_guest_sdk::Input>) -> FnResult<Json<Ha
 // El DINERO lo redondea `erplora_guest_sdk::money` (ADR-0123): unidad mínima, HALF_UP, uno solo
 // para todo el hub. Este módulo tenía su propio `round_cents` (half-even sobre `f64`).
 
-/// Redondeo a 2 decimales half-even — usado para `discount_percent` (el %), que se
-/// almacena como REAL (no es céntimos). El importe fijo va por `round_cents` → céntimos.
+/// Redondeo a 2 decimales HALF_UP — usado para `discount_percent` (el %), que se almacena
+/// como REAL (no es céntimos). El modo es el ÚNICO del hub (ADR-0123 §4): el half-even con
+/// epsilon que vivía aquí era el último resto del modo divergente.
 fn round2(x: f64) -> f64 {
-    let scaled = x * 100.0;
-    let floor = scaled.floor();
-    let diff = scaled - floor;
-    let rounded = if (diff - 0.5).abs() < 1e-9 {
-        if (floor as i64) % 2 == 0 { floor } else { floor + 1.0 }
-    } else {
-        scaled.round()
-    };
+    let rounded = (x * 100.0).round(); // f64::round = half away from zero = HALF_UP en positivos
     rounded / 100.0
 }
 
@@ -332,9 +327,10 @@ pub fn create_package_pure(input: Value) -> Result<HandlerOutput, String> {
     {
         Some(c) => c,
         None if discount_type == "fixed" => {
-            // legado: discount_value venía en EUROS → a céntimos (×100; round_cents espera
-            // el valor ya en el espacio de céntimos, half-even).
-            round_cents(legacy_discount_value.unwrap_or(0.0) * 100.0)
+            // legado: discount_value venía en EUROS → a céntimos por el SDK (HALF_UP).
+            // NOTA: el refactor del 13-07 borró `round_cents` pero dejó esta llamada —
+            // el crate llevaba desde entonces SIN COMPILAR (el wasm de dist/ era anterior).
+            money::euros_to_cents(Decimal::from_f64(legacy_discount_value.unwrap_or(0.0)).unwrap_or(Decimal::ZERO))
         }
         None => 0,
     };
@@ -388,7 +384,9 @@ pub fn create_package_pure(input: Value) -> Result<HandlerOutput, String> {
         };
         seen.push(service_id.clone());
 
-        let quantity = parse_int(item.get("quantity")).ok().flatten().unwrap_or(1).max(1);
+        // Punto fijo 10⁶ (ADR-0147): ausente = 1 sesión = QUANTITY_SCALE. Se conserva el
+        // clamp legado (mínimo 1 sesión), ahora en escala.
+        let quantity = parse_int(item.get("quantity")).ok().flatten().unwrap_or(QUANTITY_SCALE).max(QUANTITY_SCALE);
         let mut p = Map::new();
         p.insert("item_id".into(), json!(item_id));
         p.insert("package_id".into(), json!(package_id));
@@ -475,5 +473,37 @@ mod tests {
         let p = header_params(&out);
         assert_eq!(p["discount_amount_cents"], json!(1250));
         assert_eq!(p["discount_percent"], json!(0.0));
+    }
+
+    #[test]
+    fn package_item_quantity_is_fixed_point_10e6() {
+        // ADR-0147: la cantidad viaja y se guarda en punto fijo entero escala 10⁶.
+        // «2 sesiones» = 2_000_000; ausente = 1 sesión = 1_000_000 (no 1 µ).
+        let out = create_package_pure(input(json!({
+            "name": "Bono corte+color",
+            "discount_type": "percentage",
+            "discount_percent": 5.0,
+            "items": [
+                { "service_id": "s1", "quantity": 2_000_000 },
+                { "service_id": "s2" }
+            ]
+        })))
+        .unwrap();
+        assert_eq!(out.operations[1].command, "services._insert_package_item");
+        assert_eq!(out.operations[1].params["quantity"], json!(2_000_000));
+        assert_eq!(out.operations[2].params["quantity"], json!(1_000_000), "el default es 1 sesión en escala");
+    }
+
+    #[test]
+    fn discount_percent_rounds_half_up_like_the_rest_of_the_hub() {
+        // Coherencia de modo (ADR-0123 §4): el ÚNICO redondeo del hub es HALF_UP. El round2
+        // half-even local daba 12.125 → 12.12; el sistema entero redondea 12.125 → 12.13.
+        let out = create_package_pure(input(json!({
+            "name": "Bono",
+            "discount_type": "percentage",
+            "discount_percent": 12.125
+        })))
+        .unwrap();
+        assert_eq!(header_params(&out)["discount_percent"], json!(12.13));
     }
 }
