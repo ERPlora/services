@@ -1,7 +1,7 @@
 {
   "id": "services",
   "name": "Services",
-  "version": "1.5.4",
+  "version": "1.5.5",
   "agent": {
     "description": "Manages the service catalogue: create, update and delete services, categories, and service packages; list available services and packages; configure module settings.",
     "keywords": [
@@ -76,14 +76,6 @@
     "set": "services.settings.update"
   },
   "migrations": {
-    "sqlite": [
-      "migrations/sqlite/001_init.sql",
-      "migrations/sqlite/002_tax_rate_id.sql",
-      "migrations/sqlite/003_package_redemption.sql",
-      "migrations/sqlite/004_discount_split.sql",
-      "migrations/sqlite/005_tax_category_key.sql",
-      "migrations/sqlite/006_quantity_fixed_point.sql"
-    ],
     "postgres": [
       "migrations/postgres/001_init.sql",
       "migrations/postgres/002_tax_rate_id.sql",
