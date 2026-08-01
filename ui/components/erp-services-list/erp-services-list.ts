@@ -130,7 +130,9 @@ export class ErpServicesList extends LitElement {
         sortable: true,
         filterable: true,
         filterType: 'range',
-        format: (r) => Number(r.price).toFixed(2),
+        // El precio se guarda en CÉNTIMOS (INTEGER, ADR-0007): 1500 = 15,00 €. El helper canónico
+        // `formatMoney` divide por 10^decimales (no /100 a ciegas: en JPY/KWD sería distinto).
+        format: (r) => erplora().formatMoney(Number(r.price) || 0),
       },
       { key: 'duration_minutes', header: t('ui.colDuration'), align: 'right', sortable: true, filterable: true, filterType: 'text' },
     ];
@@ -223,7 +225,8 @@ export class ErpServicesList extends LitElement {
         short_description: '',
         category_id: this.newCategory || null,
         pricing_type: 'fixed',
-        price: Number(this.newPrice) || 0,
+        // El input recoge EUROS (step 0.01) pero la columna es céntimos (ADR-0007): 15 € → 1500.
+        price: Math.round((Number(this.newPrice) || 0) * 100),
         cost: 0,
         duration_minutes: Number(this.newDuration) || 60,
         buffer_before: 0,

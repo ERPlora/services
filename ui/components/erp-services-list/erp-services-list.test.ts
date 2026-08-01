@@ -23,15 +23,19 @@ beforeEach(() => {
   (globalThis as Record<string, unknown>).erplora = {
     query: async (name: string) => (name === 'services.categories.list' ? CATEGORIAS : []),
     queryPage: async () => ({
-      rows: [{ id: 's1', name: 'Corte', price: '12.00', pricing_type: 'fixed', duration_minutes: 30, is_bookable: 1, category_id: 'c1', category: 'Peluquería' }],
+      rows: [{ id: 's1', name: 'Corte', price: '1200', pricing_type: 'fixed', duration_minutes: 30, is_bookable: 1, category_id: 'c1', category: 'Peluquería' }],
       total: 1,
     }),
+    queryAll: async () => [],
     command: async (name: string, payload: Record<string, unknown>) => {
       comandos.push({ name, payload });
       return {};
     },
     on: () => () => {},
     locale: 'es',
+    // El SDK real siempre provee formatMoney (divide céntimos por 10^decimales). Mockeado aquí
+    // porque ok-data-table renderiza la celda de precio al montar.
+    formatMoney: (minor: number) => `${(Number(minor || 0) / 100).toFixed(2)} €`,
     t: (_catalog: unknown, key: string) => key,
   };
 });
@@ -105,5 +109,56 @@ describe('el alta sigue funcionando desde el panel', () => {
     expect(alta!.payload.name).toBe('Corte');
     expect(alta!.payload.category_id).toBe('c1');
     expect(alta!.payload.duration_minutes).toBe(30);
+    // El input recoge euros (12 €) pero se envía en céntimos (1200), ADR-0007.
+    expect(alta!.payload.price).toBe(1200);
+  });
+});
+
+// #268 — el precio se guarda en CÉNTIMOS (INTEGER, ADR-0007) pero se mostraba como euros sin
+// dividir (1500 céntimos → "1500.00" en vez de "15.00 €") y el alta enviaba euros crudos a la
+// columna de céntimos (15 € → guardaba 15 céntimos). Ambos extremos tenían que ir por el helper
+// canónico de dinero del SDK (formatMoney divide por 10^decimales; alta convierte euros→céntimos).
+describe('el precio va en céntimos — display divide y alta multiplica (#268)', () => {
+  // La BD real devuelve el importe en céntimos (INTEGER), no en euros con coma.
+  const FILA_CENTIMOS = [
+    { id: 's1', name: 'Corte', price: '1500', pricing_type: 'fixed', duration_minutes: 30, is_bookable: 1, category_id: 'c1', category: 'Peluquería' },
+  ];
+
+  beforeEach(() => {
+    (globalThis as Record<string, unknown>).erplora = {
+      query: async (name: string) => (name === 'services.categories.list' ? CATEGORIAS : []),
+      queryPage: async () => ({ rows: FILA_CENTIMOS, total: 1 }),
+      queryAll: async () => [],
+      command: async (name: string, payload: Record<string, unknown>) => {
+        comandos.push({ name, payload });
+        return {};
+      },
+      on: () => () => {},
+      locale: 'es',
+      // formatMoney(minor): el helper del SDK divide los céntimos entre 10^decimales (2 en EUR).
+      // Mockeado aquí para que el test no dependa del Intl del entorno.
+      formatMoney: (minor: number) => `${(Number(minor || 0) / 100).toFixed(2)} €`,
+      t: (_catalog: unknown, key: string) => key,
+    };
+  });
+
+  it('muestra 1500 céntimos como 15,00 € (no como "1500.00")', async () => {
+    const el = await montar();
+    const cols = (el as unknown as { columns: { key: string; format?: (r: Record<string, unknown>) => unknown }[] }).columns;
+    const price = cols.find((c) => c.key === 'price');
+    const rendered = price?.format?.({ price: '1500' });
+    expect(rendered, '1500 céntimos debe formatearse como euros, no como el entero crudo').toBe('15.00 €');
+  });
+
+  it('crear con 15 € en el input envía 1500 céntimos (no 15)', async () => {
+    const el = await montar();
+    const wc = el as unknown as { newName: string; newPrice: string; createService: (ev: Event) => Promise<void> };
+    wc.newName = 'Corte';
+    wc.newPrice = '15';
+    await wc.createService(new Event('submit'));
+
+    const alta = comandos.find((c) => c.name === 'services.services.create');
+    expect(alta, 'no se mandó el alta').toBeTruthy();
+    expect(alta!.payload.price, '15 € → 1500 céntimos').toBe(1500);
   });
 });
