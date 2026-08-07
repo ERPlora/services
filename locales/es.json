@@ -1,5 +1,9 @@
 {
   "name": "Servicios",
+  "setup": {
+    "title": "Tu catálogo de servicios",
+    "description": "Añade los servicios que vendes, con su precio y su duración."
+  },
   "navigation": {
     "services": {
       "label": "Servicios"

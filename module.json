@@ -76,6 +76,23 @@
     "get": "services.settings.get",
     "set": "services.settings.update"
   },
+  "setup": {
+    "query": "services.catalog.status",
+    "configured_when": [
+      {
+        "field": "sellable_services",
+        "truthy": true
+      }
+    ],
+    "title": "Your service catalogue",
+    "description": "Add the services you sell, with their price and duration.",
+    "icon": "briefcase-outline",
+    "route": "/m/services/services",
+    "permission": "services.add_service",
+    "countries": [],
+    "order": 31,
+    "required": true
+  },
   "migrations": {
     "postgres": [
       "migrations/postgres/001_init.sql",
@@ -315,6 +332,13 @@
         "description": "Lists the individual services included in a package"
       },
       "expose_api": true
+    },
+    "services.catalog.status": {
+      "permission": "services.view_service",
+      "sql": "queries/catalog_status.sql",
+      "ai": {
+        "description": "Reports how many sellable services the catalogue holds; 0 means the catalogue is still empty"
+      }
     },
     "services.settings.get": {
       "permission": "services.view_service",
