@@ -5,14 +5,22 @@
 -- los campos omitidos llegan como NULL → NOT NULL constraint. Se envuelven en COALESCE para
 -- que un alta mínima ({name, price, duration_minutes, tax_category_key}) funcione, espejando los
 -- DEFAULT de la migración. El slug se deriva del id (:new_id) cuando el caller no lo aporta.
+-- La categoría, si viene, tiene que ser de ESTE hub (services#7). La FK apunta a un id GLOBAL, así
+-- que sin esta comprobación un `category_id` de otro hub se guardaba tal cual y su nombre privado
+-- salía luego en la lista. `category_id` es OPCIONAL: vacío/NULL es legítimo (servicio sin
+-- categoría), y por eso la condición tiene sus dos ramas.
+--
+-- Si la categoría es ajena, la sentencia no afecta ninguna fila. Eso NO es un éxito silencioso: el
+-- command declara `expect_rows: {op: min, n: 1}`, así que el runtime revierte la transacción entera
+-- —ni fila ni evento— y devuelve `services.category_unavailable` (hub#139).
 INSERT INTO services_service
   (id, hub_id, name, slug, description, short_description, category_id,
    pricing_type, price, cost, duration_minutes, buffer_before, buffer_after,
    max_capacity, is_bookable, requires_confirmation, allow_online_booking,
    sort_order, is_active, is_featured, sku, barcode, notes, tax_category_key,
    is_deleted, created_by, updated_by, created_at, updated_at)
-VALUES
-  (:new_id, :hub_id, :name,
+SELECT
+   :new_id, :hub_id, :name,
    COALESCE(NULLIF(:slug, ''), 'svc-' || :new_id),
    COALESCE(:description, ''), COALESCE(:short_description, ''), :category_id,
    COALESCE(NULLIF(:pricing_type, ''), 'fixed'), COALESCE(:price, 0), COALESCE(:cost, 0),
@@ -21,4 +29,9 @@ VALUES
    COALESCE(:allow_online_booking, 1),
    COALESCE(:sort_order, 0), 1, COALESCE(:is_featured, 0),
    COALESCE(:sku, ''), COALESCE(:barcode, ''), COALESCE(:notes, ''), :tax_category_key,
-   0, :current_user_id, :current_user_id, :now, :now);
+   0, :current_user_id, :current_user_id, :now, :now
+WHERE COALESCE(NULLIF(:category_id, ''), '') = ''
+   OR EXISTS (
+        SELECT 1 FROM services_category c
+        WHERE c.id = :category_id AND c.hub_id = :hub_id AND c.is_deleted = 0
+      );

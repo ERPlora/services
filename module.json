@@ -355,6 +355,12 @@
       "sql": [
         "commands/service_create.sql"
       ],
+      "expect_rows": {
+        "op": "min",
+        "n": 1,
+        "error": "services.category_unavailable",
+        "message": "That category is not available: it does not exist in this business or it has been deleted."
+      },
       "emit": [
         "services.service.created"
       ],
@@ -377,6 +383,12 @@
       "sql": [
         "commands/service_update.sql"
       ],
+      "expect_rows": {
+        "op": "min",
+        "n": 1,
+        "error": "services.service_update_rejected",
+        "message": "The service could not be updated: it does not exist in this business, or the category you picked does not."
+      },
       "emit": [
         "services.service.updated"
       ],
