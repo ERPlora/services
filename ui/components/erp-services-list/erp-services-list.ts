@@ -4,13 +4,27 @@ import { define } from '@erplora/outfitkit/define';
 import '@erplora/outfitkit/ok-inline-feedback';
 import '@erplora/outfitkit/ok-data-table';
 import type { DataTableColumn, DataTableAction } from '@erplora/outfitkit';
-import { createListController } from '@erplora/module-sdk';
+import { createListController, majorToMinor } from '@erplora/module-sdk';
 import type { ListController, ListClient, ListParams, ListPage } from '@erplora/module-sdk';
 // i18n del módulo (ADR-0055): los catálogos `ui` se inlinean en build (esbuild) y los textos
 // internos se resuelven con `erplora.t(CATALOG, 'ui.clave')` (idioma activo, fallback locale→en→clave).
 import esLocale from '../../../locales/es.json';
 import enLocale from '../../../locales/en.json';
 const CATALOG: Record<string, unknown> = { es: esLocale, en: enLocale };
+
+/** Lo tecleado → UNIDADES MÍNIMAS (el dinero es INTEGER, ADR-0007/0123). «15,50» → 1550.
+ *
+ *  Dos supuestos que estaban aquí y eran falsos:
+ *  - **la coma**: en es-ES se teclea «15,50» y `Number` da `NaN`, que caía a 0 → el servicio se
+ *    creaba GRATIS (mismo bug que dejó sin cerrar la caja, cash_register#272);
+ *  - **la escala**: era un `×100` clavado. La escala es la de LA MONEDA del hub —
+ *    `majorToMinor` con `erplora.currencyDecimals`—; en JPY la unidad mínima ES el yen y un
+ *    ×100 cobra 100 veces de más. Si el shell es viejo y no la inyecta, se cae a 2, nunca a
+ *    `NaN`: un `NaN` en una columna INTEGER es corrupción silenciosa. */
+function toMinorUnits(v: string | number): number {
+  const decimals = erplora().currencyDecimals;
+  return majorToMinor(String(v ?? '').replace(',', '.'), typeof decimals === 'number' ? decimals : 2);
+}
 
 interface ErploraClientLike extends ListClient {
   query<T = unknown>(name: string, params?: Record<string, unknown>): Promise<T>;
@@ -24,6 +38,10 @@ interface ErploraClientLike extends ListClient {
   /** i18n del módulo (ADR-0055): idioma activo + traducción del catálogo `ui`. */
   locale: string;
   t(catalog: Record<string, unknown>, key: string, params?: Record<string, unknown>): string;
+  /** Dinero (ADR-0123): recibe UNIDADES MÍNIMAS y divide por los decimales de la moneda. */
+  formatMoney(minor: number, opts?: { currency?: string; locale?: string }): string;
+  /** Decimales de la moneda del hub — la escala del dinero. 2 en EUR, 0 en JPY, 3 en KWD. */
+  currencyDecimals: number;
 }
 
 interface Service {
@@ -226,7 +244,7 @@ export class ErpServicesList extends LitElement {
         category_id: this.newCategory || null,
         pricing_type: 'fixed',
         // El input recoge EUROS (step 0.01) pero la columna es céntimos (ADR-0007): 15 € → 1500.
-        price: Math.round((Number(this.newPrice) || 0) * 100),
+        price: toMinorUnits(this.newPrice),
         cost: 0,
         duration_minutes: Number(this.newDuration) || 60,
         buffer_before: 0,
@@ -279,7 +297,7 @@ export class ErpServicesList extends LitElement {
                el «+» de la barra desplegaría un panel vacío. -->
           <form slot="create" class="form" @submit=${(e: Event) => this.createService(e)}>
             <ion-input fill="outline" label-placement="floating" label=${t('ui.colName')} .value=${this.newName} @ionInput=${(e: any) => (this.newName = e.target.value)}></ion-input>
-            <ion-input fill="outline" label-placement="floating" label=${t('ui.colPrice')} type="number" step="0.01" .value=${this.newPrice} @ionInput=${(e: any) => (this.newPrice = e.target.value)}></ion-input>
+            <ion-input fill="outline" label-placement="floating" label=${t('ui.colPrice')} type="text" inputmode="decimal" .value=${this.newPrice} @ionInput=${(e: any) => (this.newPrice = e.target.value)}></ion-input>
             <ion-input fill="outline" label-placement="floating" label=${t('ui.colDuration')} type="number" step="1" .value=${this.newDuration} @ionInput=${(e: any) => (this.newDuration = e.target.value)}></ion-input>
             <ion-select fill="outline" label-placement="floating" label=${t('ui.colCategory')} placeholder=${t('ui.placeholderCategory')} .value=${this.newCategory} @ionChange=${(e: any) => (this.newCategory = e.target.value)}>
               <ion-select-option value="">${t('ui.optionNoCategory')}</ion-select-option>

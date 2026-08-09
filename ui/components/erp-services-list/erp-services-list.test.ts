@@ -161,4 +161,41 @@ describe('el precio va en céntimos — display divide y alta multiplica (#268)'
     expect(alta, 'no se mandó el alta').toBeTruthy();
     expect(alta!.payload.price, '15 € → 1500 céntimos').toBe(1500);
   });
+
+  // Lo que #268 dejó a medias y services#8 sigue pidiendo (verificado en el árbol actual): el
+  // display ya pasa por `formatMoney`, pero la ENTRADA seguía con dos supuestos propios.
+  const crear = async (precio: string) => {
+    const el = await montar();
+    const wc = el as unknown as { newName: string; newPrice: string; createService: (ev: Event) => Promise<void> };
+    wc.newName = 'Corte';
+    wc.newPrice = precio;
+    await wc.createService(new Event('submit'));
+    return comandos.find((c) => c.name === 'services.services.create');
+  };
+
+  // El campo era `type="number"`: en es-ES el usuario teclea «15,50» y el navegador descarta la
+  // coma como valor inválido, así que el campo llega VACÍO y el servicio se crea con precio 0.
+  // Es el mismo bug que dejó sin cerrar la caja (cash_register#272), en otra pantalla.
+  it('acepta la coma decimal: «15,50» son 1550 céntimos, no 0', async () => {
+    expect((await crear('15,50'))!.payload.price).toBe(1550);
+  });
+
+  it('el campo de precio NO es type=number (bloquea la coma en es-ES)', async () => {
+    const el = await montar();
+    const inputs = [...el.shadowRoot!.querySelectorAll('ion-input')];
+    const precio = inputs.find((i) => /price/i.test(i.getAttribute('label') ?? ''));
+    expect(precio, 'no se encontró el input de precio').toBeTruthy();
+    expect(precio!.getAttribute('type'), 'con type=number el navegador se come la coma').not.toBe('number');
+    expect(precio!.getAttribute('inputmode'), 'sin inputmode=decimal el móvil no da teclado numérico').toBe('decimal');
+  });
+
+  // La escala es la de LA MONEDA del hub, no un 2 fijo. En JPY la unidad mínima ES el yen, así que
+  // un ×100 aquí cobra 100 veces de más — y el SDK avisa expresamente de este caso.
+  it('usa la escala de la moneda del hub, no un ×100 clavado', async () => {
+    (globalThis as Record<string, unknown>).erplora = {
+      ...((globalThis as Record<string, unknown>).erplora as object),
+      currencyDecimals: 0,
+    };
+    expect((await crear('1999'))!.payload.price, '1999 ¥ son 1999 unidades mínimas').toBe(1999);
+  });
 });
