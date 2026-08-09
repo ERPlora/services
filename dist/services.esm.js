@@ -3344,21 +3344,32 @@ var es_default = {
     },
     colPrice: "Precio",
     colDuration: "Duraci\xF3n (min)",
+    colStatus: "Estado",
+    status: {
+      active: "Activo",
+      inactive: "Inactivo",
+      unconfigured: "Sin configurar"
+    },
+    statusReason: {
+      unconfigured: "Sin categor\xEDa fiscal: no se puede cobrar"
+    },
     actionDelete: "Eliminar",
     placeholderName: "Nombre",
     placeholderPrice: "Precio",
     placeholderDuration: "Duraci\xF3n (min)",
     placeholderCategory: "Categor\xEDa\u2026",
     optionNoCategory: "Sin categor\xEDa",
-    colTax: "Tipo de IVA / Impuesto",
-    taxDefault: "\u2014 (por defecto)",
+    colTax: "Categor\xEDa fiscal",
+    placeholderTax: "Categor\xEDa fiscal\u2026",
     taxGroup: "grupo",
+    taxCategoriesMissing: "Todav\xEDa no hay categor\xEDas fiscales. Config\xFAralas en Impuestos antes de a\xF1adir servicios.",
     btnSaving: "Guardando\u2026",
     btnAdd: "A\xF1adir",
     searchPlaceholder: "Buscar servicio\u2026",
     loading: "Cargando\u2026",
     empty: "Sin servicios.",
     errorCreate: "No se pudo crear el servicio",
+    errorTaxRequired: "Elige una categor\xEDa fiscal: sin ella el servicio no se puede cobrar",
     errorDelete: "No se pudo eliminar el servicio"
   }
 };
@@ -3389,21 +3400,32 @@ var en_default = {
     },
     colPrice: "Price",
     colDuration: "Duration (min)",
+    colStatus: "Status",
+    status: {
+      active: "Active",
+      inactive: "Inactive",
+      unconfigured: "Not configured"
+    },
+    statusReason: {
+      unconfigured: "No tax category: it cannot be charged"
+    },
     actionDelete: "Delete",
     placeholderName: "Name",
     placeholderPrice: "Price",
     placeholderDuration: "Duration (min)",
     placeholderCategory: "Category\u2026",
     optionNoCategory: "No category",
-    colTax: "Tax rate",
-    taxDefault: "\u2014 (default)",
+    colTax: "Tax category",
+    placeholderTax: "Tax category\u2026",
     taxGroup: "group",
+    taxCategoriesMissing: "There are no tax categories yet. Set them up in Taxes before adding services.",
     btnSaving: "Saving\u2026",
     btnAdd: "Add",
     searchPlaceholder: "Search service\u2026",
     loading: "Loading\u2026",
     empty: "No services.",
     errorCreate: "Could not create the service",
+    errorTaxRequired: "Pick a tax category: without one the service cannot be charged",
     errorDelete: "Could not delete the service"
   }
 };
@@ -3415,6 +3437,22 @@ function toMinorUnits(v3) {
   return majorToMinor(String(v3 ?? "").replace(",", "."), typeof decimals === "number" ? decimals : 2);
 }
 var PRICING_TYPES = ["fixed", "hourly", "from", "variable", "free"];
+var FILTERABLE_STATUSES = ["active", "unconfigured"];
+function stateOf(row) {
+  const declared = String(row.status ?? "").trim();
+  if (declared) return declared;
+  return String(row.tax_category_key ?? "").trim() ? "active" : "unconfigured";
+}
+var STATE_COLOR = {
+  active: "var(--ion-color-success, #2dd36f)",
+  inactive: "var(--ion-color-medium, #92949c)",
+  unconfigured: "var(--ion-color-danger, #eb445a)"
+};
+function badgeStyle(state) {
+  const tone = STATE_COLOR[state] ?? STATE_COLOR.inactive;
+  return `display:inline-block;padding:.1rem .45rem;border-radius:999px;font-size:.78rem;font-weight:600;white-space:nowrap;background:color-mix(in srgb, ${tone} 18%, transparent);color:color-mix(in srgb, ${tone} 70%, #000);`;
+}
+var REASON_STYLE = `display:block;margin-top:.15rem;font-size:.72rem;line-height:1.2;color:color-mix(in srgb, ${STATE_COLOR.unconfigured} 70%, #000);`;
 function erplora() {
   const c5 = globalThis.erplora;
   if (!c5) throw new Error("erplora SDK no inicializado por el shell");
@@ -3487,7 +3525,26 @@ var ErpServicesList = class extends i3 {
         // `formatMoney` divide por 10^decimales (no /100 a ciegas: en JPY/KWD sería distinto).
         format: (r6) => erplora().formatMoney(Number(r6.price) || 0)
       },
-      { key: "duration_minutes", header: t5("ui.colDuration"), align: "right", sortable: true, filterable: true, filterType: "text" }
+      { key: "duration_minutes", header: t5("ui.colDuration"), align: "right", sortable: true, filterable: true, filterType: "text" },
+      {
+        key: "status",
+        header: t5("ui.colStatus"),
+        sortable: true,
+        filterable: true,
+        // Dominio cerrado (el servidor lo declara `op: eq`) → el filtro `select` aísla de verdad
+        // los servicios que no se pueden cobrar, que es para lo que existe la columna.
+        filterType: "select",
+        options: FILTERABLE_STATUSES.map((v3) => ({ value: v3, label: t5(`ui.status.${v3}`) })),
+        // Marcar sin decir POR QUÉ es una etiqueta sobre la que nadie puede actuar: el motivo se
+        // pinta al lado, no solo en un `title` que en una tablet no existe. `render` vale para las
+        // dos vistas de la tabla (lista y tarjeta), así que el motivo viaja también al móvil.
+        render: (r6) => {
+          const state = stateOf(r6);
+          const reason = state === "unconfigured" ? t5("ui.statusReason.unconfigured") : "";
+          return b2`<span style=${badgeStyle(state)} title=${reason || A}>${t5(`ui.status.${state}`)}</span>
+            ${reason ? b2`<small style=${REASON_STYLE}>${reason}</small>` : A}`;
+        }
+      }
     ];
   }
   get actions() {
@@ -3530,16 +3587,13 @@ var ErpServicesList = class extends i3 {
       this.taxRates = [];
     }
   }
-  // Opciones del ion-select de la categoría fiscal: "— (sin categoría)" (valor '') + una categoría
-  // por fila (value = key canónica). El % lo resuelve `taxes` por país+categoría (ADR-0085).
+  // Opciones del ion-select de la categoría fiscal: una categoría por fila (value = key canónica).
+  // NO hay opción vacía: «— (por defecto)» era la puerta por la que se creaba un servicio que nadie
+  // podía cobrar. El % lo resuelve `taxes` por país+categoría (ADR-0085).
   taxOptions() {
-    const t5 = (k2) => erplora().t(CATALOG, k2);
-    return b2`
-      <ion-select-option value="">${t5("ui.taxDefault")}</ion-select-option>
-      ${this.taxRates.map(
+    return this.taxRates.map(
       (c5) => b2`<ion-select-option .value=${c5.key}>${c5.name} (${c5.key})</ion-select-option>`
-    )}
-    `;
+    );
   }
   // Referencia al ok-data-table para abrir/cerrar su panel lateral (el alta se proyecta dentro).
   dataTable() {
@@ -3548,6 +3602,10 @@ var ErpServicesList = class extends i3 {
   async createService(ev) {
     ev.preventDefault();
     if (!this.newName.trim()) return;
+    if (!this.newTaxRateId) {
+      this.formError = erplora().t(CATALOG, "ui.errorTaxRequired");
+      return;
+    }
     this.saving = true;
     this.formError = "";
     try {
@@ -3572,7 +3630,7 @@ var ErpServicesList = class extends i3 {
         sku: "",
         barcode: "",
         notes: "",
-        tax_category_key: this.newTaxRateId || null
+        tax_category_key: this.newTaxRateId
       });
       this.newName = "";
       this.newPrice = "";
@@ -3615,10 +3673,13 @@ var ErpServicesList = class extends i3 {
               <ion-select-option value="">${t5("ui.optionNoCategory")}</ion-select-option>
               ${this.categories.map((c5) => b2`<ion-select-option .value=${c5.id}>${c5.name}</ion-select-option>`)}
             </ion-select>
-            <ion-select fill="outline" label-placement="floating" label=${t5("ui.colTax")} .value=${this.newTaxRateId} @ionChange=${(e5) => this.newTaxRateId = e5.target.value}>
+            <ion-select fill="outline" label-placement="floating" label=${t5("ui.colTax")} placeholder=${t5("ui.placeholderTax")} .value=${this.newTaxRateId} @ionChange=${(e5) => this.newTaxRateId = e5.target.value}>
               ${this.taxOptions()}
             </ion-select>
-            <ion-button type="submit" ?disabled=${this.saving || !this.newName}>${this.saving ? t5("ui.btnSaving") : t5("ui.btnAdd")}</ion-button>
+            <!-- Sin categorías fiscales el alta es imposible (la categoría es obligatoria): se dice
+                 dónde se arregla, en vez de dejar un desplegable vacío sin explicación. -->
+            ${this.taxRates.length === 0 ? b2`<ok-inline-feedback tone="warning" icon="alert-circle-outline">${t5("ui.taxCategoriesMissing")}</ok-inline-feedback>` : A}
+            <ion-button type="submit" ?disabled=${this.saving || !this.newName || !this.newTaxRateId}>${this.saving ? t5("ui.btnSaving") : t5("ui.btnAdd")}</ion-button>
           </form>
         </ok-data-table>
       </div>`;

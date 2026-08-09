@@ -119,7 +119,8 @@
           "duration_minutes",
           "is_bookable",
           "category_id",
-          "category"
+          "category",
+          "status"
         ],
         "default_sort": "name",
         "default_dir": "asc",
@@ -143,6 +144,9 @@
             "op": "eq"
           },
           "category": {
+            "op": "eq"
+          },
+          "status": {
             "op": "eq"
           }
         },
@@ -355,6 +359,7 @@
       "sql": [
         "commands/service_create.sql"
       ],
+      "schema": "schemas/service_create.json",
       "expect_rows": {
         "op": "min",
         "n": 1,
@@ -365,7 +370,7 @@
         "services.service.created"
       ],
       "ai": {
-        "description": "Creates a new service in the catalogue"
+        "description": "Creates a new service in the catalogue. The fiscal category (tax_category_key) is mandatory: a service is sold as a sale line with its VAT, so it cannot be created without one."
       },
       "expose_api": true,
       "validates": [
@@ -373,7 +378,7 @@
           "field": "tax_category_key",
           "query": "taxes.categories.get",
           "param": "key",
-          "optional": true
+          "optional": false
         }
       ]
     },
@@ -383,6 +388,7 @@
       "sql": [
         "commands/service_update.sql"
       ],
+      "schema": "schemas/service_update.json",
       "expect_rows": {
         "op": "min",
         "n": 1,
@@ -393,7 +399,7 @@
         "services.service.updated"
       ],
       "ai": {
-        "description": "Updates the details of an existing service"
+        "description": "Updates the details of an existing service. The fiscal category (tax_category_key) cannot be emptied."
       },
       "expose_api": true,
       "validates": [
@@ -401,7 +407,7 @@
           "field": "tax_category_key",
           "query": "taxes.categories.get",
           "param": "key",
-          "optional": true
+          "optional": false
         }
       ]
     },

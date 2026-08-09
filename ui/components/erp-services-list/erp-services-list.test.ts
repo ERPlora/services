@@ -16,6 +16,11 @@ const CATEGORIAS = [
   { id: 'c2', name: 'Estética', slug: 'estetica', service_count: 1 },
 ];
 
+const CATEGORIAS_FISCALES = [
+  { id: 't1', key: 'standard', name: 'IVA general' },
+  { id: 't2', key: 'reduced', name: 'IVA reducido' },
+];
+
 const comandos: { name: string; payload: Record<string, unknown> }[] = [];
 
 beforeEach(() => {
@@ -26,7 +31,10 @@ beforeEach(() => {
       rows: [{ id: 's1', name: 'Corte', price: '1200', pricing_type: 'fixed', duration_minutes: 30, is_bookable: 1, category_id: 'c1', category: 'Peluquería' }],
       total: 1,
     }),
-    queryAll: async () => [],
+    // Categorías fiscales del hub. Ya no es un catálogo de adorno: la categoría fiscal es
+    // OBLIGATORIA para dar de alta un servicio (tax-category-required.test.ts), así que sin estas
+    // filas el formulario no deja crear nada.
+    queryAll: async (name: string) => (name === 'taxes.categories.list' ? CATEGORIAS_FISCALES : []),
     command: async (name: string, payload: Record<string, unknown>) => {
       comandos.push({ name, payload });
       return {};
@@ -97,11 +105,12 @@ describe('el alta sigue funcionando desde el panel', () => {
   it('crear un servicio manda services.services.create con los datos del panel', async () => {
     const el = await montar();
     const wc = el as unknown as { newName: string; newPrice: string; newDuration: string; newCategory: string;
-                                  createService: (ev: Event) => Promise<void> };
+                                  newTaxRateId: string; createService: (ev: Event) => Promise<void> };
     wc.newName = 'Corte';
     wc.newPrice = '12';
     wc.newDuration = '30';
     wc.newCategory = 'c1';
+    wc.newTaxRateId = 'standard'; // obligatoria: sin ella el alta ni se manda
     await wc.createService(new Event('submit'));
 
     const alta = comandos.find((c) => c.name === 'services.services.create');
@@ -128,7 +137,10 @@ describe('el precio va en céntimos — display divide y alta multiplica (#268)'
     (globalThis as Record<string, unknown>).erplora = {
       query: async (name: string) => (name === 'services.categories.list' ? CATEGORIAS : []),
       queryPage: async () => ({ rows: FILA_CENTIMOS, total: 1 }),
-      queryAll: async () => [],
+      // Categorías fiscales del hub. Ya no es un catálogo de adorno: la categoría fiscal es
+    // OBLIGATORIA para dar de alta un servicio (tax-category-required.test.ts), así que sin estas
+    // filas el formulario no deja crear nada.
+    queryAll: async (name: string) => (name === 'taxes.categories.list' ? CATEGORIAS_FISCALES : []),
       command: async (name: string, payload: Record<string, unknown>) => {
         comandos.push({ name, payload });
         return {};
@@ -152,9 +164,11 @@ describe('el precio va en céntimos — display divide y alta multiplica (#268)'
 
   it('crear con 15 € en el input envía 1500 céntimos (no 15)', async () => {
     const el = await montar();
-    const wc = el as unknown as { newName: string; newPrice: string; createService: (ev: Event) => Promise<void> };
+    const wc = el as unknown as { newName: string; newPrice: string; newTaxRateId: string;
+                                  createService: (ev: Event) => Promise<void> };
     wc.newName = 'Corte';
     wc.newPrice = '15';
+    wc.newTaxRateId = 'standard';
     await wc.createService(new Event('submit'));
 
     const alta = comandos.find((c) => c.name === 'services.services.create');
@@ -166,9 +180,11 @@ describe('el precio va en céntimos — display divide y alta multiplica (#268)'
   // display ya pasa por `formatMoney`, pero la ENTRADA seguía con dos supuestos propios.
   const crear = async (precio: string) => {
     const el = await montar();
-    const wc = el as unknown as { newName: string; newPrice: string; createService: (ev: Event) => Promise<void> };
+    const wc = el as unknown as { newName: string; newPrice: string; newTaxRateId: string;
+                                  createService: (ev: Event) => Promise<void> };
     wc.newName = 'Corte';
     wc.newPrice = precio;
+    wc.newTaxRateId = 'standard';
     await wc.createService(new Event('submit'));
     return comandos.find((c) => c.name === 'services.services.create');
   };
