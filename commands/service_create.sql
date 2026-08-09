@@ -13,6 +13,16 @@
 -- Si la categoría es ajena, la sentencia no afecta ninguna fila. Eso NO es un éxito silencioso: el
 -- command declara `expect_rows: {op: min, n: 1}`, así que el runtime revierte la transacción entera
 -- —ni fila ni evento— y devuelve `services.category_unavailable` (hub#139).
+-- Los DEFAULTS del servicio salen de los AJUSTES del hub, no de números clavados aquí
+-- (services#13). Con `default_duration = 90` guardado, un servicio mínimo se creaba igualmente con
+-- 60: la pantalla de ajustes configuraba algo que no leía nadie, y había que corregir cada servicio
+-- a mano.
+--
+-- La cadena tiene tres escalones a propósito: lo que mandó el llamante → lo que configuró el hub →
+-- el default del módulo. El último se queda porque la fila de ajustes es un singleton que puede no
+-- existir (un hub instalado sin blueprint no la tiene); por eso el JOIN es LEFT y no INNER —con
+-- INNER, ese hub no podría crear servicios— y por eso hay un valor final: un NULL contra una
+-- columna NOT NULL es una escritura que revienta, no un default.
 INSERT INTO services_service
   (id, hub_id, name, slug, description, short_description, category_id,
    pricing_type, price, cost, duration_minutes, buffer_before, buffer_after,
@@ -24,12 +34,16 @@ SELECT
    COALESCE(NULLIF(:slug, ''), 'svc-' || :new_id),
    COALESCE(:description, ''), COALESCE(:short_description, ''), :category_id,
    COALESCE(NULLIF(:pricing_type, ''), 'fixed'), COALESCE(:price, 0), COALESCE(:cost, 0),
-   COALESCE(:duration_minutes, 60), COALESCE(:buffer_before, 0), COALESCE(:buffer_after, 0),
+   COALESCE(:duration_minutes, st.default_duration, 60),
+   COALESCE(:buffer_before, st.default_buffer_time, 0),
+   COALESCE(:buffer_after, st.default_buffer_time, 0),
    COALESCE(:max_capacity, 1), COALESCE(:is_bookable, 1), COALESCE(:requires_confirmation, 0),
-   COALESCE(:allow_online_booking, 1),
+   COALESCE(:allow_online_booking, st.allow_online_booking, 1),
    COALESCE(:sort_order, 0), 1, COALESCE(:is_featured, 0),
    COALESCE(:sku, ''), COALESCE(:barcode, ''), COALESCE(:notes, ''), :tax_category_key,
    0, :current_user_id, :current_user_id, :now, :now
+FROM (SELECT 1) AS one
+LEFT JOIN services_settings st ON st.hub_id = :hub_id AND st.is_deleted = 0
 WHERE COALESCE(NULLIF(:category_id, ''), '') = ''
    OR EXISTS (
         SELECT 1 FROM services_category c
