@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "services.services.create",
+  "description": "Payload of commands/service_create.sql. `hub_id`, `new_id`, `current_user_id` and `now` are injected by the runtime (§2.5) and are not part of the payload. A service is sold as one sale line with its VAT, so it cannot exist without knowing how it taxes: `tax_category_key` is REQUIRED here, at save time, and not discovered at the counter when the sale is rejected. Deliberately minimal — the closed domains (pricing_type), the ranges and additionalProperties belong to services#9, which hardens the whole CRUD.",
+  "type": "object",
+  "required": ["name", "tax_category_key"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Name of the service. NOT NULL in the column and with no fallback in the statement."
+    },
+    "tax_category_key": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Canonical fiscal category the service taxes by (ADR-0085), one of the `key` values of `taxes.categories.list`. `minLength` is not decoration: `required` alone accepts \"\", and \"\" is exactly no category."
+    },
+    "slug": { "type": ["string", "null"] },
+    "description": { "type": ["string", "null"] },
+    "short_description": { "type": ["string", "null"] },
+    "category_id": {
+      "type": ["string", "null"],
+      "description": "Service category of THIS hub, or none. The statement checks the ownership and fails with `services.category_unavailable` if it belongs to another hub (services#7)."
+    },
+    "pricing_type": { "type": ["string", "null"] },
+    "price": {
+      "type": ["integer", "null"],
+      "description": "Minor units of the hub currency (ADR-0007/0123): 1500 = 15,00 € — never the typed-in major unit."
+    },
+    "cost": { "type": ["integer", "null"] },
+    "duration_minutes": { "type": ["integer", "null"] },
+    "buffer_before": { "type": ["integer", "null"] },
+    "buffer_after": { "type": ["integer", "null"] },
+    "max_capacity": { "type": ["integer", "null"] },
+    "is_bookable": { "type": ["integer", "null"] },
+    "requires_confirmation": { "type": ["integer", "null"] },
+    "allow_online_booking": { "type": ["integer", "null"] },
+    "sort_order": { "type": ["integer", "null"] },
+    "is_featured": { "type": ["integer", "null"] },
+    "sku": { "type": ["string", "null"] },
+    "barcode": { "type": ["string", "null"] },
+    "notes": { "type": ["string", "null"] }
+  }
+}

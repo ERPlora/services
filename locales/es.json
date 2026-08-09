@@ -23,21 +23,32 @@
     },
     "colPrice": "Precio",
     "colDuration": "Duración (min)",
+    "colStatus": "Estado",
+    "status": {
+      "active": "Activo",
+      "inactive": "Inactivo",
+      "unconfigured": "Sin configurar"
+    },
+    "statusReason": {
+      "unconfigured": "Sin categoría fiscal: no se puede cobrar"
+    },
     "actionDelete": "Eliminar",
     "placeholderName": "Nombre",
     "placeholderPrice": "Precio",
     "placeholderDuration": "Duración (min)",
     "placeholderCategory": "Categoría…",
     "optionNoCategory": "Sin categoría",
-    "colTax": "Tipo de IVA / Impuesto",
-    "taxDefault": "— (por defecto)",
+    "colTax": "Categoría fiscal",
+    "placeholderTax": "Categoría fiscal…",
     "taxGroup": "grupo",
+    "taxCategoriesMissing": "Todavía no hay categorías fiscales. Configúralas en Impuestos antes de añadir servicios.",
     "btnSaving": "Guardando…",
     "btnAdd": "Añadir",
     "searchPlaceholder": "Buscar servicio…",
     "loading": "Cargando…",
     "empty": "Sin servicios.",
     "errorCreate": "No se pudo crear el servicio",
+    "errorTaxRequired": "Elige una categoría fiscal: sin ella el servicio no se puede cobrar",
     "errorDelete": "No se pudo eliminar el servicio"
   }
 }

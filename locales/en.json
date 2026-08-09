@@ -23,21 +23,32 @@
     },
     "colPrice": "Price",
     "colDuration": "Duration (min)",
+    "colStatus": "Status",
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "unconfigured": "Not configured"
+    },
+    "statusReason": {
+      "unconfigured": "No tax category: it cannot be charged"
+    },
     "actionDelete": "Delete",
     "placeholderName": "Name",
     "placeholderPrice": "Price",
     "placeholderDuration": "Duration (min)",
     "placeholderCategory": "Category…",
     "optionNoCategory": "No category",
-    "colTax": "Tax rate",
-    "taxDefault": "— (default)",
+    "colTax": "Tax category",
+    "placeholderTax": "Tax category…",
     "taxGroup": "group",
+    "taxCategoriesMissing": "There are no tax categories yet. Set them up in Taxes before adding services.",
     "btnSaving": "Saving…",
     "btnAdd": "Add",
     "searchPlaceholder": "Search service…",
     "loading": "Loading…",
     "empty": "No services.",
     "errorCreate": "Could not create the service",
+    "errorTaxRequired": "Pick a tax category: without one the service cannot be charged",
     "errorDelete": "Could not delete the service"
   }
 }

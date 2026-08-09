@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "services.services.update",
+  "description": "Payload of commands/service_update.sql. `hub_id`, `current_user_id` and `now` are injected by the runtime (§2.5). What is fixed here is that an existing service cannot have its fiscal category EMPTIED: it went in knowing how it taxes and it stays that way. Deliberately minimal — the statement overwrites every column it lists, so the rest of the mandatory set (and additionalProperties) belongs to services#9.",
+  "type": "object",
+  "required": ["service_id", "tax_category_key"],
+  "properties": {
+    "service_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Id of the service to update, of this hub."
+    },
+    "tax_category_key": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Canonical fiscal category the service taxes by (ADR-0085). Required so the edit cannot leave behind a service nobody can charge; `minLength` closes the \"\" that `required` alone lets through."
+    },
+    "name": { "type": ["string", "null"] },
+    "slug": { "type": ["string", "null"] },
+    "description": { "type": ["string", "null"] },
+    "category_id": {
+      "type": ["string", "null"],
+      "description": "Service category of THIS hub, or none (services#7)."
+    },
+    "pricing_type": { "type": ["string", "null"] },
+    "price": {
+      "type": ["integer", "null"],
+      "description": "Minor units of the hub currency (ADR-0007/0123)."
+    },
+    "cost": { "type": ["integer", "null"] },
+    "duration_minutes": { "type": ["integer", "null"] },
+    "is_bookable": { "type": ["integer", "null"] },
+    "is_active": { "type": ["integer", "null"] },
+    "sort_order": { "type": ["integer", "null"] }
+  }
+}

@@ -54,6 +54,8 @@ interface Service {
   category_id: string | null;
   category: string | null;
   tax_category_key: string | null;
+  /** `active` | `inactive` | `unconfigured` — lo calcula `queries/services_list.sql`. */
+  status: string;
 }
 
 interface Category {
@@ -74,6 +76,41 @@ interface TaxCategory {
 // Dominio cerrado de la tarifa (migrations/*/001_init.sql: fixed|hourly|from|variable|free): se
 // ELIGE, no se teclea, y el servidor lo declara `op: eq` → el filtro `select` es real.
 const PRICING_TYPES = ['fixed', 'hourly', 'from', 'variable', 'free'];
+
+// Estados que ESTE listado puede devolver hoy. El vocabulario de `status` tiene tres valores
+// (`queries/services_list.sql`), pero el catálogo filtra `is_active = 1`, así que ofrecer
+// «inactivo» en el filtro sería una opción que siempre devuelve vacío. Cuando services#4 traiga
+// activar/desactivar desde la UI, `inactive` entra aquí y el resto ya está.
+const FILTERABLE_STATUSES = ['active', 'unconfigured'];
+
+/** El estado de la fila. Si el hub sirviera una proyección anterior (sin `status`), se deduce del
+ *  dato que importa: un servicio sin categoría fiscal no puede cobrarse, y esa es exactamente la
+ *  fila que no puede pasar desapercibida. */
+function stateOf(row: Record<string, unknown>): string {
+  const declared = String(row.status ?? '').trim();
+  if (declared) return declared;
+  return String(row.tax_category_key ?? '').trim() ? 'active' : 'unconfigured';
+}
+
+// El `render` de una celda se pinta DENTRO del shadow DOM de `ok-data-table`, así que las clases de
+// ESTE componente no llegan (mismo motivo por el que `inventory` estila su toggle en línea). El
+// color va en el atributo `style`, con las custom props de Ionic, que sí heredan.
+const STATE_COLOR: Record<string, string> = {
+  active: 'var(--ion-color-success, #2dd36f)',
+  inactive: 'var(--ion-color-medium, #92949c)',
+  unconfigured: 'var(--ion-color-danger, #eb445a)',
+};
+
+function badgeStyle(state: string): string {
+  const tone = STATE_COLOR[state] ?? STATE_COLOR.inactive;
+  return 'display:inline-block;padding:.1rem .45rem;border-radius:999px;font-size:.78rem;'
+    + 'font-weight:600;white-space:nowrap;'
+    + `background:color-mix(in srgb, ${tone} 18%, transparent);`
+    + `color:color-mix(in srgb, ${tone} 70%, #000);`;
+}
+
+const REASON_STYLE = 'display:block;margin-top:.15rem;font-size:.72rem;line-height:1.2;'
+  + `color:color-mix(in srgb, ${STATE_COLOR.unconfigured} 70%, #000);`;
 
 function erplora(): ErploraClientLike {
   const c = (globalThis as { erplora?: ErploraClientLike }).erplora;
@@ -153,6 +190,25 @@ export class ErpServicesList extends LitElement {
         format: (r) => erplora().formatMoney(Number(r.price) || 0),
       },
       { key: 'duration_minutes', header: t('ui.colDuration'), align: 'right', sortable: true, filterable: true, filterType: 'text' },
+      {
+        key: 'status',
+        header: t('ui.colStatus'),
+        sortable: true,
+        filterable: true,
+        // Dominio cerrado (el servidor lo declara `op: eq`) → el filtro `select` aísla de verdad
+        // los servicios que no se pueden cobrar, que es para lo que existe la columna.
+        filterType: 'select',
+        options: FILTERABLE_STATUSES.map((v) => ({ value: v, label: t(`ui.status.${v}`) })),
+        // Marcar sin decir POR QUÉ es una etiqueta sobre la que nadie puede actuar: el motivo se
+        // pinta al lado, no solo en un `title` que en una tablet no existe. `render` vale para las
+        // dos vistas de la tabla (lista y tarjeta), así que el motivo viaja también al móvil.
+        render: (r) => {
+          const state = stateOf(r);
+          const reason = state === 'unconfigured' ? t('ui.statusReason.unconfigured') : '';
+          return html`<span style=${badgeStyle(state)} title=${reason || nothing}>${t(`ui.status.${state}`)}</span>
+            ${reason ? html`<small style=${REASON_STYLE}>${reason}</small>` : nothing}`;
+        },
+      },
     ];
   }
 
@@ -203,8 +259,9 @@ export class ErpServicesList extends LitElement {
     } catch {
       /* categorías opcionales para el alta */
     }
-    // Tipos de IVA/impuesto para el selector (ADR-0066/0069). Best-effort: si falla (módulo `taxes`
-    // no instalado, sin permiso…) el select queda con solo "— (por defecto)" y el alta sigue.
+    // Categorías fiscales para el selector (ADR-0085). Ya NO es best-effort de adorno: la categoría
+    // es obligatoria, así que una lista vacía (módulo `taxes` sin configurar, sin permiso…) no deja
+    // un select vacío sin explicación — el formulario lo dice (`ui.taxCategoriesMissing`).
     try {
       this.taxRates = await erplora().queryAll<TaxCategory>('taxes.categories.list', { sort: 'name', dir: 'asc' });
     } catch {
@@ -212,16 +269,13 @@ export class ErpServicesList extends LitElement {
     }
   }
 
-  // Opciones del ion-select de la categoría fiscal: "— (sin categoría)" (valor '') + una categoría
-  // por fila (value = key canónica). El % lo resuelve `taxes` por país+categoría (ADR-0085).
+  // Opciones del ion-select de la categoría fiscal: una categoría por fila (value = key canónica).
+  // NO hay opción vacía: «— (por defecto)» era la puerta por la que se creaba un servicio que nadie
+  // podía cobrar. El % lo resuelve `taxes` por país+categoría (ADR-0085).
   private taxOptions() {
-    const t = (k: string): string => erplora().t(CATALOG, k);
-    return html`
-      <ion-select-option value="">${t('ui.taxDefault')}</ion-select-option>
-      ${this.taxRates.map(
-        (c) => html`<ion-select-option .value=${c.key}>${c.name} (${c.key})</ion-select-option>`,
-      )}
-    `;
+    return this.taxRates.map(
+      (c) => html`<ion-select-option .value=${c.key}>${c.name} (${c.key})</ion-select-option>`,
+    );
   }
 
   // Referencia al ok-data-table para abrir/cerrar su panel lateral (el alta se proyecta dentro).
@@ -234,6 +288,14 @@ export class ErpServicesList extends LitElement {
   private async createService(ev: Event) {
     ev.preventDefault();
     if (!this.newName.trim()) return;
+    // La categoría fiscal no es un campo más del formulario: sin ella el servicio no se puede
+    // cobrar y la venta se rechaza con la clienta delante. El servidor también lo rechaza
+    // (`schemas/service_create.json`); esto solo evita el viaje y NOMBRA lo que falta, en vez de
+    // devolver el error crudo del validador.
+    if (!this.newTaxRateId) {
+      this.formError = erplora().t(CATALOG, 'ui.errorTaxRequired');
+      return;
+    }
     this.saving = true;
     this.formError = '';
     try {
@@ -258,7 +320,7 @@ export class ErpServicesList extends LitElement {
         sku: '',
         barcode: '',
         notes: '',
-        tax_category_key: this.newTaxRateId || null,
+        tax_category_key: this.newTaxRateId,
       });
       this.newName = '';
       this.newPrice = '';
@@ -303,10 +365,15 @@ export class ErpServicesList extends LitElement {
               <ion-select-option value="">${t('ui.optionNoCategory')}</ion-select-option>
               ${this.categories.map((c) => html`<ion-select-option .value=${c.id}>${c.name}</ion-select-option>`)}
             </ion-select>
-            <ion-select fill="outline" label-placement="floating" label=${t('ui.colTax')} .value=${this.newTaxRateId} @ionChange=${(e: any) => (this.newTaxRateId = e.target.value)}>
+            <ion-select fill="outline" label-placement="floating" label=${t('ui.colTax')} placeholder=${t('ui.placeholderTax')} .value=${this.newTaxRateId} @ionChange=${(e: any) => (this.newTaxRateId = e.target.value)}>
               ${this.taxOptions()}
             </ion-select>
-            <ion-button type="submit" ?disabled=${this.saving || !this.newName}>${this.saving ? t('ui.btnSaving') : t('ui.btnAdd')}</ion-button>
+            <!-- Sin categorías fiscales el alta es imposible (la categoría es obligatoria): se dice
+                 dónde se arregla, en vez de dejar un desplegable vacío sin explicación. -->
+            ${this.taxRates.length === 0
+              ? html`<ok-inline-feedback tone="warning" icon="alert-circle-outline">${t('ui.taxCategoriesMissing')}</ok-inline-feedback>`
+              : nothing}
+            <ion-button type="submit" ?disabled=${this.saving || !this.newName || !this.newTaxRateId}>${this.saving ? t('ui.btnSaving') : t('ui.btnAdd')}</ion-button>
           </form>
         </ok-data-table>
       </div>`;
