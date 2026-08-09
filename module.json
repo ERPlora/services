@@ -564,6 +564,18 @@
       ]
     }
   },
+  "events": {
+    "listen": {},
+    "emits": [
+      "services.package.created",
+      "services.package.deleted",
+      "services.package.redeemed",
+      "services.package.updated",
+      "services.service.created",
+      "services.service.deleted",
+      "services.service.updated"
+    ]
+  },
   "ui": {
     "entry": "dist/services.esm.js"
   }
