@@ -1,5 +1,6 @@
 {
   "name": "Servicios",
+  "description": "Catálogo de servicios con categorías y bonos, y su disponibilidad.",
   "setup": {
     "title": "Tu catálogo de servicios",
     "description": "Añade los servicios que vendes, con su precio y su duración."
