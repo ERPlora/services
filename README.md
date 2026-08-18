@@ -55,8 +55,8 @@ docs/                         # documentación de usuario + corpus del asistente
 ## Estado y trabajo abierto
 
 El estado vive en las **Issues de este repo**, no aquí. Huecos conocidos y documentados en
-`docs/limits.md`: variantes y addons existen en BD **sin query ni command**; `delete_package` no
-cascadea el soft-delete a sus líneas; falta el guard cross-módulo que impide borrar un servicio con
-citas vivas. La **concesión** del bono al comprarlo es seam del módulo de venta (ADR-0076).
+`docs/limits.md`: variantes y addons existen en BD **sin query ni command**. Archivar un servicio
+con citas próximas **avisa** con el conteo (query pública de `appointments`), no bloquea (services#2).
+La **concesión** del bono al comprarlo es seam del módulo de venta (ADR-0076).
 
 Doc de arquitectura: `architecture/modules/services.md` (cargarlo antes de tocar el módulo).

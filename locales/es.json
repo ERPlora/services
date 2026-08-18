@@ -33,7 +33,6 @@
     "statusReason": {
       "unconfigured": "Sin categoría fiscal: no se puede cobrar"
     },
-    "actionDelete": "Eliminar",
     "placeholderName": "Nombre",
     "placeholderPrice": "Precio",
     "placeholderDuration": "Duración (min)",
@@ -50,7 +49,13 @@
     "empty": "Sin servicios.",
     "errorCreate": "No se pudo crear el servicio",
     "errorTaxRequired": "Elige una categoría fiscal: sin ella el servicio no se puede cobrar",
-    "errorDelete": "No se pudo eliminar el servicio"
+    "actionArchive": "Archivar",
+    "archiveTitle": "Archivar servicio",
+    "archiveHint": "dejará de ofrecerse y de poder reservarse. Se conservan su histórico y las citas ya reservadas.",
+    "archiveWarnAppointments": "{count} cita(s) próxima(s) siguen usando este servicio. Conservan su reserva, precio y duración; solo dejan de admitirse reservas nuevas.",
+    "archiveConfirm": "Archivar",
+    "btnCancel": "Cancelar",
+    "errorArchive": "No se pudo archivar el servicio"
   },
   "errors": {
     "services.category_unavailable": "Esa categoría no está disponible: no existe en este negocio o se ha eliminado.",

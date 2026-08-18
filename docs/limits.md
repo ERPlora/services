@@ -4,9 +4,11 @@
 
 - **Variants and add-ons are unreachable.** They exist in the database but have no query or command,
   so no screen and no API touch them.
-- **Deleting a service does not check for live appointments.** The cross-module guard that would
-  count active bookings for that service is not wired, so a service can be deleted while it is
-  booked.
+- **Archiving a service warns about its upcoming appointments, it does not block.** The Services
+  screen asks `appointments` how many pending/confirmed appointments still use the service and
+  shows the count before you confirm; the appointments keep their booking, price and duration. If
+  `appointments` is not installed the dialog simply has no such line. Nothing stops an API caller
+  from archiving a booked service — by design (Fresha, Square and Vagaro archive and warn too).
 - **This module cannot grant a package to a customer.** It can only redeem one.
 
 ## Errors you will actually see
@@ -62,7 +64,7 @@ A refused redemption rolls the whole transaction back — no ledger row, no even
 | See services, categories, packages and the settings | `services.view_service`, `services.view_category`, `services.view_package` |
 | Create a service | `services.add_service` |
 | Change a service, bulk-create services | `services.change_service` |
-| Delete a service | `services.delete_service` |
+| Archive a service | `services.delete_service` |
 | Create or change a category | `services.add_category` / `services.change_category` |
 | Delete a category | `services.delete_category` |
 | Create or change a package | `services.add_package` / `services.change_package` |
@@ -114,8 +116,9 @@ purchase. That surprises everyone once.
 **"The balance says uses remain but redeeming is refused."** Check the expiry and whether the package
 is still active — remaining uses is only one of the three conditions.
 
-**"I deleted a service that had appointments."** Also a known gap: no guard prevents it today. The
-appointments keep their denormalised copy of the name and price.
+**"I archived a service that had appointments."** That is allowed on purpose: the screen warned you
+with the count. The appointments keep their denormalised copy of the name, price and duration; only
+new bookings stop.
 
 **"A 20 discount was applied wrongly."** Check which field holds it. `discount_percent` is a
 percentage; `discount_amount_cents` is money in cents. They are separate fields precisely because
