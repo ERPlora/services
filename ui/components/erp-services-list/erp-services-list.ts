@@ -32,6 +32,9 @@ interface ErploraClientLike extends ListClient {
    *  rejilla de productos del TPV, un `<ion-select>` de categorías fiscales, el mapa
    *  producto↔categoría. El viejo `page_size` NO era un parámetro del runtime: truncaba a 50. */
   queryAll<T = unknown>(name: string, params?: Record<string, unknown>): Promise<T[]>;
+  /** Query to an OPTIONAL integration (ADR-0127): `undefined` when the owner module is not
+   *  installed/active in this hub; any other failure throws like `query()`. */
+  queryOptional<T = unknown>(name: string, params?: Record<string, unknown>): Promise<T | undefined>;
   queryPage<R = unknown>(name: string, params: ListParams): Promise<ListPage<R>>;
   command<T = unknown>(name: string, payload?: Record<string, unknown>): Promise<T>;
   on(event: string, cb: (payload: unknown) => void): () => void;
@@ -42,6 +45,8 @@ interface ErploraClientLike extends ListClient {
   formatMoney(minor: number, opts?: { currency?: string; locale?: string }): string;
   /** Decimales de la moneda del hub — la escala del dinero. 2 en EUR, 0 en JPY, 3 en KWD. */
   currencyDecimals: number;
+  /** UI visibility only; the runtime re-checks the permission on every command. */
+  hasPermission?(permission: string): boolean;
 }
 
 interface Service {
@@ -118,6 +123,18 @@ function erplora(): ErploraClientLike {
   return c;
 }
 
+/** UI visibility; the runtime re-validates the permission on every command. */
+function can(permission: string): boolean {
+  const client = erplora();
+  return typeof client.hasPermission === 'function' ? client.hasPermission(permission) : true;
+}
+
+/** Row of `appointments.appointments.count_active_for_service` (public query of `appointments`). */
+interface ActiveAppointments {
+  active_count: number | string;
+  next_start_datetime: string | null;
+}
+
 export class ErpServicesList extends LitElement {
   static styles = css`
     :host { display:flex; flex-direction:column; height:100%; min-height:0; font-family: system-ui, sans-serif; color: var(--ion-text-color, #1c1b18); }
@@ -149,6 +166,13 @@ export class ErpServicesList extends LitElement {
   @state() saving = false;
 
   @state() tick = 0;
+
+  /** Service waiting for the archive confirmation (services#2). `null` = no dialog. */
+  @state() archiveTarget: Service | null = null;
+
+  /** Upcoming appointments of `archiveTarget`, from `appointments`; `null` = unknown (module not
+   *  installed / no permission) — the warning is advisory, never a dependency. */
+  @state() archiveActive: ActiveAppointments | null = null;
 
   private ctrl!: ListController<Service>;
 
@@ -212,8 +236,14 @@ export class ErpServicesList extends LitElement {
     ];
   }
 
+  // «Archive», not «delete»: `services.services.delete` is a soft-delete + `is_active = 0` — the
+  // service stops being offered and its history (and the appointments already booked, which keep
+  // their own snapshot) stays. That is what Fresha/Square/Vagaro/Odoo do; none of them deletes a
+  // service with future bookings. Only who holds the permission sees the action (services#2).
   private get actions(): DataTableAction[] {
-    return [{ id: 'delete', label: erplora().t(CATALOG, 'ui.actionDelete'), icon: 'trash', color: 'danger' }];
+    return can('services.delete_service')
+      ? [{ id: 'archive', label: erplora().t(CATALOG, 'ui.actionArchive'), icon: 'archive-outline', color: 'danger' }]
+      : [];
   }
 
   // TODO-LIT: componentWillLoad → connectedCallback. Recuerda: connectedCallback se dispara
@@ -336,16 +366,80 @@ export class ErpServicesList extends LitElement {
     }
   }
 
-  private async onRowAction(ev: CustomEvent<{ actionId: string; row: Record<string, unknown> }>) {
+  async onRowAction(ev: CustomEvent<{ actionId: string; row: Record<string, unknown> }>) {
     const { actionId, row } = ev.detail;
-    if (actionId !== 'delete') return;
+    if (actionId !== 'archive' || !can('services.delete_service')) return;
+    this.formError = '';
+    // Never on the first tap: confirm, and say what it touches. The count comes from a PUBLIC
+    // query of `appointments` (services cannot look at its table, and cannot `reads` it either:
+    // appointments depends on services, so the reverse dependency would be a cycle). It is an
+    // OPTIONAL integration (ADR-0127, `queryOptional`): a hub without appointments gets the dialog
+    // without the line. Any other failure is logged, not swallowed — but it never blocks
+    // archiving: the line is advice about what the archive touches, not a precondition.
+    this.archiveTarget = row as unknown as Service;
+    this.archiveActive = null;
+    try {
+      const rows = await erplora().queryOptional<ActiveAppointments[]>(
+        'appointments.appointments.count_active_for_service',
+        { service_id: String(row.id) },
+      );
+      const first = Array.isArray(rows) ? rows[0] : null;
+      if (first && this.archiveTarget?.id === row.id) this.archiveActive = first;
+    } catch (e) {
+      console.warn('[services] appointments.appointments.count_active_for_service failed; archiving without the warning line', e);
+      this.archiveActive = null;
+    }
+  }
+
+  /** Runs the confirmed archive (`services.services.delete`). */
+  async confirmArchive(): Promise<void> {
+    const target = this.archiveTarget;
+    if (!target || !can('services.delete_service')) return;
+    this.saving = true;
     this.formError = '';
     try {
-      await erplora().command('services.services.delete', { service_id: row.id });
+      await erplora().command('services.services.delete', { service_id: target.id });
+      this.archiveTarget = null;
+      this.archiveActive = null;
       await this.ctrl.load();
     } catch (e) {
-      this.formError = e instanceof Error ? e.message : erplora().t(CATALOG, 'ui.errorDelete');
+      this.formError = e instanceof Error ? e.message : erplora().t(CATALOG, 'ui.errorArchive');
+      this.archiveTarget = null;
+    } finally {
+      this.saving = false;
     }
+  }
+
+  private renderArchiveConfirm() {
+    const t = (k: string, p?: Record<string, unknown>): string => erplora().t(CATALOG, k, p);
+    const count = Number(this.archiveActive?.active_count ?? 0) || 0;
+    return html`<ion-modal .isOpen=${!!this.archiveTarget} @ionModalDidDismiss=${() => (this.archiveTarget = null)}>
+      <ion-header class="ion-no-border">
+        <ion-toolbar><ion-title>${t('ui.archiveTitle')}</ion-title></ion-toolbar>
+      </ion-header>
+      <ion-content class="ion-padding">
+        <!-- Self-styled: ion-modal is reparented to <body>, so this component's CSS does not reach it. -->
+        <ion-list lines="none">
+          <ion-item>
+            <ion-label class="ion-text-wrap">
+              <b>${this.archiveTarget?.name ?? ''}</b> — ${t('ui.archiveHint')}
+            </ion-label>
+          </ion-item>
+          ${count > 0
+            ? html`<ion-item>
+                <ion-icon slot="start" name="calendar-outline" color="warning"></ion-icon>
+                <ion-label class="ion-text-wrap">${t('ui.archiveWarnAppointments', { count })}</ion-label>
+              </ion-item>`
+            : nothing}
+        </ion-list>
+        <ion-button class="ion-margin-top" expand="block" color="danger" ?disabled=${this.saving} @click=${() => this.confirmArchive()}>
+          ${this.saving ? t('ui.btnSaving') : t('ui.archiveConfirm')}
+        </ion-button>
+        <ion-button expand="block" fill="outline" ?disabled=${this.saving} @click=${() => (this.archiveTarget = null)}>
+          ${t('ui.btnCancel')}
+        </ion-button>
+      </ion-content>
+    </ion-modal>`;
   }
 
   // El título de la vista lo pinta el topbar del shell: repetirlo aquí lo duplicaba en pantalla.
@@ -376,6 +470,7 @@ export class ErpServicesList extends LitElement {
             <ion-button type="submit" ?disabled=${this.saving || !this.newName || !this.newTaxRateId}>${this.saving ? t('ui.btnSaving') : t('ui.btnAdd')}</ion-button>
           </form>
         </ok-data-table>
+        ${this.renderArchiveConfirm()}
       </div>`;
   }
 }

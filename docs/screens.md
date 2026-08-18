@@ -30,10 +30,12 @@ by name.
 Prices are entered in euros and stored in cents. Requires `services.add_service` — an employee has
 this.
 
-### Edit or delete a service
+### Edit or archive a service
 
-Editing needs `services.change_service`; deleting needs `services.delete_service` (**admin only**)
-and is a soft delete.
+Editing needs `services.change_service`. **Archive** (row action `…` → Archive) needs
+`services.delete_service` (**admin only**): it asks you to confirm and, if `appointments` is
+installed, tells you how many upcoming appointments still use the service — they keep their
+booking; the service just stops being offered. It is a soft delete: nothing is destroyed.
 
 ### Create many services at once
 

@@ -32,7 +32,6 @@
     "statusReason": {
       "unconfigured": "No tax category: it cannot be charged"
     },
-    "actionDelete": "Delete",
     "placeholderName": "Name",
     "placeholderPrice": "Price",
     "placeholderDuration": "Duration (min)",
@@ -49,7 +48,13 @@
     "empty": "No services.",
     "errorCreate": "Could not create the service",
     "errorTaxRequired": "Pick a tax category: without one the service cannot be charged",
-    "errorDelete": "Could not delete the service"
+    "actionArchive": "Archive",
+    "archiveTitle": "Archive service",
+    "archiveHint": "it will no longer be offered or bookable. Its history and the appointments already booked are kept.",
+    "archiveWarnAppointments": "{count} upcoming appointment(s) still use this service. They keep their booking, price and duration; only new bookings stop.",
+    "archiveConfirm": "Archive",
+    "btnCancel": "Cancel",
+    "errorArchive": "Could not archive the service"
   },
   "errors": {
     "services.category_unavailable": "That category is not available: it does not exist in this business or it has been deleted.",

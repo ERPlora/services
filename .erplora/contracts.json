@@ -7,7 +7,9 @@
       "services.services.list",
       "taxes.categories.list"
     ],
-    "optional_queries": [],
+    "optional_queries": [
+      "appointments.appointments.count_active_for_service"
+    ],
     "commands": [
       "services.services.create",
       "services.services.delete"

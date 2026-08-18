@@ -76,8 +76,10 @@ describe('el alta vive DENTRO de la tabla (paridad con /employees e inventory)',
 
   it('no queda NINGÚN control de alta suelto fuera de la tabla', async () => {
     const el = await montar();
+    // The archive confirmation (`ion-modal`, services#2) is not an «alta» control: it is the same
+    // dialog inventory renders next to its table. Everything else must live inside the table.
     const sueltos = [...el.shadowRoot.querySelectorAll('form, ion-input, ion-select, ion-button')].filter(
-      (n) => !n.closest('ok-data-table'),
+      (n) => !n.closest('ok-data-table') && !n.closest('ion-modal'),
     );
     expect(sueltos.map((n) => n.tagName.toLowerCase()), 'hay controles de alta fuera de la tabla').toEqual([]);
   });
