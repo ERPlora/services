@@ -506,7 +506,8 @@
       "permission": "services.delete_package",
       "transaction": true,
       "sql": [
-        "commands/package_delete.sql"
+        "commands/package_delete.sql",
+        "commands/package_delete_items.sql"
       ],
       "emit": [
         "services.package.deleted"
