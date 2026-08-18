@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "services.packages.update",
+  "description": "Payload of commands/package_update.sql (header only — the lines are not editable through this door). Full snapshot; PARTIAL for callers via `records.package.patch` (hub#632): the runtime reads `services.packages.get` with `package_id` and completes the omitted keys before validating. Explicit `null` clears (`fixed_price: null` removes the closed price); omitted preserves. Closed contract (services#9).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "package_id",
+    "name",
+    "slug",
+    "discount_type",
+    "discount_percent",
+    "discount_amount_cents",
+    "is_active",
+    "is_featured"
+  ],
+  "properties": {
+    "package_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "Id of the package to update, of this hub."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "slug": {
+      "type": "string",
+      "pattern": "^[^\\sA-Z]+$",
+      "minLength": 1,
+      "maxLength": 120,
+      "description": "URL-safe key, unique per hub: lowercase, no spaces."
+    },
+    "description": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 2000
+    },
+    "discount_type": {
+      "type": "string",
+      "enum": [
+        "percentage",
+        "fixed"
+      ],
+      "description": "Discriminator of the typed discount (migration 004): `percentage` reads `discount_percent`, `fixed` reads `discount_amount_cents`."
+    },
+    "discount_percent": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "discount_amount_cents": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "fixed_price": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Closed price of the whole package in minor units, or null (price = sum of lines minus discount)."
+    },
+    "validity_days": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1,
+      "description": "Days the voucher stays redeemable after its first use; null = never expires."
+    },
+    "max_uses": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1,
+      "description": "Uses the voucher grants; null = unlimited."
+    },
+    "is_active": {
+      "type": "integer",
+      "enum": [
+        0,
+        1
+      ]
+    },
+    "is_featured": {
+      "type": "integer",
+      "enum": [
+        0,
+        1
+      ]
+    }
+  }
+}

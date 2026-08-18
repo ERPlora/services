@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "services.categories.update",
+  "description": "Payload of commands/category_update.sql. Full snapshot; PARTIAL for callers via `records.category.patch` (hub#632): the runtime reads `services.categories.get` with `category_id` and completes the omitted keys before validating. Explicit `null` clears; omitted preserves. Closed contract (services#9).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "category_id",
+    "name",
+    "slug",
+    "sort_order",
+    "is_active"
+  ],
+  "properties": {
+    "category_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "Id of the category to update, of this hub."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "slug": {
+      "type": "string",
+      "pattern": "^[^\\sA-Z]+$",
+      "minLength": 1,
+      "maxLength": 120,
+      "description": "URL-safe key, unique per hub: lowercase, no spaces."
+    },
+    "description": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 2000
+    },
+    "parent_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 64,
+      "description": "Parent category of THIS hub, alive, or none (root). The statement checks ownership and liveness and refuses with `services.parent_category_unavailable`; a category cannot be its own parent (CHECK)."
+    },
+    "icon": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 80,
+      "description": "Iconify name (`ion:cut-outline`) or empty."
+    },
+    "color": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^(#[0-9a-fA-F]{6})?$",
+      "description": "`#rrggbb` or empty."
+    },
+    "sort_order": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "is_active": {
+      "type": "integer",
+      "enum": [
+        0,
+        1
+      ]
+    }
+  }
+}

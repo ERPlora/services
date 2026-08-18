@@ -25,7 +25,7 @@
 -- columna NOT NULL es una escritura que revienta, no un default.
 INSERT INTO services_service
   (id, hub_id, name, slug, description, short_description, category_id,
-   pricing_type, price, cost, duration_minutes, buffer_before, buffer_after,
+   pricing_type, price, min_price, max_price, cost, duration_minutes, buffer_before, buffer_after,
    max_capacity, is_bookable, requires_confirmation, allow_online_booking,
    sort_order, is_active, is_featured, sku, barcode, notes, tax_category_key,
    is_deleted, created_by, updated_by, created_at, updated_at)
@@ -33,7 +33,8 @@ SELECT
    :new_id, :hub_id, :name,
    COALESCE(NULLIF(:slug, ''), 'svc-' || :new_id),
    COALESCE(:description, ''), COALESCE(:short_description, ''), :category_id,
-   COALESCE(NULLIF(:pricing_type, ''), 'fixed'), COALESCE(:price, 0), COALESCE(:cost, 0),
+   COALESCE(NULLIF(:pricing_type, ''), 'fixed'), COALESCE(:price, 0), :min_price, :max_price,
+   COALESCE(:cost, 0),
    COALESCE(:duration_minutes, st.default_duration, 60),
    COALESCE(:buffer_before, st.default_buffer_time, 0),
    COALESCE(:buffer_after, st.default_buffer_time, 0),

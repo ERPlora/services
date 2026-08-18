@@ -51,5 +51,14 @@
     "errorCreate": "No se pudo crear el servicio",
     "errorTaxRequired": "Elige una categoría fiscal: sin ella el servicio no se puede cobrar",
     "errorDelete": "No se pudo eliminar el servicio"
+  },
+  "errors": {
+    "services.category_unavailable": "Esa categoría no está disponible: no existe en este negocio o se ha eliminado.",
+    "services.service_update_rejected": "No se ha podido actualizar el servicio: no existe en este negocio, o la categoría elegida no existe.",
+    "services.service_not_found": "Ese servicio no existe en este negocio.",
+    "services.parent_category_unavailable": "Esa categoría padre no está disponible: no existe en este negocio o se ha eliminado.",
+    "services.category_update_rejected": "No se ha podido actualizar la categoría: no existe en este negocio, o la categoría padre elegida no existe (o es ella misma).",
+    "services.category_not_found": "Esa categoría no existe en este negocio.",
+    "services.package_not_found": "Ese paquete no existe en este negocio."
   }
 }

@@ -100,7 +100,8 @@
       "migrations/postgres/003_package_redemption.sql",
       "migrations/postgres/004_discount_split.sql",
       "migrations/postgres/005_tax_category_key.sql",
-      "migrations/postgres/006_quantity_fixed_point.sql"
+      "migrations/postgres/006_quantity_fixed_point.sql",
+      "migrations/postgres/007_domain_checks.sql"
     ]
   },
   "queries": {
@@ -213,6 +214,15 @@
       },
       "ai": {
         "description": "Lists the defined service categories"
+      },
+      "expose_api": true
+    },
+    "services.categories.get": {
+      "permission": "services.view_category",
+      "sql": "queries/category_get.sql",
+      "schema": "schemas/category_get.json",
+      "ai": {
+        "description": "Retrieves the full detail of a service category by its identifier"
       },
       "expose_api": true
     },
@@ -372,15 +382,7 @@
       "ai": {
         "description": "Creates a new service in the catalogue. The fiscal category (tax_category_key) is mandatory: a service is sold as a sale line with its VAT, so it cannot be created without one."
       },
-      "expose_api": true,
-      "validates": [
-        {
-          "field": "tax_category_key",
-          "query": "taxes.categories.get",
-          "param": "key",
-          "optional": false
-        }
-      ]
+      "expose_api": true
     },
     "services.services.update": {
       "permission": "services.change_service",
@@ -401,15 +403,7 @@
       "ai": {
         "description": "Updates the details of an existing service. The fiscal category (tax_category_key) cannot be emptied."
       },
-      "expose_api": true,
-      "validates": [
-        {
-          "field": "tax_category_key",
-          "query": "taxes.categories.get",
-          "param": "key",
-          "optional": false
-        }
-      ]
+      "expose_api": true
     },
     "services.services.delete": {
       "permission": "services.delete_service",
@@ -417,6 +411,13 @@
       "sql": [
         "commands/service_delete.sql"
       ],
+      "schema": "schemas/service_delete.json",
+      "expect_rows": {
+        "op": "min",
+        "n": 1,
+        "error": "services.service_not_found",
+        "message": "That service does not exist in this business."
+      },
       "emit": [
         "services.service.deleted"
       ],
@@ -431,6 +432,7 @@
         "file": "dist/handler.wasm",
         "function": "bulk_create_services"
       },
+      "schema": "schemas/services_bulk_create.json",
       "ai": {
         "description": "Creates multiple services in a single bulk operation"
       }
@@ -447,6 +449,13 @@
       "sql": [
         "commands/category_create.sql"
       ],
+      "schema": "schemas/category_create.json",
+      "expect_rows": {
+        "op": "min",
+        "n": 1,
+        "error": "services.parent_category_unavailable",
+        "message": "That parent category is not available: it does not exist in this business or it has been deleted."
+      },
       "ai": {
         "description": "Creates a new service category"
       },
@@ -458,6 +467,13 @@
       "sql": [
         "commands/category_update.sql"
       ],
+      "schema": "schemas/category_update.json",
+      "expect_rows": {
+        "op": "min",
+        "n": 1,
+        "error": "services.category_update_rejected",
+        "message": "The category could not be updated: it does not exist in this business, or the parent you picked does not (or is the category itself)."
+      },
       "ai": {
         "description": "Updates the details of an existing service category"
       },
@@ -469,6 +485,13 @@
       "sql": [
         "commands/category_delete.sql"
       ],
+      "schema": "schemas/category_delete.json",
+      "expect_rows": {
+        "op": "min",
+        "n": 1,
+        "error": "services.category_not_found",
+        "message": "That category does not exist in this business."
+      },
       "ai": {
         "description": "Deletes a service category (destructive)"
       }
@@ -480,6 +503,7 @@
         "file": "dist/handler.wasm",
         "function": "create_package"
       },
+      "schema": "schemas/package_create.json",
       "emit": [
         "services.package.created"
       ],
@@ -494,6 +518,13 @@
       "sql": [
         "commands/package_update.sql"
       ],
+      "schema": "schemas/package_update.json",
+      "expect_rows": {
+        "op": "min",
+        "n": 1,
+        "error": "services.package_not_found",
+        "message": "That package does not exist in this business."
+      },
       "emit": [
         "services.package.updated"
       ],
@@ -509,6 +540,13 @@
         "commands/package_delete.sql",
         "commands/package_delete_items.sql"
       ],
+      "schema": "schemas/package_delete.json",
+      "expect_rows": {
+        "op": "min",
+        "n": 1,
+        "error": "services.package_not_found",
+        "message": "That package does not exist in this business."
+      },
       "emit": [
         "services.package.deleted"
       ],
@@ -554,15 +592,33 @@
       "schema": "schemas/settings_update.json",
       "ai": {
         "description": "Updates the general settings of the services module"
-      },
-      "validates": [
-        {
-          "field": "default_tax_category_key",
-          "query": "taxes.categories.get",
-          "param": "key",
-          "optional": true
-        }
-      ]
+      }
+    }
+  },
+  "records": {
+    "service": {
+      "mutable": true,
+      "update": "services.services.update",
+      "patch": {
+        "read": "services.services.get",
+        "key": "service_id"
+      }
+    },
+    "category": {
+      "mutable": true,
+      "update": "services.categories.update",
+      "patch": {
+        "read": "services.categories.get",
+        "key": "category_id"
+      }
+    },
+    "package": {
+      "mutable": true,
+      "update": "services.packages.update",
+      "patch": {
+        "read": "services.packages.get",
+        "key": "package_id"
+      }
     }
   },
   "events": {

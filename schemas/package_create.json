@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "services.packages.create",
+  "description": "Payload of the WASM handler `create_package` (services._insert_package + N × services._insert_package_item, one transaction). `hub_id`, `current_user_id`, `now` and the id batch are provided by the runtime. `discount_value` is the LEGACY polymorphic field (% or major units by type) the handler still derives into the typed columns — accepted for compatibility, not to be used by new callers. Closed contract (services#9).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "name"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "description": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 2000
+    },
+    "discount_type": {
+      "type": "string",
+      "enum": [
+        "percentage",
+        "fixed"
+      ],
+      "description": "Discriminator of the typed discount (migration 004): `percentage` reads `discount_percent`, `fixed` reads `discount_amount_cents`."
+    },
+    "discount_percent": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Percent off when `discount_type = percentage` (0..100, REAL column, not money)."
+    },
+    "discount_amount_cents": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Amount off in minor units when `discount_type = fixed` (ADR-0007)."
+    },
+    "fixed_price": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Closed price of the whole package in minor units, or null (price = sum of lines minus discount)."
+    },
+    "validity_days": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1,
+      "description": "Days the voucher stays redeemable after its first use; null = never expires."
+    },
+    "max_uses": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1,
+      "description": "Uses the voucher grants; null = unlimited."
+    },
+    "is_active": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "enum": [
+        0,
+        1,
+        null
+      ]
+    },
+    "is_featured": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "enum": [
+        0,
+        1,
+        null
+      ]
+    },
+    "discount_value": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "LEGACY: percent (`percentage`) or major units (`fixed`), derived by the handler when the typed field is absent. Prefer `discount_percent` / `discount_amount_cents`."
+    },
+    "sort_order": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "items": {
+      "type": "array",
+      "description": "Lines of the package. Each names a live service of THIS hub (checked by the insert statement) with a quantity in fixed-point 10⁶ (ADR-0147: 2000000 = 2 sessions). Duplicated service_ids collapse into one line.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "service_id"
+        ],
+        "properties": {
+          "service_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "quantity": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "description": "Fixed-point 10⁶ (ADR-0147); omitted = 1 session (1000000)."
+          }
+        }
+      }
+    }
+  }
+}
