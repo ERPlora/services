@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "services.categories.get params",
+  "description": "Params of queries/category_get.sql. `hub_id` is injected by the runtime (§2.5). It is also the `patch` read of `services.categories.update` (hub#632).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "category_id"
+  ],
+  "properties": {
+    "category_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "Id of the category to fetch."
+    }
+  }
+}

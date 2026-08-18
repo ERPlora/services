@@ -16,6 +16,8 @@ UPDATE services_service SET
   category_id      = :category_id,
   pricing_type     = :pricing_type,
   price            = :price,
+  min_price        = :min_price,
+  max_price        = :max_price,
   cost             = :cost,
   duration_minutes = :duration_minutes,
   is_bookable      = :is_bookable,

@@ -1,44 +1,204 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "services.services.create",
-  "description": "Payload of commands/service_create.sql. `hub_id`, `new_id`, `current_user_id` and `now` are injected by the runtime (§2.5) and are not part of the payload. A service is sold as one sale line with its VAT, so it cannot exist without knowing how it taxes: `tax_category_key` is REQUIRED here, at save time, and not discovered at the counter when the sale is rejected. Deliberately minimal — the closed domains (pricing_type), the ranges and additionalProperties belong to services#9, which hardens the whole CRUD.",
+  "description": "Payload of commands/service_create.sql. `hub_id`, `new_id`, `current_user_id` and `now` are injected by the runtime (§2.5) and are NOT part of the payload — sending them is refused. A service is sold as one sale line with its VAT, so it cannot exist without knowing how it taxes: `tax_category_key` is REQUIRED here, at save time (services#33). Closed contract (services#9): pricing type is an enum, money and durations have floors, flags are 0/1, unknown keys are refused. Omitted optional fields resolve in the statement (caller → hub settings → module default), on purpose NOT as schema defaults: a schema default for `duration_minutes` would silently override the hub's `default_duration` setting (services#13).",
   "type": "object",
-  "required": ["name", "tax_category_key"],
+  "additionalProperties": false,
+  "required": [
+    "name",
+    "tax_category_key"
+  ],
   "properties": {
     "name": {
       "type": "string",
       "minLength": 1,
+      "maxLength": 200,
       "description": "Name of the service. NOT NULL in the column and with no fallback in the statement."
     },
     "tax_category_key": {
       "type": "string",
       "minLength": 1,
+      "maxLength": 64,
       "description": "Canonical fiscal category the service taxes by (ADR-0085), one of the `key` values of `taxes.categories.list`. `minLength` is not decoration: `required` alone accepts \"\", and \"\" is exactly no category."
     },
-    "slug": { "type": ["string", "null"] },
-    "description": { "type": ["string", "null"] },
-    "short_description": { "type": ["string", "null"] },
-    "category_id": {
-      "type": ["string", "null"],
-      "description": "Service category of THIS hub, or none. The statement checks the ownership and fails with `services.category_unavailable` if it belongs to another hub (services#7)."
+    "slug": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[^\\sA-Z]*$",
+      "maxLength": 120,
+      "description": "URL-safe key, unique per hub (`uq_*_hub_slug`): lowercase, no spaces. Empty/null = derived by the statement/handler."
     },
-    "pricing_type": { "type": ["string", "null"] },
+    "description": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 2000
+    },
+    "category_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 64,
+      "description": "Service category of THIS hub, or none. The statement checks the ownership and fails with `services.category_unavailable` if it belongs to another hub or is deleted (services#7)."
+    },
+    "pricing_type": {
+      "type": "string",
+      "enum": [
+        "fixed",
+        "hourly",
+        "from",
+        "variable",
+        "free"
+      ],
+      "description": "Closed domain. `from` prices carry `min_price`/`max_price`; `free` sells at 0."
+    },
     "price": {
-      "type": ["integer", "null"],
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
       "description": "Minor units of the hub currency (ADR-0007/0123): 1500 = 15,00 € — never the typed-in major unit."
     },
-    "cost": { "type": ["integer", "null"] },
-    "duration_minutes": { "type": ["integer", "null"] },
-    "buffer_before": { "type": ["integer", "null"] },
-    "buffer_after": { "type": ["integer", "null"] },
-    "max_capacity": { "type": ["integer", "null"] },
-    "is_bookable": { "type": ["integer", "null"] },
-    "requires_confirmation": { "type": ["integer", "null"] },
-    "allow_online_booking": { "type": ["integer", "null"] },
-    "sort_order": { "type": ["integer", "null"] },
-    "is_featured": { "type": ["integer", "null"] },
-    "sku": { "type": ["string", "null"] },
-    "barcode": { "type": ["string", "null"] },
-    "notes": { "type": ["string", "null"] }
+    "min_price": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Lower bound of a `from`/`variable` price, in minor units. `min_price <= max_price` is enforced by the CHECK constraint (JSON Schema cannot compare two fields)."
+    },
+    "max_price": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Upper bound of a `from`/`variable` price, in minor units."
+    },
+    "cost": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Internal cost, minor units."
+    },
+    "duration_minutes": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1,
+      "description": "A service takes time: 0 or negative is not a duration. Omitted = the hub's `default_duration` setting (resolved by the statement, not here — a schema default would override the setting)."
+    },
+    "is_bookable": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "enum": [
+        0,
+        1,
+        null
+      ]
+    },
+    "sort_order": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "short_description": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 2000
+    },
+    "buffer_before": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Minutes blocked before the service. Omitted = hub's `default_buffer_time`."
+    },
+    "buffer_after": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Minutes blocked after the service. Omitted = hub's `default_buffer_time`."
+    },
+    "max_capacity": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1,
+      "description": "How many customers one slot serves; at least 1."
+    },
+    "requires_confirmation": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "enum": [
+        0,
+        1,
+        null
+      ]
+    },
+    "allow_online_booking": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "enum": [
+        0,
+        1,
+        null
+      ],
+      "description": "Omitted = hub's `allow_online_booking` setting."
+    },
+    "is_featured": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "enum": [
+        0,
+        1,
+        null
+      ]
+    },
+    "sku": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 64
+    },
+    "barcode": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 64
+    },
+    "notes": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 2000
+    }
   }
 }

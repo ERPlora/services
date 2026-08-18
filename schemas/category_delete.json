@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "services.categories.delete",
+  "description": "Soft-delete of a category of THIS hub (`hub_id` injected by the runtime, never sent). A category that does not exist in this hub affects 0 rows and the command is REFUSED (`expect_rows`), not silently accepted. Closed contract (services#9).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "category_id"
+  ],
+  "properties": {
+    "category_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "Id of the category to delete."
+    }
+  }
+}

@@ -4,7 +4,6 @@
 
 - **Variants and add-ons are unreachable.** They exist in the database but have no query or command,
   so no screen and no API touch them.
-- **Deleting a package does not soft-delete its lines.** The header goes; the item rows remain.
 - **Deleting a service does not check for live appointments.** The cross-module guard that would
   count active bookings for that service is not wired, so a service can be deleted while it is
   booked.
@@ -16,6 +15,10 @@
 |---|---|---|
 | `services.category_unavailable` | The category you attached belongs to another hub | Pick a category of this hub, or leave it empty |
 | `services.service_update_rejected` | The update matched nothing: either the service is not in this hub **or** the category is foreign | Check both — the message deliberately names the two |
+| `services.service_not_found` / `services.category_not_found` / `services.package_not_found` | A delete or update named an id that is not in this hub | Check the id — nothing was changed |
+| `services.parent_category_unavailable` | The parent category you attached belongs to another hub or is deleted | Pick a live parent of this hub, or leave it empty (root) |
+| `services.category_update_rejected` | The category update matched nothing: the category is not in this hub, or the parent is foreign/deleted/the category itself | Check both |
+| `InvalidPayload` (validation error) | The payload broke the command's contract: unknown key, pricing type outside the enum, negative price, duration 0, capacity 0, percentage above 100, empty batch… | Fix the named field; every public command has a JSON Schema |
 | `package_not_found` | The package does not exist or is inactive | Reactivate it, or check the id |
 | `no_uses_left` | The maximum uses are already consumed | Sell another package |
 | `expired` | The validity window has passed since the **first** redemption | The package is spent; a new one is needed |
@@ -29,6 +32,19 @@ A refused redemption rolls the whole transaction back — no ledger row, no even
 | Pricing type | `fixed`, `hourly`, `from`, `variable`, `free` |
 | Package discount type | `percentage` or `fixed` |
 | Currency | EUR |
+
+## Validation rules (server side — the schemas refuse, the CHECK constraints back them up)
+
+| Rule | Where |
+|---|---|
+| Money (`price`, `cost`, `min_price`, `max_price`, `fixed_price`, `discount_amount_cents`) is a non-negative integer in minor units | schema + CHECK |
+| `min_price <= max_price` | CHECK only (a cross-field rule) |
+| `duration_minutes >= 1`; buffers `>= 0`; `max_capacity >= 1` | schema + CHECK |
+| Flags (`is_bookable`, `is_active`, …) are `0` or `1` | schema + CHECK |
+| `discount_percent` in `0..100`; `max_uses >= 1`; `validity_days >= 1` (or null) | schema + CHECK |
+| A category's parent is a live category of this hub and never itself | statement (`expect_rows`) + CHECK |
+| Unknown keys and the system params (`hub_id`, `now`, …) are refused | schema (`additionalProperties: false`) |
+| Updates are **partial**: send the id plus the fields you change; omitted fields keep their value, an explicit `null` clears | `records.*.patch` |
 
 ## Caps and sizes
 
@@ -80,9 +96,10 @@ convention, with no cross-module foreign key.
 **"I cannot book this service."** Check that it is marked **bookable** and that it has a duration. A
 service with no duration gives the diary no window.
 
-**"The service saved without a tax category."** That is legitimate — it falls back to the hub's
-default tax category from the settings. If the fallback is also missing, the sale will fail to
-resolve a rate.
+**"It refused to save the service without a tax category."** That is deliberate: a service is sold as
+a sale line with its VAT, so `tax_category_key` is required at save time (not discovered at the
+counter). Services created through `bulk_create` are the exception today — they carry no tax
+category and fall back to the hub's default.
 
 **"It says the category is unavailable but I can see it."** It belongs to another hub. An empty
 category is allowed; a foreign one is not.
@@ -96,9 +113,6 @@ purchase. That surprises everyone once.
 
 **"The balance says uses remain but redeeming is refused."** Check the expiry and whether the package
 is still active — remaining uses is only one of the three conditions.
-
-**"I deleted a package and its services are still listed."** Known gap: the lines are not
-soft-deleted with the header.
 
 **"I deleted a service that had appointments."** Also a known gap: no guard prevents it today. The
 appointments keep their denormalised copy of the name and price.

@@ -1,36 +1,119 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "services.services.update",
-  "description": "Payload of commands/service_update.sql. `hub_id`, `current_user_id` and `now` are injected by the runtime (§2.5). What is fixed here is that an existing service cannot have its fiscal category EMPTIED: it went in knowing how it taxes and it stays that way. Deliberately minimal — the statement overwrites every column it lists, so the rest of the mandatory set (and additionalProperties) belongs to services#9.",
+  "description": "Payload of commands/service_update.sql. `hub_id`, `current_user_id` and `now` are injected by the runtime (§2.5). The statement overwrites every column it lists, so the schema demands the FULL snapshot — and the door is still PARTIAL for callers: `records.service.patch` (hub#632) makes the runtime read `services.services.get` with `service_id` and complete the omitted keys from the row BEFORE validating. Explicit `null` clears; omitted preserves. An existing service cannot have its fiscal category EMPTIED (services#33). Closed contract (services#9).",
   "type": "object",
-  "required": ["service_id", "tax_category_key"],
+  "additionalProperties": false,
+  "required": [
+    "service_id",
+    "name",
+    "slug",
+    "pricing_type",
+    "price",
+    "cost",
+    "duration_minutes",
+    "is_bookable",
+    "is_active",
+    "sort_order",
+    "tax_category_key"
+  ],
   "properties": {
     "service_id": {
       "type": "string",
       "minLength": 1,
+      "maxLength": 64,
       "description": "Id of the service to update, of this hub."
     },
     "tax_category_key": {
       "type": "string",
       "minLength": 1,
+      "maxLength": 64,
       "description": "Canonical fiscal category the service taxes by (ADR-0085). Required so the edit cannot leave behind a service nobody can charge; `minLength` closes the \"\" that `required` alone lets through."
     },
-    "name": { "type": ["string", "null"] },
-    "slug": { "type": ["string", "null"] },
-    "description": { "type": ["string", "null"] },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "description": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 2000
+    },
     "category_id": {
-      "type": ["string", "null"],
-      "description": "Service category of THIS hub, or none (services#7)."
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 64,
+      "description": "Service category of THIS hub, or none. The statement checks the ownership and fails with `services.category_unavailable` if it belongs to another hub or is deleted (services#7)."
     },
-    "pricing_type": { "type": ["string", "null"] },
+    "pricing_type": {
+      "type": "string",
+      "enum": [
+        "fixed",
+        "hourly",
+        "from",
+        "variable",
+        "free"
+      ],
+      "description": "Closed domain. `from` prices carry `min_price`/`max_price`; `free` sells at 0."
+    },
     "price": {
-      "type": ["integer", "null"],
-      "description": "Minor units of the hub currency (ADR-0007/0123)."
+      "type": "integer",
+      "minimum": 0,
+      "description": "Minor units of the hub currency (ADR-0007/0123): 1500 = 15,00 € — never the typed-in major unit."
     },
-    "cost": { "type": ["integer", "null"] },
-    "duration_minutes": { "type": ["integer", "null"] },
-    "is_bookable": { "type": ["integer", "null"] },
-    "is_active": { "type": ["integer", "null"] },
-    "sort_order": { "type": ["integer", "null"] }
+    "min_price": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Lower bound of a `from`/`variable` price, in minor units. `min_price <= max_price` is enforced by the CHECK constraint (JSON Schema cannot compare two fields)."
+    },
+    "max_price": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Upper bound of a `from`/`variable` price, in minor units."
+    },
+    "cost": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "duration_minutes": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "is_bookable": {
+      "type": "integer",
+      "enum": [
+        0,
+        1
+      ]
+    },
+    "sort_order": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "slug": {
+      "type": "string",
+      "pattern": "^[^\\sA-Z]+$",
+      "minLength": 1,
+      "maxLength": 120,
+      "description": "URL-safe key, unique per hub: lowercase, no spaces."
+    },
+    "is_active": {
+      "type": "integer",
+      "enum": [
+        0,
+        1
+      ]
+    }
   }
 }
