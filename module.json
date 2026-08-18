@@ -39,6 +39,13 @@
     "admin": [
       "*"
     ],
+    "cashier": [
+      "services.view_service",
+      "services.view_category",
+      "services.view_package",
+      "services.view_package_balance",
+      "services.redeem_package"
+    ],
     "manager": [
       "services.view_service",
       "services.add_service",
