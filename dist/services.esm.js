@@ -3357,7 +3357,7 @@ var es_default = {
     colStatus: "Estado",
     status: {
       active: "Activo",
-      inactive: "Inactivo",
+      inactive: "Archivado",
       unconfigured: "Sin configurar"
     },
     statusReason: {
@@ -3386,6 +3386,8 @@ var es_default = {
     archiveConfirm: "Archivar",
     btnCancel: "Cancelar",
     errorArchive: "No se pudo archivar el servicio",
+    actionRestore: "Restaurar",
+    errorRestore: "No se pudo restaurar el servicio",
     actionEdit: "Editar",
     editingTitle: "Editando servicio",
     editingCancel: "Cancelar edici\xF3n",
@@ -3439,6 +3441,7 @@ var es_default = {
     "services.category_unavailable": "Esa categor\xEDa no est\xE1 disponible: no existe en este negocio o se ha eliminado.",
     "services.service_update_rejected": "No se ha podido actualizar el servicio: no existe en este negocio, o la categor\xEDa elegida no existe.",
     "services.service_not_found": "Ese servicio no existe en este negocio.",
+    "services.service_not_archived": "No se ha podido recuperar el servicio: no existe en este negocio, o ya se est\xE1 ofreciendo.",
     "services.parent_category_unavailable": "Esa categor\xEDa padre no est\xE1 disponible: no existe en este negocio o se ha eliminado.",
     "services.category_update_rejected": "No se ha podido actualizar la categor\xEDa: no existe en este negocio, o la categor\xEDa padre elegida no existe (o es ella misma).",
     "services.category_not_found": "Esa categor\xEDa no existe en este negocio.",
@@ -3481,7 +3484,7 @@ var en_default = {
     colStatus: "Status",
     status: {
       active: "Active",
-      inactive: "Inactive",
+      inactive: "Archived",
       unconfigured: "Not configured"
     },
     statusReason: {
@@ -3510,6 +3513,8 @@ var en_default = {
     archiveConfirm: "Archive",
     btnCancel: "Cancel",
     errorArchive: "Could not archive the service",
+    actionRestore: "Restore",
+    errorRestore: "Could not restore the service",
     actionEdit: "Edit",
     editingTitle: "Editing service",
     editingCancel: "Cancel edit",
@@ -3563,6 +3568,7 @@ var en_default = {
     "services.category_unavailable": "That category is not available: it does not exist in this business or it has been deleted.",
     "services.service_update_rejected": "The service could not be updated: it does not exist in this business, or the category you picked does not.",
     "services.service_not_found": "That service does not exist in this business.",
+    "services.service_not_archived": "That service could not be brought back: it does not exist in this business, or it is already being offered.",
     "services.parent_category_unavailable": "That parent category is not available: it does not exist in this business or it has been deleted.",
     "services.category_update_rejected": "The category could not be updated: it does not exist in this business, or the parent you picked does not (or is the category itself).",
     "services.category_not_found": "That category does not exist in this business.",
@@ -3806,7 +3812,8 @@ function toMajorText(minor) {
   return String(minorToMajor(Number(minor) || 0, typeof decimals2 === "number" ? decimals2 : 2));
 }
 var PRICING_TYPES = ["fixed", "hourly", "from", "variable", "free"];
-var FILTERABLE_STATUSES = ["active", "unconfigured"];
+var FILTERABLE_STATUSES = ["active", "unconfigured", "inactive"];
+var ARCHIVED_STATUS = "inactive";
 function stateOf(row) {
   const declared = String(row.status ?? "").trim();
   if (declared) return declared;
@@ -3844,6 +3851,7 @@ var ErpServicesList = class extends i3 {
     this.newTaxRateId = "";
     this.saving = false;
     this.tick = 0;
+    this.showingArchived = false;
     this.editingId = null;
     this.archiveTarget = null;
     this.archiveActive = null;
@@ -3927,12 +3935,51 @@ var ErpServicesList = class extends i3 {
   // service stops being offered and its history (and the appointments already booked, which keep
   // their own snapshot) stays. That is what Fresha/Square/Vagaro/Odoo do; none of them deletes a
   // service with future bookings. Only who holds the permission sees the action (services#2).
+  //
+  // While the ARCHIVED ones are on screen the row offers the way back instead (services#44), which
+  // is how Square (`Unarchive`) and Fresha/Treatwell (the row's `⋯`) do it: the action lives on the
+  // row, never inside the record — Shopify's «open it, scroll to the bottom, unarchive, then change
+  // the state again» is six taps and two screens for one decision. Offering «archive» on something
+  // already archived would be an offer to do nothing, so it goes.
   get actions() {
     const t5 = (k2) => erplora2().t(CATALOG2, k2);
+    if (this.showingArchived) {
+      return can2("services.change_service") ? [{ id: "restore", label: t5("ui.actionRestore"), icon: "arrow-undo-outline", color: "success" }] : [];
+    }
     return [
       ...can2("services.change_service") ? [{ id: "edit", label: t5("ui.actionEdit"), icon: "create-outline" }] : [],
       ...can2("services.delete_service") ? [{ id: "archive", label: t5("ui.actionArchive"), icon: "archive-outline", color: "danger" }] : []
     ];
+  }
+  /** Filter change of the table. `status = inactive` is not one filter more: the archived services
+   *  are NOT in the default answer of `services.services.list` at all (the diary consumes that very
+   *  query as its selector of bookable services), so picking it has to widen the SCOPE too —
+   *  otherwise the filter would only ever paint an empty table.
+   *
+   *  The scope is written straight into the controller's context and the reload is left to
+   *  `setFilter`: `setContext` would reload on its own and the same tap would cost two round trips
+   *  to the hub. */
+  onFilterChange(col, value) {
+    if (col === "status") {
+      this.showingArchived = String(value ?? "") === ARCHIVED_STATUS;
+      this.ctrl.state.context = this.showingArchived ? { include_archived: 1 } : {};
+    }
+    this.ctrl.setFilter(col, value);
+  }
+  /** Puts an archived service back (`services.services.restore`). No confirmation: restoring is not
+   *  destructive —it undoes one— and the market does not ask for one either. */
+  async restoreService(row) {
+    if (!can2("services.change_service")) return;
+    this.formError = "";
+    this.saving = true;
+    try {
+      await erplora2().command("services.services.restore", { service_id: String(row.id) });
+      await this.ctrl.load();
+    } catch (e5) {
+      this.formError = e5 instanceof Error ? e5.message : erplora2().t(CATALOG2, "ui.errorRestore");
+    } finally {
+      this.saving = false;
+    }
   }
   async connectedCallback() {
     super.connectedCallback();
@@ -4069,6 +4116,7 @@ var ErpServicesList = class extends i3 {
   }
   async onRowAction(ev) {
     const { actionId, row } = ev.detail;
+    if (actionId === "restore") return this.restoreService(row);
     if (actionId === "edit" && can2("services.change_service")) {
       this.formError = "";
       let full = row;
@@ -4155,7 +4203,7 @@ var ErpServicesList = class extends i3 {
     return b2`<div class="page">
         ${this.formError ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : A}
         ${this.ctrl?.error ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : A}
-        <ok-data-table .serverSide=${true} .fill=${true} .addable=${true} .views=${true} .cardTitle=${(row) => String(row.name ?? "")} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "asc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchPlaceholder")} .actions=${this.actions} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.empty")} @rowAction=${(e5) => this.onRowAction(e5)} @pageChange=${(e5) => this.ctrl.setPage(e5.detail)} @pageSizeChange=${(e5) => this.ctrl.setPageSize(e5.detail)} @sortChange=${(e5) => this.ctrl.setSort(e5.detail.sort, e5.detail.dir)} @searchChange=${(e5) => this.ctrl.setSearch(e5.detail)} @filterChange=${(e5) => this.ctrl.setFilter(e5.detail.col, e5.detail.value)}>
+        <ok-data-table .serverSide=${true} .fill=${true} .addable=${true} .views=${true} .cardTitle=${(row) => String(row.name ?? "")} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "asc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchPlaceholder")} .actions=${this.actions} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.empty")} @rowAction=${(e5) => this.onRowAction(e5)} @pageChange=${(e5) => this.ctrl.setPage(e5.detail)} @pageSizeChange=${(e5) => this.ctrl.setPageSize(e5.detail)} @sortChange=${(e5) => this.ctrl.setSort(e5.detail.sort, e5.detail.dir)} @searchChange=${(e5) => this.ctrl.setSearch(e5.detail)} @filterChange=${(e5) => this.onFilterChange(e5.detail.col, e5.detail.value)}>
           <!-- Alta: se proyecta SIEMPRE (aunque el panel esté cerrado); si solo se pintara al abrir,
                el «+» de la barra desplegaría un panel vacío. -->
           <form slot="create" class="form" @submit=${(e5) => this.createService(e5)}>
@@ -4213,6 +4261,9 @@ __decorateClass([
 __decorateClass([
   r5()
 ], ErpServicesList.prototype, "tick", 2);
+__decorateClass([
+  r5()
+], ErpServicesList.prototype, "showingArchived", 2);
 __decorateClass([
   r5()
 ], ErpServicesList.prototype, "editingId", 2);

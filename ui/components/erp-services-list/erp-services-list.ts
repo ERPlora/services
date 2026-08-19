@@ -88,11 +88,14 @@ interface TaxCategory {
 // ELIGE, no se teclea, y el servidor lo declara `op: eq` → el filtro `select` es real.
 const PRICING_TYPES = ['fixed', 'hourly', 'from', 'variable', 'free'];
 
-// Estados que ESTE listado puede devolver hoy. El vocabulario de `status` tiene tres valores
-// (`queries/services_list.sql`), pero el catálogo filtra `is_active = 1`, así que ofrecer
-// «inactivo» en el filtro sería una opción que siempre devuelve vacío. Cuando services#44 traiga
-// ver/reactivar los archivados desde la UI, `inactive` entra aquí y el resto ya está.
-const FILTERABLE_STATUSES = ['active', 'unconfigured'];
+// Los tres valores del vocabulario de `status` (`queries/services_list.sql`). `inactive` —los
+// archivados— entró con services#44: el listado los trae solo si se piden, así que la opción del
+// filtro es también el interruptor del alcance (ver `onFilterChange`). Va la última a propósito:
+// el trabajo del día está en las otras dos.
+const FILTERABLE_STATUSES = ['active', 'unconfigured', 'inactive'];
+
+/** El valor de `status` que devuelve un servicio archivado (o desactivado). */
+const ARCHIVED_STATUS = 'inactive';
 
 /** El estado de la fila. Si el hub sirviera una proyección anterior (sin `status`), se deduce del
  *  dato que importa: un servicio sin categoría fiscal no puede cobrarse, y esa es exactamente la
@@ -173,6 +176,10 @@ export class ErpServicesList extends LitElement {
 
   @state() tick = 0;
 
+  /** The list is scoped to the ARCHIVED services (services#44). It drives what the row offers, and
+   *  it is set from the status filter — never on its own. */
+  @state() showingArchived = false;
+
   /** Service being edited (services#4): the create panel becomes the edit form and the submit
    *  sends `services.services.update` instead of `create`. `null` = create mode. Same pattern as
    *  inventory products (inventory#8). */
@@ -251,14 +258,57 @@ export class ErpServicesList extends LitElement {
   // service stops being offered and its history (and the appointments already booked, which keep
   // their own snapshot) stays. That is what Fresha/Square/Vagaro/Odoo do; none of them deletes a
   // service with future bookings. Only who holds the permission sees the action (services#2).
+  //
+  // While the ARCHIVED ones are on screen the row offers the way back instead (services#44), which
+  // is how Square (`Unarchive`) and Fresha/Treatwell (the row's `⋯`) do it: the action lives on the
+  // row, never inside the record — Shopify's «open it, scroll to the bottom, unarchive, then change
+  // the state again» is six taps and two screens for one decision. Offering «archive» on something
+  // already archived would be an offer to do nothing, so it goes.
   private get actions(): DataTableAction[] {
     const t = (k: string): string => erplora().t(CATALOG, k);
+    if (this.showingArchived) {
+      return can('services.change_service')
+        ? [{ id: 'restore', label: t('ui.actionRestore'), icon: 'arrow-undo-outline', color: 'success' }]
+        : [];
+    }
     return [
       ...(can('services.change_service') ? [{ id: 'edit', label: t('ui.actionEdit'), icon: 'create-outline' }] : []),
       ...(can('services.delete_service')
         ? [{ id: 'archive', label: t('ui.actionArchive'), icon: 'archive-outline', color: 'danger' }]
         : []),
     ];
+  }
+
+  /** Filter change of the table. `status = inactive` is not one filter more: the archived services
+   *  are NOT in the default answer of `services.services.list` at all (the diary consumes that very
+   *  query as its selector of bookable services), so picking it has to widen the SCOPE too —
+   *  otherwise the filter would only ever paint an empty table.
+   *
+   *  The scope is written straight into the controller's context and the reload is left to
+   *  `setFilter`: `setContext` would reload on its own and the same tap would cost two round trips
+   *  to the hub. */
+  onFilterChange(col: string, value: unknown): void {
+    if (col === 'status') {
+      this.showingArchived = String(value ?? '') === ARCHIVED_STATUS;
+      this.ctrl.state.context = this.showingArchived ? { include_archived: 1 } : {};
+    }
+    this.ctrl.setFilter(col, value);
+  }
+
+  /** Puts an archived service back (`services.services.restore`). No confirmation: restoring is not
+   *  destructive —it undoes one— and the market does not ask for one either. */
+  private async restoreService(row: Record<string, unknown>) {
+    if (!can('services.change_service')) return;
+    this.formError = '';
+    this.saving = true;
+    try {
+      await erplora().command('services.services.restore', { service_id: String(row.id) });
+      await this.ctrl.load();
+    } catch (e) {
+      this.formError = e instanceof Error ? e.message : erplora().t(CATALOG, 'ui.errorRestore');
+    } finally {
+      this.saving = false;
+    }
   }
 
   // TODO-LIT: componentWillLoad → connectedCallback. Recuerda: connectedCallback se dispara
@@ -425,6 +475,7 @@ export class ErpServicesList extends LitElement {
 
   async onRowAction(ev: CustomEvent<{ actionId: string; row: Record<string, unknown> }>) {
     const { actionId, row } = ev.detail;
+    if (actionId === 'restore') return this.restoreService(row);
     if (actionId === 'edit' && can('services.change_service')) {
       // Edit = the create panel, pre-filled from the FULL row (the list projects a subset).
       this.formError = '';
@@ -524,7 +575,7 @@ export class ErpServicesList extends LitElement {
     return html`<div class="page">
         ${this.formError ? html`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : nothing}
         ${this.ctrl?.error ? html`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : nothing}
-        <ok-data-table .serverSide=${true} .fill=${true} .addable=${true} .views=${true} .cardTitle=${(row: Record<string, unknown>) => String(row.name ?? '')} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? 'asc'} .searchable=${true} .searchPlaceholder=${t('ui.searchPlaceholder')} .actions=${this.actions} .emptyMessage=${this.ctrl?.loading ? t('ui.loading') : t('ui.empty')} @rowAction=${(e: CustomEvent) => this.onRowAction(e)} @pageChange=${(e: CustomEvent<number>) => this.ctrl.setPage(e.detail)} @pageSizeChange=${(e: CustomEvent<number>) => this.ctrl.setPageSize(e.detail)} @sortChange=${(e: CustomEvent<{ sort: string; dir: 'asc' | 'desc' }>) => this.ctrl.setSort(e.detail.sort, e.detail.dir)} @searchChange=${(e: CustomEvent<string>) => this.ctrl.setSearch(e.detail)} @filterChange=${(e: CustomEvent<{ col: string; value: unknown }>) => this.ctrl.setFilter(e.detail.col, e.detail.value)}>
+        <ok-data-table .serverSide=${true} .fill=${true} .addable=${true} .views=${true} .cardTitle=${(row: Record<string, unknown>) => String(row.name ?? '')} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? 'asc'} .searchable=${true} .searchPlaceholder=${t('ui.searchPlaceholder')} .actions=${this.actions} .emptyMessage=${this.ctrl?.loading ? t('ui.loading') : t('ui.empty')} @rowAction=${(e: CustomEvent) => this.onRowAction(e)} @pageChange=${(e: CustomEvent<number>) => this.ctrl.setPage(e.detail)} @pageSizeChange=${(e: CustomEvent<number>) => this.ctrl.setPageSize(e.detail)} @sortChange=${(e: CustomEvent<{ sort: string; dir: 'asc' | 'desc' }>) => this.ctrl.setSort(e.detail.sort, e.detail.dir)} @searchChange=${(e: CustomEvent<string>) => this.ctrl.setSearch(e.detail)} @filterChange=${(e: CustomEvent<{ col: string; value: unknown }>) => this.onFilterChange(e.detail.col, e.detail.value)}>
           <!-- Alta: se proyecta SIEMPRE (aunque el panel esté cerrado); si solo se pintara al abrir,
                el «+» de la barra desplegaría un panel vacío. -->
           <form slot="create" class="form" @submit=${(e: Event) => this.createService(e)}>

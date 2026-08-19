@@ -196,6 +196,15 @@ refuses("services.services.delete", {"service_id": ""}, "an empty id")
 refuses(
     "services.services.delete", {"service_id": "s1", "hub_id": "x"}, "a smuggled hub_id"
 )
+# services#44: the way back from the archive is its own door (`update` demands `is_deleted = 0`).
+accepts("services.services.restore", {"service_id": "s1"}, "the id")
+refuses("services.services.restore", {}, "no id")
+refuses("services.services.restore", {"service_id": ""}, "an empty id")
+refuses(
+    "services.services.restore",
+    {"service_id": "s1", "is_active": 1},
+    "a smuggled column (restoring is not a partial update)",
+)
 accepts("services.categories.delete", {"category_id": "c1"}, "the id")
 refuses("services.categories.delete", {"id": "c1"}, "the wrong key name")
 accepts("services.packages.delete", {"package_id": "p1"}, "the id")

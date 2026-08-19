@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "services.services.restore",
+  "description": "Puts an archived service of THIS hub back into the catalogue (`hub_id` injected by the runtime, never sent): it undoes `services.services.delete` — the soft-delete goes, `is_active` returns to 1, and nothing else is touched (services#44). It exists as its own door because `services.services.update` demands `is_deleted = 0` and therefore cannot reach an archived row. A service that is not archived — or is not of this hub — affects 0 rows and the command is REFUSED (`expect_rows`), not silently accepted. Closed contract (services#9).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "service_id"
+  ],
+  "properties": {
+    "service_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "Id of the archived service to bring back."
+    }
+  }
+}

@@ -22,6 +22,7 @@
       "services.packages.update",
       "services.services.create",
       "services.services.delete",
+      "services.services.restore",
       "services.services.update"
     ],
     "events": [

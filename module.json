@@ -444,6 +444,27 @@
         "description": "Archives a service: it is no longer offered or bookable (soft-delete + is_active = 0). Its history and the appointments already booked (which keep their own name/price/duration snapshot) are kept. Before archiving, ask `appointments.appointments.count_active_for_service` (if appointments is installed) and tell the user how many upcoming appointments still use it."
       }
     },
+    "services.services.restore": {
+      "permission": "services.change_service",
+      "transaction": true,
+      "sql": [
+        "commands/service_restore.sql"
+      ],
+      "schema": "schemas/service_restore.json",
+      "expect_rows": {
+        "op": "min",
+        "n": 1,
+        "error": "services.service_not_archived",
+        "message": "That service could not be brought back: it does not exist in this business, or it is already being offered."
+      },
+      "emit": [
+        "services.service.updated"
+      ],
+      "ai": {
+        "description": "Brings an archived service back into the catalogue: it is offered and bookable again (undoes `services.services.delete`). Its name, price, duration and history are untouched — archiving never changed them."
+      },
+      "expose_api": true
+    },
     "services.services.bulk_create": {
       "permission": "services.change_service",
       "handler": {
