@@ -56,6 +56,7 @@ A refused redemption rolls the whole transaction back — no ledger row, no even
 | Maximum rows a paginated request may ask for | 500 |
 | Slug uniqueness | one per hub, for services, categories and packages |
 | A service inside a package | once — repeats are de-duplicated |
+| Lines in one package | 255 |
 
 ## Permissions per action
 
@@ -106,6 +107,11 @@ created. Nothing is filled in for you: a made-up tax category is made-up fiscal 
 
 **"It says the category is unavailable but I can see it."** It belongs to another hub. An empty
 category is allowed; a foreign one is not.
+
+**"It refused to create the package because of one of its lines."** A package line has to name a
+service of **this** business that is still in the catalogue. It used to be worse: the line was
+dropped and the package was created without it, so the voucher was short of sessions and nobody was
+told. Now the whole package is refused and nothing is saved — fix the line and save again.
 
 **"A customer's voucher is not recognised."** Either they were never granted it — this module cannot
 grant, only redeem — or it is out of uses, expired or inactive. Run the check command; it tells you

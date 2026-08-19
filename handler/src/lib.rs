@@ -156,6 +156,19 @@ pub fn slugify(name: &str) -> String {
 
 const PRICING_TYPES: [&str; 5] = ["fixed", "hourly", "from", "variable", "free"];
 
+/// Ids de los servicios VIVOS de este hub, de `context.reads["services.services.list"]`
+/// (ADR-0069: el catálogo de confianza que entrega el host, no lo que diga el payload).
+/// `None` = la read no llegó (manifest antiguo o query degradada) — el caller decide, y en
+/// `create_package` decide cerrar.
+fn catalogue_service_ids(input: &Value) -> Option<Vec<String>> {
+    let rows = input
+        .get("context")?
+        .get("reads")?
+        .get("services.services.list")?
+        .as_array()?;
+    Some(rows.iter().filter_map(|r| r.get("id").map(as_str)).collect())
+}
+
 // ── pieza 1: bulk_create_services ───────────────────────────────────────────
 
 /// Lógica pura de `services.services.bulk_create`: valida cada ítem de forma
@@ -381,18 +394,49 @@ pub fn create_package_pure(input: Value) -> Result<HandlerOutput, String> {
     h.insert("is_featured".into(), json!(bool_field(&payload, "is_featured", false)));
     ops.push(Operation::sql("services._insert_package", h));
 
-    // Líneas: saltar service_id inválido; dedupe (uq_services_packageitem_pkg_svc);
-    // quantity = max(1, int); sort_order = índice de entrada.
+    // Líneas: dedupe (uq_services_packageitem_pkg_svc); quantity = max(1, int);
+    // sort_order = índice de entrada.
+    //
+    // services#42 — lo que YA NO se hace es saltarse una línea en silencio. `_insert_package_item`
+    // es un `INSERT … SELECT` que JOINea el servicio con el hub del paquete: un `service_id`
+    // desconocido o de otro hub insertaba CERO filas, nadie miraba el recuento (el camino WASM
+    // aplica las intenciones con `execute_tx`, sin la gate de `expect_rows`) y el bono se creaba
+    // sin esa sesión, respondiendo `ok`. Un bono al que le faltan sesiones es un bono mal vendido,
+    // así que ahora el command entero se rechaza y no se persiste nada.
+    //
+    // El handler corre en un sandbox y no puede leer la BD: la lista de servicios vivos de ESTE
+    // hub llega pre-cargada en `context.reads` (ADR-0069), declarada por el manifest en
+    // `services.packages.create`. Sin ese catálogo las líneas no son verificables → fail CLOSED.
     let items = payload.get("items").and_then(|v| v.as_array()).unwrap_or(&empty);
+    let catalogue = catalogue_service_ids(&input);
+    if !items.is_empty() && catalogue.is_none() {
+        return Err(
+            "The service catalogue could not be read, so the package lines cannot be verified"
+                .to_string(),
+        );
+    }
+    let catalogue = catalogue.unwrap_or_default();
+
     let mut seen: Vec<String> = Vec::new();
     for (idx, item) in items.iter().enumerate() {
         let service_id = str_field(item, "service_id").trim().to_string();
-        if service_id.is_empty() || seen.contains(&service_id) {
+        if service_id.is_empty() {
+            return Err("A package line must name a service".to_string());
+        }
+        if !catalogue.iter().any(|id| id == &service_id) {
+            return Err(format!(
+                "Service `{service_id}` is not in this business's catalogue: the package line cannot be created"
+            ));
+        }
+        // Duplicada: el índice único `uq_services_packageitem_pkg_svc` la rechazaría; se colapsa
+        // en una sola línea (mismo servicio, misma línea), que es lo que el índice describe.
+        if seen.contains(&service_id) {
             continue;
         }
         let item_id = match new_ids.get(1 + seen.len()).map(as_str) {
             Some(id) if !id.is_empty() => id,
-            _ => continue, // lote de ids agotado: no añadir más líneas
+            // Lote de ids agotado: antes se descartaban las líneas de más, sin decirlo.
+            _ => return Err("Host id batch exhausted: the package has too many lines".to_string()),
         };
         seen.push(service_id.clone());
 
@@ -420,6 +464,19 @@ mod tests {
     use super::*;
 
     fn input(payload: Value) -> Value {
+        json!({
+            "payload": payload,
+            "context": {
+                "new_ids": ["pkg-1", "li-1", "li-2"],
+                // Catálogo de confianza del hub (ADR-0069): el manifest declara la read
+                // `services.services.list` en `services.packages.create`.
+                "reads": { "services.services.list": [{ "id": "s1" }, { "id": "s2" }] }
+            }
+        })
+    }
+
+    /// Igual que [`input`] pero SIN la read del catálogo: el caso degradado.
+    fn input_without_catalogue(payload: Value) -> Value {
         json!({ "payload": payload, "context": { "new_ids": ["pkg-1", "li-1", "li-2"] } })
     }
 
@@ -554,6 +611,82 @@ mod tests {
         assert_eq!(out.operations[1].command, "services._insert_package_item");
         assert_eq!(out.operations[1].params["quantity"], json!(2_000_000));
         assert_eq!(out.operations[2].params["quantity"], json!(1_000_000), "el default es 1 sesión en escala");
+    }
+
+    // ── services#42: una línea que no se puede materializar NO se salta en silencio ──────────
+
+    /// El síntoma: `_insert_package_item` es un `INSERT … SELECT` que JOINea el servicio con el
+    /// hub del paquete, así que un `service_id` desconocido (o de otro hub) insertaba CERO filas
+    /// y nadie lo miraba: el bono se creaba sin esa línea y el command respondía `ok`.
+    #[test]
+    fn a_line_naming_a_service_outside_the_catalogue_rejects_the_command() {
+        let err = create_package_pure(input(json!({
+            "name": "Bono con línea fantasma",
+            "items": [{ "service_id": "s1" }, { "service_id": "s-from-another-hub" }]
+        })))
+        .unwrap_err();
+        assert!(
+            err.contains("s-from-another-hub"),
+            "the rejection must name the line that cannot be created, got: {err}"
+        );
+    }
+
+    /// Las líneas del catálogo del hub sí pasan, y siguen componiendo su operación.
+    #[test]
+    fn lines_of_the_hub_catalogue_are_accepted() {
+        let out = create_package_pure(input(json!({
+            "name": "Bono corte+color",
+            "items": [{ "service_id": "s1" }, { "service_id": "s2" }]
+        })))
+        .unwrap();
+        assert_eq!(out.operations.len(), 3, "cabecera + dos líneas");
+        assert_eq!(out.operations[1].params["service_id"], json!("s1"));
+        assert_eq!(out.operations[2].params["service_id"], json!("s2"));
+    }
+
+    /// Una línea sin `service_id` tampoco se cae por el sumidero (el schema ya la rechaza; esta
+    /// es la segunda puerta).
+    #[test]
+    fn a_line_without_a_service_rejects_the_command() {
+        assert!(create_package_pure(input(json!({
+            "name": "Bono vacío por dentro",
+            "items": [{ "service_id": "  " }]
+        })))
+        .is_err());
+    }
+
+    /// Fail-CLOSED: si el catálogo no llegó, las líneas no se pueden verificar y el bono no se
+    /// crea a medias. Sin líneas no hay nada que verificar, así que ese camino sigue abierto.
+    #[test]
+    fn without_the_catalogue_lines_cannot_be_verified_and_the_command_is_refused() {
+        assert!(create_package_pure(input_without_catalogue(json!({
+            "name": "Bono sin catálogo",
+            "items": [{ "service_id": "s1" }]
+        })))
+        .is_err());
+        assert!(
+            create_package_pure(input_without_catalogue(json!({ "name": "Bono sin líneas" })))
+                .is_ok()
+        );
+    }
+
+    /// El lote de ids del host es finito (256): al agotarse, las líneas de más se descartaban en
+    /// silencio. Ahora el command se rechaza — un bono al que le faltan sesiones es un bono mal
+    /// vendido.
+    #[test]
+    fn an_exhausted_id_batch_rejects_the_command_instead_of_dropping_lines() {
+        let err = create_package_pure(json!({
+            "payload": {
+                "name": "Bono largo",
+                "items": [{ "service_id": "s1" }, { "service_id": "s2" }]
+            },
+            "context": {
+                "new_ids": ["pkg-1", "li-1"],
+                "reads": { "services.services.list": [{ "id": "s1" }, { "id": "s2" }] }
+            }
+        }))
+        .unwrap_err();
+        assert!(err.to_lowercase().contains("id"), "got: {err}");
     }
 
     #[test]

@@ -302,6 +302,18 @@ refuses(
 )
 refuses(PC, {"items": [{"service_id": "s1"}]}, "no name")
 refuses(PC, dict(PKG_MIN, foo=1), "an unknown key")
+# services#42: the host hands the handler 256 ids and the package header spends one, so line 256
+# had no id — and was DROPPED in silence. The door refuses it now; the handler refuses it too.
+refuses(
+    PC,
+    dict(PKG_MIN, items=[{"service_id": f"s{i}"} for i in range(256)]),
+    "more lines than the host's id batch (256)",
+)
+accepts(
+    PC,
+    dict(PKG_MIN, items=[{"service_id": f"s{i}"} for i in range(255)]),
+    "exactly as many lines as the batch allows",
+)
 PU = "services.packages.update"
 PKG_UPD = {
     "package_id": "p1",
