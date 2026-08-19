@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "services.services.bulk_create",
-  "description": "Payload of the WASM handler `bulk_create_services`: a batch of services, each validated here with the SAME domain rules as `services.services.create` (enum pricing type, non-negative money, duration >= 1, capacity >= 1, flags 0/1). The handler still collects per-item business errors and derives the slug; the id batch is the runtime's. Closed contract (services#9).",
+  "description": "Payload of the WASM handler `bulk_create_services`: a batch of services, each validated here with the SAME domain rules as `services.services.create` (enum pricing type, non-negative money, duration >= 1, capacity >= 1, flags 0/1, and the mandatory fiscal category). The handler still collects per-item business errors and derives the slug; the id batch is the runtime's. Closed contract (services#9); the fiscal category joined it in services#41, so that a batch no longer produces services that cannot be charged.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -16,13 +16,20 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "name"
+          "name",
+          "tax_category_key"
         ],
         "properties": {
           "name": {
             "type": "string",
             "minLength": 1,
             "maxLength": 200
+          },
+          "tax_category_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "Canonical fiscal category the service taxes by (ADR-0085), one of the `key` values of `taxes.categories.list`. Required per item, exactly as in `services.services.create`: importing a price list without it fills the catalogue with services the till refuses (services#41). `minLength` is not decoration: `required` alone accepts \"\", and \"\" is exactly no category."
           },
           "description": {
             "type": [
