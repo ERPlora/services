@@ -4,7 +4,7 @@ import { define } from '@erplora/outfitkit/define';
 import '@erplora/outfitkit/ok-inline-feedback';
 import '@erplora/outfitkit/ok-data-table';
 import type { DataTableColumn, DataTableAction } from '@erplora/outfitkit';
-import { createListController, majorToMinor } from '@erplora/module-sdk';
+import { createListController, majorToMinor, minorToMajor } from '@erplora/module-sdk';
 import type { ListController, ListClient, ListParams, ListPage } from '@erplora/module-sdk';
 // i18n del módulo (ADR-0055): los catálogos `ui` se inlinean en build (esbuild) y los textos
 // internos se resuelven con `erplora.t(CATALOG, 'ui.clave')` (idioma activo, fallback locale→en→clave).
@@ -24,6 +24,12 @@ const CATALOG: Record<string, unknown> = { es: esLocale, en: enLocale };
 function toMinorUnits(v: string | number): number {
   const decimals = erplora().currencyDecimals;
   return majorToMinor(String(v ?? '').replace(',', '.'), typeof decimals === 'number' ? decimals : 2);
+}
+
+/** MINOR units (what the row carries) → what a human types in the price field. 1200 → "12". */
+function toMajorText(minor: unknown): string {
+  const decimals = erplora().currencyDecimals;
+  return String(minorToMajor(Number(minor) || 0, typeof decimals === 'number' ? decimals : 2));
 }
 
 interface ErploraClientLike extends ListClient {
@@ -84,8 +90,8 @@ const PRICING_TYPES = ['fixed', 'hourly', 'from', 'variable', 'free'];
 
 // Estados que ESTE listado puede devolver hoy. El vocabulario de `status` tiene tres valores
 // (`queries/services_list.sql`), pero el catálogo filtra `is_active = 1`, así que ofrecer
-// «inactivo» en el filtro sería una opción que siempre devuelve vacío. Cuando services#4 traiga
-// activar/desactivar desde la UI, `inactive` entra aquí y el resto ya está.
+// «inactivo» en el filtro sería una opción que siempre devuelve vacío. Cuando services#44 traiga
+// ver/reactivar los archivados desde la UI, `inactive` entra aquí y el resto ya está.
 const FILTERABLE_STATUSES = ['active', 'unconfigured'];
 
 /** El estado de la fila. Si el hub sirviera una proyección anterior (sin `status`), se deduce del
@@ -167,6 +173,11 @@ export class ErpServicesList extends LitElement {
 
   @state() tick = 0;
 
+  /** Service being edited (services#4): the create panel becomes the edit form and the submit
+   *  sends `services.services.update` instead of `create`. `null` = create mode. Same pattern as
+   *  inventory products (inventory#8). */
+  @state() editingId: string | null = null;
+
   /** Service waiting for the archive confirmation (services#2). `null` = no dialog. */
   @state() archiveTarget: Service | null = null;
 
@@ -241,9 +252,13 @@ export class ErpServicesList extends LitElement {
   // their own snapshot) stays. That is what Fresha/Square/Vagaro/Odoo do; none of them deletes a
   // service with future bookings. Only who holds the permission sees the action (services#2).
   private get actions(): DataTableAction[] {
-    return can('services.delete_service')
-      ? [{ id: 'archive', label: erplora().t(CATALOG, 'ui.actionArchive'), icon: 'archive-outline', color: 'danger' }]
-      : [];
+    const t = (k: string): string => erplora().t(CATALOG, k);
+    return [
+      ...(can('services.change_service') ? [{ id: 'edit', label: t('ui.actionEdit'), icon: 'create-outline' }] : []),
+      ...(can('services.delete_service')
+        ? [{ id: 'archive', label: t('ui.actionArchive'), icon: 'archive-outline', color: 'danger' }]
+        : []),
+    ];
   }
 
   // TODO-LIT: componentWillLoad → connectedCallback. Recuerda: connectedCallback se dispara
@@ -284,10 +299,12 @@ export class ErpServicesList extends LitElement {
   }
 
   private async loadAux() {
+    // `queryAll`, not `query`: `services.categories.list` is a paginated list and a plain `query`
+    // truncated it to the first page — a hub with more than 50 categories could not pick the rest.
     try {
-      this.categories = (await erplora().query<Category[]>('services.categories.list')) ?? [];
+      this.categories = (await erplora().queryAll<Category>('services.categories.list', { sort: 'name', dir: 'asc' })) ?? [];
     } catch {
-      /* categorías opcionales para el alta */
+      /* categories are optional for the form */
     }
     // Categorías fiscales para el selector (ADR-0085). Ya NO es best-effort de adorno: la categoría
     // es obligatoria, así que una lista vacía (módulo `taxes` sin configurar, sin permiso…) no deja
@@ -315,9 +332,23 @@ export class ErpServicesList extends LitElement {
       | null;
   }
 
-  private async createService(ev: Event) {
+  /** Back to a clean CREATE form (services#4). */
+  cancelEdit(): void {
+    this.editingId = null;
+    this.newName = '';
+    this.newPrice = '';
+    this.newDuration = '';
+    this.newCategory = '';
+    this.newTaxRateId = '';
+    this.formError = '';
+  }
+
+  /** Submit of the panel form: create OR update, decided by `editingId` (services#4). */
+  async createService(ev: Event) {
     ev.preventDefault();
     if (!this.newName.trim()) return;
+    if (this.editingId) return this.saveEdit();
+    if (!can('services.add_service')) return;
     // La categoría fiscal no es un campo más del formulario: sin ella el servicio no se puede
     // cobrar y la venta se rechaza con la clienta delante. El servidor también lo rechaza
     // (`schemas/service_create.json`); esto solo evita el viaje y NOMBRA lo que falta, en vez de
@@ -352,11 +383,7 @@ export class ErpServicesList extends LitElement {
         notes: '',
         tax_category_key: this.newTaxRateId,
       });
-      this.newName = '';
-      this.newPrice = '';
-      this.newDuration = '';
-      this.newCategory = '';
-      this.newTaxRateId = '';
+      this.cancelEdit();
       this.dataTable()?.close(); // el panel de alta se cierra solo tras crear
       await this.ctrl.load(); // (además del evento; garantiza refresco inmediato)
     } catch (e) {
@@ -366,8 +393,57 @@ export class ErpServicesList extends LitElement {
     }
   }
 
+  /** `services.services.update` through the PARTIAL door (`records.service.patch`, hub#632): only
+   *  the id + what the form edits travel; the runtime completes the rest from the row, so the
+   *  fields this form does not show (buffers, capacity, sku…) are never wiped by an edit. */
+  private async saveEdit() {
+    if (!this.editingId || !can('services.change_service')) return;
+    if (!this.newTaxRateId) {
+      this.formError = erplora().t(CATALOG, 'ui.errorTaxRequired');
+      return;
+    }
+    this.saving = true;
+    this.formError = '';
+    try {
+      await erplora().command('services.services.update', {
+        service_id: this.editingId,
+        name: this.newName.trim(),
+        category_id: this.newCategory || null,
+        price: toMinorUnits(this.newPrice),
+        duration_minutes: Number(this.newDuration) || 60,
+        tax_category_key: this.newTaxRateId,
+      });
+      this.cancelEdit();
+      this.dataTable()?.close();
+      await this.ctrl.load();
+    } catch (e) {
+      this.formError = e instanceof Error ? e.message : erplora().t(CATALOG, 'ui.errorUpdate');
+    } finally {
+      this.saving = false;
+    }
+  }
+
   async onRowAction(ev: CustomEvent<{ actionId: string; row: Record<string, unknown> }>) {
     const { actionId, row } = ev.detail;
+    if (actionId === 'edit' && can('services.change_service')) {
+      // Edit = the create panel, pre-filled from the FULL row (the list projects a subset).
+      this.formError = '';
+      let full: Record<string, unknown> = row;
+      try {
+        const rows = await erplora().query<Record<string, unknown>[]>('services.services.get', { service_id: String(row.id) });
+        if (Array.isArray(rows) && rows[0]) full = rows[0];
+      } catch {
+        /* the row of the list is enough to pre-fill what this form edits */
+      }
+      this.editingId = String(row.id);
+      this.newName = String(full.name ?? '');
+      this.newPrice = toMajorText(full.price);
+      this.newDuration = String(full.duration_minutes ?? '');
+      this.newCategory = String(full.category_id ?? '');
+      this.newTaxRateId = String(full.tax_category_key ?? '');
+      this.dataTable()?.open('create');
+      return;
+    }
     if (actionId !== 'archive' || !can('services.delete_service')) return;
     this.formError = '';
     // Never on the first tap: confirm, and say what it touches. The count comes from a PUBLIC
@@ -452,6 +528,12 @@ export class ErpServicesList extends LitElement {
           <!-- Alta: se proyecta SIEMPRE (aunque el panel esté cerrado); si solo se pintara al abrir,
                el «+» de la barra desplegaría un panel vacío. -->
           <form slot="create" class="form" @submit=${(e: Event) => this.createService(e)}>
+            ${this.editingId
+              ? html`<ok-inline-feedback tone="info" icon="create-outline">
+                  <b>${t('ui.editingTitle')}</b> — ${this.newName}
+                  <ion-button size="small" fill="clear" @click=${() => this.cancelEdit()}>${t('ui.editingCancel')}</ion-button>
+                </ok-inline-feedback>`
+              : nothing}
             <ion-input fill="outline" label-placement="floating" label=${t('ui.colName')} .value=${this.newName} @ionInput=${(e: any) => (this.newName = e.target.value)}></ion-input>
             <ion-input fill="outline" label-placement="floating" label=${t('ui.colPrice')} type="text" inputmode="decimal" .value=${this.newPrice} @ionInput=${(e: any) => (this.newPrice = e.target.value)}></ion-input>
             <ion-input fill="outline" label-placement="floating" label=${t('ui.colDuration')} type="number" step="1" .value=${this.newDuration} @ionInput=${(e: any) => (this.newDuration = e.target.value)}></ion-input>
@@ -467,7 +549,7 @@ export class ErpServicesList extends LitElement {
             ${this.taxRates.length === 0
               ? html`<ok-inline-feedback tone="warning" icon="alert-circle-outline">${t('ui.taxCategoriesMissing')}</ok-inline-feedback>`
               : nothing}
-            <ion-button type="submit" ?disabled=${this.saving || !this.newName || !this.newTaxRateId}>${this.saving ? t('ui.btnSaving') : t('ui.btnAdd')}</ion-button>
+            <ion-button type="submit" ?disabled=${this.saving || !this.newName || !this.newTaxRateId}>${this.saving ? t('ui.btnSaving') : this.editingId ? t('ui.btnSave') : t('ui.btnAdd')}</ion-button>
           </form>
         </ok-data-table>
         ${this.renderArchiveConfirm()}

@@ -26,7 +26,7 @@ const comandos: { name: string; payload: Record<string, unknown> }[] = [];
 beforeEach(() => {
   comandos.length = 0;
   (globalThis as Record<string, unknown>).erplora = {
-    query: async (name: string) => (name === 'services.categories.list' ? CATEGORIAS : []),
+    query: async () => [],
     queryPage: async () => ({
       rows: [{ id: 's1', name: 'Corte', price: '1200', pricing_type: 'fixed', duration_minutes: 30, is_bookable: 1, category_id: 'c1', category: 'Peluquería' }],
       total: 1,
@@ -34,7 +34,9 @@ beforeEach(() => {
     // Categorías fiscales del hub. Ya no es un catálogo de adorno: la categoría fiscal es
     // OBLIGATORIA para dar de alta un servicio (tax-category-required.test.ts), así que sin estas
     // filas el formulario no deja crear nada.
-    queryAll: async (name: string) => (name === 'taxes.categories.list' ? CATEGORIAS_FISCALES : []),
+    // Categories come through `queryAll` too (services#4): a plain `query` truncated them to 50.
+    queryAll: async (name: string) =>
+      name === 'taxes.categories.list' ? CATEGORIAS_FISCALES : name === 'services.categories.list' ? CATEGORIAS : [],
     command: async (name: string, payload: Record<string, unknown>) => {
       comandos.push({ name, payload });
       return {};
@@ -137,12 +139,14 @@ describe('el precio va en céntimos — display divide y alta multiplica (#268)'
 
   beforeEach(() => {
     (globalThis as Record<string, unknown>).erplora = {
-      query: async (name: string) => (name === 'services.categories.list' ? CATEGORIAS : []),
+      query: async () => [],
       queryPage: async () => ({ rows: FILA_CENTIMOS, total: 1 }),
       // Categorías fiscales del hub. Ya no es un catálogo de adorno: la categoría fiscal es
     // OBLIGATORIA para dar de alta un servicio (tax-category-required.test.ts), así que sin estas
     // filas el formulario no deja crear nada.
-    queryAll: async (name: string) => (name === 'taxes.categories.list' ? CATEGORIAS_FISCALES : []),
+    // Categories come through `queryAll` too (services#4): a plain `query` truncated them to 50.
+    queryAll: async (name: string) =>
+      name === 'taxes.categories.list' ? CATEGORIAS_FISCALES : name === 'services.categories.list' ? CATEGORIAS : [],
       command: async (name: string, payload: Record<string, unknown>) => {
         comandos.push({ name, payload });
         return {};

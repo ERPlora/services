@@ -3313,9 +3313,12 @@ function createListController(client, queryName, onChange = () => {
 }, opts = {}) {
   return new ListController(client, queryName, onChange, opts);
 }
-function majorToMinor(amount, decimals) {
+function majorToMinor(amount, decimals2) {
   const n6 = Number(amount);
-  return Number.isFinite(n6) ? Math.round(n6 * 10 ** decimals) : 0;
+  return Number.isFinite(n6) ? Math.round(n6 * 10 ** decimals2) : 0;
+}
+function minorToMajor(amount, decimals2) {
+  return (amount ?? 0) / 10 ** decimals2;
 }
 
 // modules/services/locales/es.json
@@ -3329,6 +3332,12 @@ var es_default = {
   navigation: {
     services: {
       label: "Servicios"
+    },
+    categories: {
+      label: "Categor\xEDas"
+    },
+    packages: {
+      label: "Bonos y paquetes"
     }
   },
   ui: {
@@ -3376,7 +3385,55 @@ var es_default = {
     archiveWarnAppointments: "{count} cita(s) pr\xF3xima(s) siguen usando este servicio. Conservan su reserva, precio y duraci\xF3n; solo dejan de admitirse reservas nuevas.",
     archiveConfirm: "Archivar",
     btnCancel: "Cancelar",
-    errorArchive: "No se pudo archivar el servicio"
+    errorArchive: "No se pudo archivar el servicio",
+    actionEdit: "Editar",
+    editingTitle: "Editando servicio",
+    editingCancel: "Cancelar edici\xF3n",
+    btnSave: "Guardar cambios",
+    errorUpdate: "No se pudo actualizar el servicio",
+    colParent: "Categor\xEDa padre",
+    colSortOrder: "Orden",
+    colServiceCount: "Servicios",
+    placeholderParent: "Padre\u2026",
+    optionNoParent: "Sin padre (ra\xEDz)",
+    searchCategoryPlaceholder: "Buscar categor\xEDa\u2026",
+    emptyCategories: "No hay categor\xEDas.",
+    editingCategoryTitle: "Editando categor\xEDa",
+    deleteCategoryTitle: "Eliminar categor\xEDa",
+    deleteCategoryHint: "la categor\xEDa desaparece; los servicios que contiene se conservan, sin categor\xEDa.",
+    deleteCategoryImpact: "{count} servicio(s) se quedar\xE1n sin categor\xEDa.",
+    errorSaveCategory: "No se pudo guardar la categor\xEDa",
+    errorDeleteCategory: "No se pudo eliminar la categor\xEDa",
+    actionDelete: "Eliminar",
+    colDiscount: "Descuento",
+    colFixedPrice: "Precio cerrado",
+    colItems: "L\xEDneas",
+    colDiscountType: "Tipo de descuento",
+    discountType: {
+      percentage: "Porcentaje",
+      fixed: "Importe fijo"
+    },
+    colDiscountAmount: "Descuento (importe)",
+    colDiscountPercent: "Descuento (%)",
+    fixedPriceHelp: "D\xE9jalo vac\xEDo para que valga la suma de sus l\xEDneas menos el descuento.",
+    colValidityDays: "Vigencia (d\xEDas)",
+    validityHelp: "D\xEDas canjeable desde el primer uso; vac\xEDo = no caduca.",
+    colMaxUses: "Usos",
+    maxUsesHelp: "Usos que concede el bono; vac\xEDo = ilimitados.",
+    packageLinesTitle: "Servicios incluidos",
+    colService: "Servicio",
+    colSessions: "Sesiones",
+    addLine: "A\xF1adir servicio",
+    removeLine: "Quitar l\xEDnea",
+    packageLinesFixed: "Los servicios incluidos no se cambian una vez creado: archiva este paquete y crea uno nuevo.",
+    searchPackagePlaceholder: "Buscar paquete\u2026",
+    emptyPackages: "No hay paquetes.",
+    editingPackageTitle: "Editando paquete",
+    deletePackageTitle: "Eliminar paquete",
+    deletePackageHint: "el paquete y sus {count} l\xEDnea(s) desaparecen del cat\xE1logo; los bonos ya vendidos conservan su saldo.",
+    errorPackageNoLines: "A\xF1ade al menos un servicio: un paquete sin l\xEDneas no se puede canjear.",
+    errorSavePackage: "No se pudo guardar el paquete",
+    errorDeletePackage: "No se pudo eliminar el paquete"
   },
   errors: {
     "services.category_unavailable": "Esa categor\xEDa no est\xE1 disponible: no existe en este negocio o se ha eliminado.",
@@ -3399,6 +3456,12 @@ var en_default = {
   navigation: {
     services: {
       label: "Services"
+    },
+    categories: {
+      label: "Categories"
+    },
+    packages: {
+      label: "Packages"
     }
   },
   ui: {
@@ -3446,7 +3509,55 @@ var en_default = {
     archiveWarnAppointments: "{count} upcoming appointment(s) still use this service. They keep their booking, price and duration; only new bookings stop.",
     archiveConfirm: "Archive",
     btnCancel: "Cancel",
-    errorArchive: "Could not archive the service"
+    errorArchive: "Could not archive the service",
+    actionEdit: "Edit",
+    editingTitle: "Editing service",
+    editingCancel: "Cancel edit",
+    btnSave: "Save changes",
+    errorUpdate: "Could not update the service",
+    colParent: "Parent category",
+    colSortOrder: "Order",
+    colServiceCount: "Services",
+    placeholderParent: "Parent\u2026",
+    optionNoParent: "No parent (root)",
+    searchCategoryPlaceholder: "Search category\u2026",
+    emptyCategories: "No categories.",
+    editingCategoryTitle: "Editing category",
+    deleteCategoryTitle: "Delete category",
+    deleteCategoryHint: "the category disappears; the services in it are kept, without a category.",
+    deleteCategoryImpact: "{count} service(s) will be left without a category.",
+    errorSaveCategory: "Could not save the category",
+    errorDeleteCategory: "Could not delete the category",
+    actionDelete: "Delete",
+    colDiscount: "Discount",
+    colFixedPrice: "Closed price",
+    colItems: "Lines",
+    colDiscountType: "Discount type",
+    discountType: {
+      percentage: "Percentage",
+      fixed: "Fixed amount"
+    },
+    colDiscountAmount: "Discount (amount)",
+    colDiscountPercent: "Discount (%)",
+    fixedPriceHelp: "Leave empty to price it as the sum of its lines minus the discount.",
+    colValidityDays: "Validity (days)",
+    validityHelp: "Days redeemable after the first use; empty = never expires.",
+    colMaxUses: "Uses",
+    maxUsesHelp: "Uses the voucher grants; empty = unlimited.",
+    packageLinesTitle: "Services included",
+    colService: "Service",
+    colSessions: "Sessions",
+    addLine: "Add service",
+    removeLine: "Remove line",
+    packageLinesFixed: "The services included cannot be changed once created: archive this package and create a new one.",
+    searchPackagePlaceholder: "Search package\u2026",
+    emptyPackages: "No packages.",
+    editingPackageTitle: "Editing package",
+    deletePackageTitle: "Delete package",
+    deletePackageHint: "the package and its {count} line(s) disappear from the catalogue; vouchers already sold keep their balance.",
+    errorPackageNoLines: "Add at least one service: a package with no lines cannot be redeemed.",
+    errorSavePackage: "Could not save the package",
+    errorDeletePackage: "Could not delete the package"
   },
   errors: {
     "services.category_unavailable": "That category is not available: it does not exist in this business or it has been deleted.",
@@ -3459,11 +3570,240 @@ var en_default = {
   }
 };
 
-// modules/services/ui/components/erp-services-list/erp-services-list.ts
+// modules/services/ui/components/erp-services-categories/erp-services-categories.ts
 var CATALOG = { es: es_default, en: en_default };
+function erplora() {
+  const c5 = globalThis.erplora;
+  if (!c5) throw new Error("erplora SDK no inicializado por el shell");
+  return c5;
+}
+function can(permission) {
+  const client = erplora();
+  return typeof client.hasPermission === "function" ? client.hasPermission(permission) : true;
+}
+var ErpServicesCategories = class extends i3 {
+  constructor() {
+    super(...arguments);
+    this.newName = "";
+    this.newParent = "";
+    this.newSortOrder = "";
+    this.saving = false;
+    this.formError = "";
+    this.editingId = null;
+    this.deleteTarget = null;
+    this.allCategories = [];
+    this.onLocaleChange = () => this.requestUpdate();
+  }
+  static {
+    this.styles = i`
+    :host { display: flex; flex-direction: column; height: 100%; min-height: 0; font-family: system-ui, sans-serif; color: var(--ion-text-color, #1c1b18); }
+    .page { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
+    .page > ok-data-table { flex: 1 1 auto; min-height: 0; }
+    .form { display: flex; flex-direction: column; gap: 0.7rem; }
+    .form ion-button[type='submit'] { align-self: flex-end; }
+  `;
+  }
+  get columns() {
+    const t5 = (k2) => erplora().t(CATALOG, k2);
+    const nameOf = (id) => this.allCategories.find((c5) => c5.id === id)?.name ?? "\u2014";
+    return [
+      { key: "name", header: t5("ui.colName"), sortable: true, filterable: true, filterType: "text" },
+      { key: "parent_id", header: t5("ui.colParent"), sortable: true, format: (r6) => nameOf(r6.parent_id) },
+      { key: "sort_order", header: t5("ui.colSortOrder"), align: "right", sortable: true },
+      { key: "service_count", header: t5("ui.colServiceCount"), align: "right", sortable: true, filterable: true, filterType: "range" }
+    ];
+  }
+  get actions() {
+    const t5 = (k2) => erplora().t(CATALOG, k2);
+    return [
+      ...can("services.change_category") ? [{ id: "edit", label: t5("ui.actionEdit"), icon: "create-outline" }] : [],
+      ...can("services.delete_category") ? [{ id: "delete", label: t5("ui.actionDelete"), icon: "trash-outline", color: "danger" }] : []
+    ];
+  }
+  async connectedCallback() {
+    super.connectedCallback();
+    window.addEventListener("erplora:locale-changed", this.onLocaleChange);
+    this.ctrl = createListController(erplora(), "services.categories.list", () => this.requestUpdate(), {
+      pageSize: 50,
+      sort: "name",
+      dir: "asc"
+    });
+    await Promise.all([this.ctrl.load(), this.loadAll()]);
+    try {
+      const off1 = erplora().on("services.service.created", () => this.ctrl.load());
+      const off2 = erplora().on("services.service.updated", () => this.ctrl.load());
+      const off3 = erplora().on("services.service.deleted", () => this.ctrl.load());
+      this.unsub = () => {
+        off1();
+        off2();
+        off3();
+      };
+    } catch {
+    }
+  }
+  disconnectedCallback() {
+    window.removeEventListener("erplora:locale-changed", this.onLocaleChange);
+    super.disconnectedCallback();
+    this.unsub?.();
+  }
+  async loadAll() {
+    try {
+      this.allCategories = await erplora().queryAll("services.categories.list", { sort: "name", dir: "asc" }) ?? [];
+    } catch {
+      this.allCategories = [];
+    }
+  }
+  dataTable() {
+    return this.renderRoot.querySelector("ok-data-table");
+  }
+  async onRowAction(ev) {
+    const { actionId, row } = ev.detail;
+    const c5 = row;
+    if (actionId === "edit" && can("services.change_category")) {
+      this.editingId = c5.id;
+      this.newName = c5.name ?? "";
+      this.newParent = c5.parent_id ?? "";
+      this.newSortOrder = String(c5.sort_order ?? 0);
+      this.formError = "";
+      this.dataTable()?.open("create");
+    } else if (actionId === "delete" && can("services.delete_category")) {
+      this.deleteTarget = c5;
+    }
+  }
+  /** Back to a clean CREATE form. */
+  cancelEdit() {
+    this.editingId = null;
+    this.newName = "";
+    this.newParent = "";
+    this.newSortOrder = "";
+    this.formError = "";
+  }
+  /** Submit: create OR update by `editingId`. The update goes through the PARTIAL door
+   *  (`records.category.patch`, hub#632): id + edited fields; the runtime completes slug/is_active. */
+  async save(ev) {
+    ev.preventDefault();
+    const required = this.editingId ? "services.change_category" : "services.add_category";
+    if (!can(required) || !this.newName.trim()) return;
+    this.saving = true;
+    this.formError = "";
+    try {
+      const fields = {
+        name: this.newName.trim(),
+        parent_id: this.newParent || null,
+        sort_order: Number(this.newSortOrder) || 0
+      };
+      if (this.editingId) {
+        await erplora().command("services.categories.update", { category_id: this.editingId, ...fields });
+      } else {
+        await erplora().command("services.categories.create", fields);
+      }
+      this.cancelEdit();
+      this.dataTable()?.close();
+      await Promise.all([this.ctrl.load(), this.loadAll()]);
+    } catch (e5) {
+      this.formError = e5 instanceof Error ? e5.message : erplora().t(CATALOG, "ui.errorSaveCategory");
+    } finally {
+      this.saving = false;
+    }
+  }
+  async confirmDelete() {
+    const target = this.deleteTarget;
+    if (!target || !can("services.delete_category")) return;
+    this.saving = true;
+    try {
+      await erplora().command("services.categories.delete", { category_id: target.id });
+      this.deleteTarget = null;
+      await Promise.all([this.ctrl.load(), this.loadAll()]);
+    } catch (e5) {
+      this.formError = e5 instanceof Error ? e5.message : erplora().t(CATALOG, "ui.errorDeleteCategory");
+      this.deleteTarget = null;
+    } finally {
+      this.saving = false;
+    }
+  }
+  renderDeleteConfirm() {
+    const t5 = (k2, p4) => erplora().t(CATALOG, k2, p4);
+    const count = Number(this.deleteTarget?.service_count ?? 0) || 0;
+    return b2`<ion-modal .isOpen=${!!this.deleteTarget} @ionModalDidDismiss=${() => this.deleteTarget = null}>
+      <ion-header class="ion-no-border">
+        <ion-toolbar><ion-title>${t5("ui.deleteCategoryTitle")}</ion-title></ion-toolbar>
+      </ion-header>
+      <ion-content class="ion-padding">
+        <!-- Self-styled: ion-modal is reparented to <body>, this component's CSS does not reach it. -->
+        <ion-list lines="none">
+          <ion-item>
+            <ion-label class="ion-text-wrap"><b>${this.deleteTarget?.name ?? ""}</b> — ${t5("ui.deleteCategoryHint")}</ion-label>
+          </ion-item>
+          ${count > 0 ? b2`<ion-item>
+                <ion-icon slot="start" name="alert-circle-outline" color="warning"></ion-icon>
+                <ion-label class="ion-text-wrap">${t5("ui.deleteCategoryImpact", { count })}</ion-label>
+              </ion-item>` : A}
+        </ion-list>
+        <ion-button class="ion-margin-top" expand="block" color="danger" ?disabled=${this.saving} @click=${() => this.confirmDelete()}>${t5("ui.actionDelete")}</ion-button>
+        <ion-button expand="block" fill="outline" ?disabled=${this.saving} @click=${() => this.deleteTarget = null}>${t5("ui.btnCancel")}</ion-button>
+      </ion-content>
+    </ion-modal>`;
+  }
+  render() {
+    const t5 = (k2) => erplora().t(CATALOG, k2);
+    const parentOptions = this.allCategories.filter((c5) => c5.id !== this.editingId);
+    return b2`<div class="page">
+      ${this.formError ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : A}
+      ${this.ctrl?.error ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : A}
+      <ok-data-table .serverSide=${true} .fill=${true} .views=${true} .addable=${can("services.add_category")} .cardTitle=${(row) => String(row.name ?? "")} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "asc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchCategoryPlaceholder")} .actions=${this.actions} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.emptyCategories")} @rowAction=${(e5) => this.onRowAction(e5)} @pageChange=${(e5) => this.ctrl.setPage(e5.detail)} @pageSizeChange=${(e5) => this.ctrl.setPageSize(e5.detail)} @sortChange=${(e5) => this.ctrl.setSort(e5.detail.sort, e5.detail.dir)} @searchChange=${(e5) => this.ctrl.setSearch(e5.detail)} @filterChange=${(e5) => this.ctrl.setFilter(e5.detail.col, e5.detail.value)}>
+        <form slot="create" class="form" @submit=${(e5) => this.save(e5)}>
+          ${this.editingId ? b2`<ok-inline-feedback tone="info" icon="create-outline">
+                <b>${t5("ui.editingCategoryTitle")}</b> — ${this.newName}
+                <ion-button size="small" fill="clear" @click=${() => this.cancelEdit()}>${t5("ui.editingCancel")}</ion-button>
+              </ok-inline-feedback>` : A}
+          <ion-input fill="outline" label-placement="floating" label=${t5("ui.colName")} .value=${this.newName} @ionInput=${(e5) => this.newName = e5.target.value}></ion-input>
+          <ion-select fill="outline" label-placement="floating" label=${t5("ui.colParent")} placeholder=${t5("ui.placeholderParent")} .value=${this.newParent} @ionChange=${(e5) => this.newParent = e5.target.value}>
+            <ion-select-option value="">${t5("ui.optionNoParent")}</ion-select-option>
+            ${parentOptions.map((c5) => b2`<ion-select-option .value=${c5.id}>${c5.name}</ion-select-option>`)}
+          </ion-select>
+          <ion-input fill="outline" label-placement="floating" label=${t5("ui.colSortOrder")} type="number" step="1" .value=${this.newSortOrder} @ionInput=${(e5) => this.newSortOrder = e5.target.value}></ion-input>
+          <ion-button type="submit" ?disabled=${this.saving || !this.newName}>${this.saving ? t5("ui.btnSaving") : this.editingId ? t5("ui.btnSave") : t5("ui.btnAdd")}</ion-button>
+        </form>
+      </ok-data-table>
+      ${this.renderDeleteConfirm()}
+    </div>`;
+  }
+};
+__decorateClass([
+  r5()
+], ErpServicesCategories.prototype, "newName", 2);
+__decorateClass([
+  r5()
+], ErpServicesCategories.prototype, "newParent", 2);
+__decorateClass([
+  r5()
+], ErpServicesCategories.prototype, "newSortOrder", 2);
+__decorateClass([
+  r5()
+], ErpServicesCategories.prototype, "saving", 2);
+__decorateClass([
+  r5()
+], ErpServicesCategories.prototype, "formError", 2);
+__decorateClass([
+  r5()
+], ErpServicesCategories.prototype, "editingId", 2);
+__decorateClass([
+  r5()
+], ErpServicesCategories.prototype, "deleteTarget", 2);
+__decorateClass([
+  r5()
+], ErpServicesCategories.prototype, "allCategories", 2);
+define("erp-services-categories", ErpServicesCategories);
+
+// modules/services/ui/components/erp-services-list/erp-services-list.ts
+var CATALOG2 = { es: es_default, en: en_default };
 function toMinorUnits(v3) {
-  const decimals = erplora().currencyDecimals;
-  return majorToMinor(String(v3 ?? "").replace(",", "."), typeof decimals === "number" ? decimals : 2);
+  const decimals2 = erplora2().currencyDecimals;
+  return majorToMinor(String(v3 ?? "").replace(",", "."), typeof decimals2 === "number" ? decimals2 : 2);
+}
+function toMajorText(minor) {
+  const decimals2 = erplora2().currencyDecimals;
+  return String(minorToMajor(Number(minor) || 0, typeof decimals2 === "number" ? decimals2 : 2));
 }
 var PRICING_TYPES = ["fixed", "hourly", "from", "variable", "free"];
 var FILTERABLE_STATUSES = ["active", "unconfigured"];
@@ -3482,13 +3822,13 @@ function badgeStyle(state) {
   return `display:inline-block;padding:.1rem .45rem;border-radius:999px;font-size:.78rem;font-weight:600;white-space:nowrap;background:color-mix(in srgb, ${tone} 18%, transparent);color:color-mix(in srgb, ${tone} 70%, #000);`;
 }
 var REASON_STYLE = `display:block;margin-top:.15rem;font-size:.72rem;line-height:1.2;color:color-mix(in srgb, ${STATE_COLOR.unconfigured} 70%, #000);`;
-function erplora() {
+function erplora2() {
   const c5 = globalThis.erplora;
   if (!c5) throw new Error("erplora SDK no inicializado por el shell");
   return c5;
 }
-function can(permission) {
-  const client = erplora();
+function can2(permission) {
+  const client = erplora2();
   return typeof client.hasPermission === "function" ? client.hasPermission(permission) : true;
 }
 var ErpServicesList = class extends i3 {
@@ -3504,6 +3844,7 @@ var ErpServicesList = class extends i3 {
     this.newTaxRateId = "";
     this.saving = false;
     this.tick = 0;
+    this.editingId = null;
     this.archiveTarget = null;
     this.archiveActive = null;
     // TODO-LIT: componentWillLoad → connectedCallback. Recuerda: connectedCallback se dispara
@@ -3526,7 +3867,7 @@ var ErpServicesList = class extends i3 {
   `;
   }
   get columns() {
-    const t5 = (k2) => erplora().t(CATALOG, k2);
+    const t5 = (k2) => erplora2().t(CATALOG2, k2);
     return [
       { key: "name", header: t5("ui.colName"), sortable: true, filterable: true, filterType: "text" },
       {
@@ -3558,7 +3899,7 @@ var ErpServicesList = class extends i3 {
         filterType: "range",
         // El precio se guarda en CÉNTIMOS (INTEGER, ADR-0007): 1500 = 15,00 €. El helper canónico
         // `formatMoney` divide por 10^decimales (no /100 a ciegas: en JPY/KWD sería distinto).
-        format: (r6) => erplora().formatMoney(Number(r6.price) || 0)
+        format: (r6) => erplora2().formatMoney(Number(r6.price) || 0)
       },
       { key: "duration_minutes", header: t5("ui.colDuration"), align: "right", sortable: true, filterable: true, filterType: "text" },
       {
@@ -3587,21 +3928,25 @@ var ErpServicesList = class extends i3 {
   // their own snapshot) stays. That is what Fresha/Square/Vagaro/Odoo do; none of them deletes a
   // service with future bookings. Only who holds the permission sees the action (services#2).
   get actions() {
-    return can("services.delete_service") ? [{ id: "archive", label: erplora().t(CATALOG, "ui.actionArchive"), icon: "archive-outline", color: "danger" }] : [];
+    const t5 = (k2) => erplora2().t(CATALOG2, k2);
+    return [
+      ...can2("services.change_service") ? [{ id: "edit", label: t5("ui.actionEdit"), icon: "create-outline" }] : [],
+      ...can2("services.delete_service") ? [{ id: "archive", label: t5("ui.actionArchive"), icon: "archive-outline", color: "danger" }] : []
+    ];
   }
   async connectedCallback() {
     super.connectedCallback();
     window.addEventListener("erplora:locale-changed", this.onLocaleChange);
-    this.ctrl = createListController(erplora(), "services.services.list", () => this.requestUpdate(), {
+    this.ctrl = createListController(erplora2(), "services.services.list", () => this.requestUpdate(), {
       pageSize: 50,
       sort: "name",
       dir: "asc"
     });
     await Promise.all([this.ctrl.load(), this.loadAux()]);
     try {
-      const off1 = erplora().on("services.service.created", () => this.ctrl.load());
-      const off2 = erplora().on("services.service.updated", () => this.ctrl.load());
-      const off3 = erplora().on("services.service.deleted", () => this.ctrl.load());
+      const off1 = erplora2().on("services.service.created", () => this.ctrl.load());
+      const off2 = erplora2().on("services.service.updated", () => this.ctrl.load());
+      const off3 = erplora2().on("services.service.deleted", () => this.ctrl.load());
       this.unsub = () => {
         off1();
         off2();
@@ -3617,11 +3962,11 @@ var ErpServicesList = class extends i3 {
   }
   async loadAux() {
     try {
-      this.categories = await erplora().query("services.categories.list") ?? [];
+      this.categories = await erplora2().queryAll("services.categories.list", { sort: "name", dir: "asc" }) ?? [];
     } catch {
     }
     try {
-      this.taxRates = await erplora().queryAll("taxes.categories.list", { sort: "name", dir: "asc" });
+      this.taxRates = await erplora2().queryAll("taxes.categories.list", { sort: "name", dir: "asc" });
     } catch {
       this.taxRates = [];
     }
@@ -3638,17 +3983,30 @@ var ErpServicesList = class extends i3 {
   dataTable() {
     return this.renderRoot.querySelector("ok-data-table");
   }
+  /** Back to a clean CREATE form (services#4). */
+  cancelEdit() {
+    this.editingId = null;
+    this.newName = "";
+    this.newPrice = "";
+    this.newDuration = "";
+    this.newCategory = "";
+    this.newTaxRateId = "";
+    this.formError = "";
+  }
+  /** Submit of the panel form: create OR update, decided by `editingId` (services#4). */
   async createService(ev) {
     ev.preventDefault();
     if (!this.newName.trim()) return;
+    if (this.editingId) return this.saveEdit();
+    if (!can2("services.add_service")) return;
     if (!this.newTaxRateId) {
-      this.formError = erplora().t(CATALOG, "ui.errorTaxRequired");
+      this.formError = erplora2().t(CATALOG2, "ui.errorTaxRequired");
       return;
     }
     this.saving = true;
     this.formError = "";
     try {
-      await erplora().command("services.services.create", {
+      await erplora2().command("services.services.create", {
         name: this.newName.trim(),
         description: "",
         short_description: "",
@@ -3671,27 +4029,69 @@ var ErpServicesList = class extends i3 {
         notes: "",
         tax_category_key: this.newTaxRateId
       });
-      this.newName = "";
-      this.newPrice = "";
-      this.newDuration = "";
-      this.newCategory = "";
-      this.newTaxRateId = "";
+      this.cancelEdit();
       this.dataTable()?.close();
       await this.ctrl.load();
     } catch (e5) {
-      this.formError = e5 instanceof Error ? e5.message : erplora().t(CATALOG, "ui.errorCreate");
+      this.formError = e5 instanceof Error ? e5.message : erplora2().t(CATALOG2, "ui.errorCreate");
+    } finally {
+      this.saving = false;
+    }
+  }
+  /** `services.services.update` through the PARTIAL door (`records.service.patch`, hub#632): only
+   *  the id + what the form edits travel; the runtime completes the rest from the row, so the
+   *  fields this form does not show (buffers, capacity, sku…) are never wiped by an edit. */
+  async saveEdit() {
+    if (!this.editingId || !can2("services.change_service")) return;
+    if (!this.newTaxRateId) {
+      this.formError = erplora2().t(CATALOG2, "ui.errorTaxRequired");
+      return;
+    }
+    this.saving = true;
+    this.formError = "";
+    try {
+      await erplora2().command("services.services.update", {
+        service_id: this.editingId,
+        name: this.newName.trim(),
+        category_id: this.newCategory || null,
+        price: toMinorUnits(this.newPrice),
+        duration_minutes: Number(this.newDuration) || 60,
+        tax_category_key: this.newTaxRateId
+      });
+      this.cancelEdit();
+      this.dataTable()?.close();
+      await this.ctrl.load();
+    } catch (e5) {
+      this.formError = e5 instanceof Error ? e5.message : erplora2().t(CATALOG2, "ui.errorUpdate");
     } finally {
       this.saving = false;
     }
   }
   async onRowAction(ev) {
     const { actionId, row } = ev.detail;
-    if (actionId !== "archive" || !can("services.delete_service")) return;
+    if (actionId === "edit" && can2("services.change_service")) {
+      this.formError = "";
+      let full = row;
+      try {
+        const rows = await erplora2().query("services.services.get", { service_id: String(row.id) });
+        if (Array.isArray(rows) && rows[0]) full = rows[0];
+      } catch {
+      }
+      this.editingId = String(row.id);
+      this.newName = String(full.name ?? "");
+      this.newPrice = toMajorText(full.price);
+      this.newDuration = String(full.duration_minutes ?? "");
+      this.newCategory = String(full.category_id ?? "");
+      this.newTaxRateId = String(full.tax_category_key ?? "");
+      this.dataTable()?.open("create");
+      return;
+    }
+    if (actionId !== "archive" || !can2("services.delete_service")) return;
     this.formError = "";
     this.archiveTarget = row;
     this.archiveActive = null;
     try {
-      const rows = await erplora().queryOptional(
+      const rows = await erplora2().queryOptional(
         "appointments.appointments.count_active_for_service",
         { service_id: String(row.id) }
       );
@@ -3705,23 +4105,23 @@ var ErpServicesList = class extends i3 {
   /** Runs the confirmed archive (`services.services.delete`). */
   async confirmArchive() {
     const target = this.archiveTarget;
-    if (!target || !can("services.delete_service")) return;
+    if (!target || !can2("services.delete_service")) return;
     this.saving = true;
     this.formError = "";
     try {
-      await erplora().command("services.services.delete", { service_id: target.id });
+      await erplora2().command("services.services.delete", { service_id: target.id });
       this.archiveTarget = null;
       this.archiveActive = null;
       await this.ctrl.load();
     } catch (e5) {
-      this.formError = e5 instanceof Error ? e5.message : erplora().t(CATALOG, "ui.errorArchive");
+      this.formError = e5 instanceof Error ? e5.message : erplora2().t(CATALOG2, "ui.errorArchive");
       this.archiveTarget = null;
     } finally {
       this.saving = false;
     }
   }
   renderArchiveConfirm() {
-    const t5 = (k2, p4) => erplora().t(CATALOG, k2, p4);
+    const t5 = (k2, p4) => erplora2().t(CATALOG2, k2, p4);
     const count = Number(this.archiveActive?.active_count ?? 0) || 0;
     return b2`<ion-modal .isOpen=${!!this.archiveTarget} @ionModalDidDismiss=${() => this.archiveTarget = null}>
       <ion-header class="ion-no-border">
@@ -3751,7 +4151,7 @@ var ErpServicesList = class extends i3 {
   }
   // El título de la vista lo pinta el topbar del shell: repetirlo aquí lo duplicaba en pantalla.
   render() {
-    const t5 = (k2) => erplora().t(CATALOG, k2);
+    const t5 = (k2) => erplora2().t(CATALOG2, k2);
     return b2`<div class="page">
         ${this.formError ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : A}
         ${this.ctrl?.error ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : A}
@@ -3759,6 +4159,10 @@ var ErpServicesList = class extends i3 {
           <!-- Alta: se proyecta SIEMPRE (aunque el panel esté cerrado); si solo se pintara al abrir,
                el «+» de la barra desplegaría un panel vacío. -->
           <form slot="create" class="form" @submit=${(e5) => this.createService(e5)}>
+            ${this.editingId ? b2`<ok-inline-feedback tone="info" icon="create-outline">
+                  <b>${t5("ui.editingTitle")}</b> — ${this.newName}
+                  <ion-button size="small" fill="clear" @click=${() => this.cancelEdit()}>${t5("ui.editingCancel")}</ion-button>
+                </ok-inline-feedback>` : A}
             <ion-input fill="outline" label-placement="floating" label=${t5("ui.colName")} .value=${this.newName} @ionInput=${(e5) => this.newName = e5.target.value}></ion-input>
             <ion-input fill="outline" label-placement="floating" label=${t5("ui.colPrice")} type="text" inputmode="decimal" .value=${this.newPrice} @ionInput=${(e5) => this.newPrice = e5.target.value}></ion-input>
             <ion-input fill="outline" label-placement="floating" label=${t5("ui.colDuration")} type="number" step="1" .value=${this.newDuration} @ionInput=${(e5) => this.newDuration = e5.target.value}></ion-input>
@@ -3772,7 +4176,7 @@ var ErpServicesList = class extends i3 {
             <!-- Sin categorías fiscales el alta es imposible (la categoría es obligatoria): se dice
                  dónde se arregla, en vez de dejar un desplegable vacío sin explicación. -->
             ${this.taxRates.length === 0 ? b2`<ok-inline-feedback tone="warning" icon="alert-circle-outline">${t5("ui.taxCategoriesMissing")}</ok-inline-feedback>` : A}
-            <ion-button type="submit" ?disabled=${this.saving || !this.newName || !this.newTaxRateId}>${this.saving ? t5("ui.btnSaving") : t5("ui.btnAdd")}</ion-button>
+            <ion-button type="submit" ?disabled=${this.saving || !this.newName || !this.newTaxRateId}>${this.saving ? t5("ui.btnSaving") : this.editingId ? t5("ui.btnSave") : t5("ui.btnAdd")}</ion-button>
           </form>
         </ok-data-table>
         ${this.renderArchiveConfirm()}
@@ -3811,11 +4215,321 @@ __decorateClass([
 ], ErpServicesList.prototype, "tick", 2);
 __decorateClass([
   r5()
+], ErpServicesList.prototype, "editingId", 2);
+__decorateClass([
+  r5()
 ], ErpServicesList.prototype, "archiveTarget", 2);
 __decorateClass([
   r5()
 ], ErpServicesList.prototype, "archiveActive", 2);
 define("erp-services-list", ErpServicesList);
-export {
-  ErpServicesList
+
+// modules/services/ui/components/erp-services-packages/erp-services-packages.ts
+var CATALOG3 = { es: es_default, en: en_default };
+var SESSION_SCALE = 1e6;
+var EMPTY_FORM = { name: "", discountType: "percentage", discountValue: "", fixedPrice: "", validityDays: "", maxUses: "" };
+function erplora3() {
+  const c5 = globalThis.erplora;
+  if (!c5) throw new Error("erplora SDK no inicializado por el shell");
+  return c5;
+}
+function can3(permission) {
+  const client = erplora3();
+  return typeof client.hasPermission === "function" ? client.hasPermission(permission) : true;
+}
+function decimals() {
+  const d3 = erplora3().currencyDecimals;
+  return typeof d3 === "number" ? d3 : 2;
+}
+function toMinorOrNull(v3) {
+  const s5 = String(v3 ?? "").trim().replace(",", ".");
+  if (!s5) return null;
+  return majorToMinor(s5, decimals());
+}
+function toIntOrNull(v3) {
+  const s5 = String(v3 ?? "").trim();
+  if (!s5) return null;
+  const n6 = Number.parseInt(s5, 10);
+  return Number.isFinite(n6) ? n6 : null;
+}
+var ErpServicesPackages = class extends i3 {
+  constructor() {
+    super(...arguments);
+    this.form = { ...EMPTY_FORM };
+    this.items = [{ serviceId: "", sessions: "1" }];
+    this.services = [];
+    this.saving = false;
+    this.formError = "";
+    this.editingId = null;
+    this.deleteTarget = null;
+    this.onLocaleChange = () => this.requestUpdate();
+  }
+  static {
+    this.styles = i`
+    :host { display: flex; flex-direction: column; height: 100%; min-height: 0; font-family: system-ui, sans-serif; color: var(--ion-text-color, #1c1b18); }
+    .page { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
+    .page > ok-data-table { flex: 1 1 auto; min-height: 0; }
+    .form { display: flex; flex-direction: column; gap: 0.7rem; }
+    .form ion-button[type='submit'] { align-self: flex-end; }
+    .line { display: grid; grid-template-columns: 1fr 5.5rem auto; gap: 0.4rem; align-items: center; }
+    .lines-title { font-size: 0.85rem; font-weight: 600; margin: 0.3rem 0 0; }
+  `;
+  }
+  get columns() {
+    const t5 = (k2) => erplora3().t(CATALOG3, k2);
+    return [
+      { key: "name", header: t5("ui.colName"), sortable: true, filterable: true, filterType: "text" },
+      {
+        key: "discount_type",
+        header: t5("ui.colDiscount"),
+        sortable: true,
+        format: (r6) => r6.discount_type === "fixed" ? `-${erplora3().formatMoney(Number(r6.discount_amount_cents) || 0)}` : `-${Number(r6.discount_percent) || 0} %`
+      },
+      {
+        key: "fixed_price",
+        header: t5("ui.colFixedPrice"),
+        align: "right",
+        sortable: true,
+        format: (r6) => r6.fixed_price == null || r6.fixed_price === "" ? "\u2014" : erplora3().formatMoney(Number(r6.fixed_price) || 0)
+      },
+      { key: "items", header: t5("ui.colItems"), align: "right", sortable: true },
+      {
+        key: "is_active",
+        header: t5("ui.colStatus"),
+        sortable: true,
+        filterable: true,
+        filterType: "select",
+        options: [{ value: "1", label: t5("ui.status.active") }, { value: "0", label: t5("ui.status.inactive") }],
+        format: (r6) => Number(r6.is_active) ? t5("ui.status.active") : t5("ui.status.inactive")
+      }
+    ];
+  }
+  get actions() {
+    const t5 = (k2) => erplora3().t(CATALOG3, k2);
+    return [
+      ...can3("services.change_package") ? [{ id: "edit", label: t5("ui.actionEdit"), icon: "create-outline" }] : [],
+      ...can3("services.delete_package") ? [{ id: "delete", label: t5("ui.actionDelete"), icon: "trash-outline", color: "danger" }] : []
+    ];
+  }
+  async connectedCallback() {
+    super.connectedCallback();
+    window.addEventListener("erplora:locale-changed", this.onLocaleChange);
+    this.ctrl = createListController(erplora3(), "services.packages.list", () => this.requestUpdate(), {
+      pageSize: 50,
+      sort: "name",
+      dir: "asc"
+    });
+    await Promise.all([this.ctrl.load(), this.loadServices()]);
+    try {
+      const off1 = erplora3().on("services.package.created", () => this.ctrl.load());
+      const off2 = erplora3().on("services.package.updated", () => this.ctrl.load());
+      const off3 = erplora3().on("services.package.deleted", () => this.ctrl.load());
+      this.unsub = () => {
+        off1();
+        off2();
+        off3();
+      };
+    } catch {
+    }
+  }
+  disconnectedCallback() {
+    window.removeEventListener("erplora:locale-changed", this.onLocaleChange);
+    super.disconnectedCallback();
+    this.unsub?.();
+  }
+  async loadServices() {
+    try {
+      this.services = await erplora3().queryAll("services.services.list", { sort: "name", dir: "asc" }) ?? [];
+    } catch {
+      this.services = [];
+    }
+  }
+  dataTable() {
+    return this.renderRoot.querySelector("ok-data-table");
+  }
+  addItem() {
+    this.items = [...this.items, { serviceId: "", sessions: "1" }];
+  }
+  removeItem(i7) {
+    this.items = this.items.filter((_2, idx) => idx !== i7);
+    if (this.items.length === 0) this.items = [{ serviceId: "", sessions: "1" }];
+  }
+  setItem(i7, patch) {
+    this.items = this.items.map((it, idx) => idx === i7 ? { ...it, ...patch } : it);
+  }
+  async onRowAction(ev) {
+    const { actionId, row } = ev.detail;
+    const p4 = row;
+    if (actionId === "edit" && can3("services.change_package")) {
+      this.formError = "";
+      let full = row;
+      try {
+        const rows = await erplora3().query("services.packages.get", { package_id: p4.id });
+        if (Array.isArray(rows) && rows[0]) full = rows[0];
+      } catch {
+      }
+      const type = String(full.discount_type ?? "percentage");
+      this.editingId = p4.id;
+      this.form = {
+        name: String(full.name ?? ""),
+        discountType: type,
+        discountValue: type === "fixed" ? String(minorToMajor(Number(full.discount_amount_cents) || 0, decimals())) : String(Number(full.discount_percent) || 0),
+        fixedPrice: full.fixed_price == null || full.fixed_price === "" ? "" : String(minorToMajor(Number(full.fixed_price) || 0, decimals())),
+        validityDays: full.validity_days == null ? "" : String(full.validity_days),
+        maxUses: full.max_uses == null ? "" : String(full.max_uses)
+      };
+      this.dataTable()?.open("create");
+    } else if (actionId === "delete" && can3("services.delete_package")) {
+      this.deleteTarget = p4;
+    }
+  }
+  /** Back to a clean CREATE form. */
+  cancelEdit() {
+    this.editingId = null;
+    this.form = { ...EMPTY_FORM };
+    this.items = [{ serviceId: "", sessions: "1" }];
+    this.formError = "";
+  }
+  /** The header fields as the commands want them: percent OR minor units by `discount_type`. */
+  headerPayload() {
+    const fixed = this.form.discountType === "fixed";
+    return {
+      name: this.form.name.trim(),
+      discount_type: fixed ? "fixed" : "percentage",
+      discount_percent: fixed ? null : Number(String(this.form.discountValue).replace(",", ".")) || 0,
+      discount_amount_cents: fixed ? toMinorOrNull(this.form.discountValue) ?? 0 : null,
+      fixed_price: toMinorOrNull(this.form.fixedPrice),
+      validity_days: toIntOrNull(this.form.validityDays),
+      max_uses: toIntOrNull(this.form.maxUses)
+    };
+  }
+  /** Submit: create (header + lines) OR update (header, partial door `records.package.patch`). */
+  async save(ev) {
+    ev.preventDefault();
+    const required = this.editingId ? "services.change_package" : "services.add_package";
+    if (!can3(required) || !this.form.name.trim()) return;
+    const t5 = (k2) => erplora3().t(CATALOG3, k2);
+    const header = this.headerPayload();
+    const lines = this.items.filter((l3) => l3.serviceId).map((l3) => ({ service_id: l3.serviceId, quantity: Math.max(1, Math.round(Number(l3.sessions) || 1)) * SESSION_SCALE }));
+    if (!this.editingId && lines.length === 0) {
+      this.formError = t5("ui.errorPackageNoLines");
+      return;
+    }
+    this.saving = true;
+    this.formError = "";
+    try {
+      if (this.editingId) {
+        await erplora3().command("services.packages.update", {
+          package_id: this.editingId,
+          ...header,
+          discount_percent: header.discount_percent ?? 0,
+          discount_amount_cents: header.discount_amount_cents ?? 0
+        });
+      } else {
+        await erplora3().command("services.packages.create", { ...header, items: lines });
+      }
+      this.cancelEdit();
+      this.dataTable()?.close();
+      await this.ctrl.load();
+    } catch (e5) {
+      this.formError = e5 instanceof Error ? e5.message : t5("ui.errorSavePackage");
+    } finally {
+      this.saving = false;
+    }
+  }
+  async confirmDelete() {
+    const target = this.deleteTarget;
+    if (!target || !can3("services.delete_package")) return;
+    this.saving = true;
+    try {
+      await erplora3().command("services.packages.delete", { package_id: target.id });
+      this.deleteTarget = null;
+      await this.ctrl.load();
+    } catch (e5) {
+      this.formError = e5 instanceof Error ? e5.message : erplora3().t(CATALOG3, "ui.errorDeletePackage");
+      this.deleteTarget = null;
+    } finally {
+      this.saving = false;
+    }
+  }
+  renderDeleteConfirm() {
+    const t5 = (k2, p4) => erplora3().t(CATALOG3, k2, p4);
+    return b2`<ion-modal .isOpen=${!!this.deleteTarget} @ionModalDidDismiss=${() => this.deleteTarget = null}>
+      <ion-header class="ion-no-border">
+        <ion-toolbar><ion-title>${t5("ui.deletePackageTitle")}</ion-title></ion-toolbar>
+      </ion-header>
+      <ion-content class="ion-padding">
+        <!-- Self-styled: ion-modal is reparented to <body>, this component's CSS does not reach it. -->
+        <ion-list lines="none">
+          <ion-item>
+            <ion-label class="ion-text-wrap"><b>${this.deleteTarget?.name ?? ""}</b> — ${t5("ui.deletePackageHint", { count: Number(this.deleteTarget?.items ?? 0) || 0 })}</ion-label>
+          </ion-item>
+        </ion-list>
+        <ion-button class="ion-margin-top" expand="block" color="danger" ?disabled=${this.saving} @click=${() => this.confirmDelete()}>${t5("ui.actionDelete")}</ion-button>
+        <ion-button expand="block" fill="outline" ?disabled=${this.saving} @click=${() => this.deleteTarget = null}>${t5("ui.btnCancel")}</ion-button>
+      </ion-content>
+    </ion-modal>`;
+  }
+  renderLines() {
+    const t5 = (k2) => erplora3().t(CATALOG3, k2);
+    return b2`<p class="lines-title">${t5("ui.packageLinesTitle")}</p>
+      ${this.items.map((line, i7) => b2`<div class="line">
+        <ion-select fill="outline" label-placement="floating" label=${t5("ui.colService")} .value=${line.serviceId} @ionChange=${(e5) => this.setItem(i7, { serviceId: e5.target.value })}>
+          ${this.services.map((s5) => b2`<ion-select-option .value=${s5.id}>${s5.name} · ${erplora3().formatMoney(Number(s5.price) || 0)}</ion-select-option>`)}
+        </ion-select>
+        <ion-input fill="outline" label-placement="floating" label=${t5("ui.colSessions")} type="number" min="1" step="1" .value=${line.sessions} @ionInput=${(e5) => this.setItem(i7, { sessions: e5.target.value })}></ion-input>
+        <ion-button fill="clear" size="small" aria-label=${t5("ui.removeLine")} @click=${() => this.removeItem(i7)}><ion-icon slot="icon-only" name="close-outline"></ion-icon></ion-button>
+      </div>`)}
+      <ion-button fill="outline" size="small" @click=${() => this.addItem()}>${t5("ui.addLine")}</ion-button>`;
+  }
+  render() {
+    const t5 = (k2) => erplora3().t(CATALOG3, k2);
+    const fixed = this.form.discountType === "fixed";
+    return b2`<div class="page">
+      ${this.formError ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : A}
+      ${this.ctrl?.error ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : A}
+      <ok-data-table .serverSide=${true} .fill=${true} .views=${true} .addable=${can3("services.add_package")} .cardTitle=${(row) => String(row.name ?? "")} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "asc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchPackagePlaceholder")} .actions=${this.actions} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.emptyPackages")} @rowAction=${(e5) => this.onRowAction(e5)} @pageChange=${(e5) => this.ctrl.setPage(e5.detail)} @pageSizeChange=${(e5) => this.ctrl.setPageSize(e5.detail)} @sortChange=${(e5) => this.ctrl.setSort(e5.detail.sort, e5.detail.dir)} @searchChange=${(e5) => this.ctrl.setSearch(e5.detail)} @filterChange=${(e5) => this.ctrl.setFilter(e5.detail.col, e5.detail.value)}>
+        <form slot="create" class="form" @submit=${(e5) => this.save(e5)}>
+          ${this.editingId ? b2`<ok-inline-feedback tone="info" icon="create-outline">
+                <b>${t5("ui.editingPackageTitle")}</b> — ${this.form.name}
+                <ion-button size="small" fill="clear" @click=${() => this.cancelEdit()}>${t5("ui.editingCancel")}</ion-button>
+              </ok-inline-feedback>` : A}
+          <ion-input fill="outline" label-placement="floating" label=${t5("ui.colName")} .value=${this.form.name} @ionInput=${(e5) => this.form = { ...this.form, name: e5.target.value }}></ion-input>
+          <ion-select fill="outline" label-placement="floating" label=${t5("ui.colDiscountType")} .value=${this.form.discountType} @ionChange=${(e5) => this.form = { ...this.form, discountType: e5.target.value }}>
+            <ion-select-option value="percentage">${t5("ui.discountType.percentage")}</ion-select-option>
+            <ion-select-option value="fixed">${t5("ui.discountType.fixed")}</ion-select-option>
+          </ion-select>
+          <ion-input fill="outline" label-placement="floating" label=${fixed ? t5("ui.colDiscountAmount") : t5("ui.colDiscountPercent")} type="text" inputmode="decimal" .value=${this.form.discountValue} @ionInput=${(e5) => this.form = { ...this.form, discountValue: e5.target.value }}></ion-input>
+          <ion-input fill="outline" label-placement="floating" label=${t5("ui.colFixedPrice")} helper-text=${t5("ui.fixedPriceHelp")} type="text" inputmode="decimal" .value=${this.form.fixedPrice} @ionInput=${(e5) => this.form = { ...this.form, fixedPrice: e5.target.value }}></ion-input>
+          <ion-input fill="outline" label-placement="floating" label=${t5("ui.colValidityDays")} helper-text=${t5("ui.validityHelp")} type="number" min="1" step="1" .value=${this.form.validityDays} @ionInput=${(e5) => this.form = { ...this.form, validityDays: e5.target.value }}></ion-input>
+          <ion-input fill="outline" label-placement="floating" label=${t5("ui.colMaxUses")} helper-text=${t5("ui.maxUsesHelp")} type="number" min="1" step="1" .value=${this.form.maxUses} @ionInput=${(e5) => this.form = { ...this.form, maxUses: e5.target.value }}></ion-input>
+          ${this.editingId ? b2`<ok-inline-feedback tone="neutral" icon="information-circle-outline">${t5("ui.packageLinesFixed")}</ok-inline-feedback>` : this.renderLines()}
+          <ion-button type="submit" ?disabled=${this.saving || !this.form.name}>${this.saving ? t5("ui.btnSaving") : this.editingId ? t5("ui.btnSave") : t5("ui.btnAdd")}</ion-button>
+        </form>
+      </ok-data-table>
+      ${this.renderDeleteConfirm()}
+    </div>`;
+  }
 };
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "form", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "items", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "services", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "saving", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "formError", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "editingId", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "deleteTarget", 2);
+define("erp-services-packages", ErpServicesPackages);

@@ -214,6 +214,39 @@ def check_navigation(m: dict) -> None:
         field(path, entry, "label", str, required=True)
         field(path, entry, "component", str, required=True)
         field(path, entry, "icon", str)
+    check_navigation_views(nav)
+
+
+# The three views of the catalogue (services#4, ADR-0022): Services, Categories, Packages. Each
+# entry names a Web Component that really lives in `ui/components/` (a `navigation` entry whose
+# component nobody defines is a menu item that opens an empty screen), and has its label in BOTH
+# locales (`navigation.<id>.label`, ADR-0055 — English source + Spanish).
+REQUIRED_VIEWS = {
+    "services": "erp-services-list",
+    "categories": "erp-services-categories",
+    "packages": "erp-services-packages",
+}
+
+
+def check_navigation_views(nav: list) -> None:
+    by_id = {e.get("id"): e for e in nav if isinstance(e, dict)}
+    for view_id, component in REQUIRED_VIEWS.items():
+        entry = by_id.get(view_id)
+        if entry is None:
+            failures.append(f"navigation: view {view_id!r} ({component}) is not declared")
+            continue
+        if entry.get("component") != component:
+            failures.append(f"navigation[{view_id}].component is {entry.get('component')!r}, expected {component!r}")
+        src = MODULE_DIR / "ui" / "components" / component / f"{component}.ts"
+        if not src.exists():
+            failures.append(f"navigation[{view_id}]: {src.relative_to(MODULE_DIR)} does not exist — the menu would open nothing")
+        elif f"define('{component}'" not in src.read_text():
+            failures.append(f"{src.relative_to(MODULE_DIR)}: does not `define('{component}', …)`")
+        for lang in ("en", "es"):
+            catalog = json.loads((MODULE_DIR / "locales" / f"{lang}.json").read_text())
+            label = ((catalog.get("navigation") or {}).get(view_id) or {}).get("label")
+            if not isinstance(label, str) or not label.strip():
+                failures.append(f"locales/{lang}.json: navigation.{view_id}.label is missing")
 
 
 def check_sql_blocks(m: dict) -> None:

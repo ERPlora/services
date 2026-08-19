@@ -7,6 +7,12 @@
   "navigation": {
     "services": {
       "label": "Services"
+    },
+    "categories": {
+      "label": "Categories"
+    },
+    "packages": {
+      "label": "Packages"
     }
   },
   "ui": {
@@ -54,7 +60,55 @@
     "archiveWarnAppointments": "{count} upcoming appointment(s) still use this service. They keep their booking, price and duration; only new bookings stop.",
     "archiveConfirm": "Archive",
     "btnCancel": "Cancel",
-    "errorArchive": "Could not archive the service"
+    "errorArchive": "Could not archive the service",
+    "actionEdit": "Edit",
+    "editingTitle": "Editing service",
+    "editingCancel": "Cancel edit",
+    "btnSave": "Save changes",
+    "errorUpdate": "Could not update the service",
+    "colParent": "Parent category",
+    "colSortOrder": "Order",
+    "colServiceCount": "Services",
+    "placeholderParent": "Parent…",
+    "optionNoParent": "No parent (root)",
+    "searchCategoryPlaceholder": "Search category…",
+    "emptyCategories": "No categories.",
+    "editingCategoryTitle": "Editing category",
+    "deleteCategoryTitle": "Delete category",
+    "deleteCategoryHint": "the category disappears; the services in it are kept, without a category.",
+    "deleteCategoryImpact": "{count} service(s) will be left without a category.",
+    "errorSaveCategory": "Could not save the category",
+    "errorDeleteCategory": "Could not delete the category",
+    "actionDelete": "Delete",
+    "colDiscount": "Discount",
+    "colFixedPrice": "Closed price",
+    "colItems": "Lines",
+    "colDiscountType": "Discount type",
+    "discountType": {
+      "percentage": "Percentage",
+      "fixed": "Fixed amount"
+    },
+    "colDiscountAmount": "Discount (amount)",
+    "colDiscountPercent": "Discount (%)",
+    "fixedPriceHelp": "Leave empty to price it as the sum of its lines minus the discount.",
+    "colValidityDays": "Validity (days)",
+    "validityHelp": "Days redeemable after the first use; empty = never expires.",
+    "colMaxUses": "Uses",
+    "maxUsesHelp": "Uses the voucher grants; empty = unlimited.",
+    "packageLinesTitle": "Services included",
+    "colService": "Service",
+    "colSessions": "Sessions",
+    "addLine": "Add service",
+    "removeLine": "Remove line",
+    "packageLinesFixed": "The services included cannot be changed once created: archive this package and create a new one.",
+    "searchPackagePlaceholder": "Search package…",
+    "emptyPackages": "No packages.",
+    "editingPackageTitle": "Editing package",
+    "deletePackageTitle": "Delete package",
+    "deletePackageHint": "the package and its {count} line(s) disappear from the catalogue; vouchers already sold keep their balance.",
+    "errorPackageNoLines": "Add at least one service: a package with no lines cannot be redeemed.",
+    "errorSavePackage": "Could not save the package",
+    "errorDeletePackage": "Could not delete the package"
   },
   "errors": {
     "services.category_unavailable": "That category is not available: it does not exist in this business or it has been deleted.",

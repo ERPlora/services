@@ -74,6 +74,18 @@
       "label": "Services",
       "icon": "briefcase",
       "component": "erp-services-list"
+    },
+    {
+      "id": "categories",
+      "label": "Categories",
+      "icon": "pricetags",
+      "component": "erp-services-categories"
+    },
+    {
+      "id": "packages",
+      "label": "Packages",
+      "icon": "gift",
+      "component": "erp-services-packages"
     }
   ],
   "settings": {

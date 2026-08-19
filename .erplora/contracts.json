@@ -4,6 +4,9 @@
   "consumes": {
     "queries": [
       "services.categories.list",
+      "services.packages.get",
+      "services.packages.list",
+      "services.services.get",
       "services.services.list",
       "taxes.categories.list"
     ],
@@ -11,10 +14,20 @@
       "appointments.appointments.count_active_for_service"
     ],
     "commands": [
+      "services.categories.create",
+      "services.categories.delete",
+      "services.categories.update",
+      "services.packages.create",
+      "services.packages.delete",
+      "services.packages.update",
       "services.services.create",
-      "services.services.delete"
+      "services.services.delete",
+      "services.services.update"
     ],
     "events": [
+      "services.package.created",
+      "services.package.deleted",
+      "services.package.updated",
       "services.service.created",
       "services.service.deleted",
       "services.service.updated"

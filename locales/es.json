@@ -8,6 +8,12 @@
   "navigation": {
     "services": {
       "label": "Servicios"
+    },
+    "categories": {
+      "label": "Categorías"
+    },
+    "packages": {
+      "label": "Bonos y paquetes"
     }
   },
   "ui": {
@@ -55,7 +61,55 @@
     "archiveWarnAppointments": "{count} cita(s) próxima(s) siguen usando este servicio. Conservan su reserva, precio y duración; solo dejan de admitirse reservas nuevas.",
     "archiveConfirm": "Archivar",
     "btnCancel": "Cancelar",
-    "errorArchive": "No se pudo archivar el servicio"
+    "errorArchive": "No se pudo archivar el servicio",
+    "actionEdit": "Editar",
+    "editingTitle": "Editando servicio",
+    "editingCancel": "Cancelar edición",
+    "btnSave": "Guardar cambios",
+    "errorUpdate": "No se pudo actualizar el servicio",
+    "colParent": "Categoría padre",
+    "colSortOrder": "Orden",
+    "colServiceCount": "Servicios",
+    "placeholderParent": "Padre…",
+    "optionNoParent": "Sin padre (raíz)",
+    "searchCategoryPlaceholder": "Buscar categoría…",
+    "emptyCategories": "No hay categorías.",
+    "editingCategoryTitle": "Editando categoría",
+    "deleteCategoryTitle": "Eliminar categoría",
+    "deleteCategoryHint": "la categoría desaparece; los servicios que contiene se conservan, sin categoría.",
+    "deleteCategoryImpact": "{count} servicio(s) se quedarán sin categoría.",
+    "errorSaveCategory": "No se pudo guardar la categoría",
+    "errorDeleteCategory": "No se pudo eliminar la categoría",
+    "actionDelete": "Eliminar",
+    "colDiscount": "Descuento",
+    "colFixedPrice": "Precio cerrado",
+    "colItems": "Líneas",
+    "colDiscountType": "Tipo de descuento",
+    "discountType": {
+      "percentage": "Porcentaje",
+      "fixed": "Importe fijo"
+    },
+    "colDiscountAmount": "Descuento (importe)",
+    "colDiscountPercent": "Descuento (%)",
+    "fixedPriceHelp": "Déjalo vacío para que valga la suma de sus líneas menos el descuento.",
+    "colValidityDays": "Vigencia (días)",
+    "validityHelp": "Días canjeable desde el primer uso; vacío = no caduca.",
+    "colMaxUses": "Usos",
+    "maxUsesHelp": "Usos que concede el bono; vacío = ilimitados.",
+    "packageLinesTitle": "Servicios incluidos",
+    "colService": "Servicio",
+    "colSessions": "Sesiones",
+    "addLine": "Añadir servicio",
+    "removeLine": "Quitar línea",
+    "packageLinesFixed": "Los servicios incluidos no se cambian una vez creado: archiva este paquete y crea uno nuevo.",
+    "searchPackagePlaceholder": "Buscar paquete…",
+    "emptyPackages": "No hay paquetes.",
+    "editingPackageTitle": "Editando paquete",
+    "deletePackageTitle": "Eliminar paquete",
+    "deletePackageHint": "el paquete y sus {count} línea(s) desaparecen del catálogo; los bonos ya vendidos conservan su saldo.",
+    "errorPackageNoLines": "Añade al menos un servicio: un paquete sin líneas no se puede canjear.",
+    "errorSavePackage": "No se pudo guardar el paquete",
+    "errorDeletePackage": "No se pudo eliminar el paquete"
   },
   "errors": {
     "services.category_unavailable": "Esa categoría no está disponible: no existe en este negocio o se ha eliminado.",
