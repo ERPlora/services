@@ -32,7 +32,7 @@
     "colStatus": "Status",
     "status": {
       "active": "Active",
-      "inactive": "Inactive",
+      "inactive": "Archived",
       "unconfigured": "Not configured"
     },
     "statusReason": {
@@ -61,6 +61,8 @@
     "archiveConfirm": "Archive",
     "btnCancel": "Cancel",
     "errorArchive": "Could not archive the service",
+    "actionRestore": "Restore",
+    "errorRestore": "Could not restore the service",
     "actionEdit": "Edit",
     "editingTitle": "Editing service",
     "editingCancel": "Cancel edit",
@@ -114,6 +116,7 @@
     "services.category_unavailable": "That category is not available: it does not exist in this business or it has been deleted.",
     "services.service_update_rejected": "The service could not be updated: it does not exist in this business, or the category you picked does not.",
     "services.service_not_found": "That service does not exist in this business.",
+    "services.service_not_archived": "That service could not be brought back: it does not exist in this business, or it is already being offered.",
     "services.parent_category_unavailable": "That parent category is not available: it does not exist in this business or it has been deleted.",
     "services.category_update_rejected": "The category could not be updated: it does not exist in this business, or the parent you picked does not (or is the category itself).",
     "services.category_not_found": "That category does not exist in this business.",

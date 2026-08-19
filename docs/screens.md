@@ -40,6 +40,19 @@ duration, category and tax category — the rest of the fields keep their values
 installed, tells you how many upcoming appointments still use the service — they keep their
 booking; the service just stops being offered. It is a soft delete: nothing is destroyed.
 
+### See and restore the archived services
+
+The list shows **only what you can offer**: archived services are not in it, on purpose — the diary
+reads this very list to know what can be booked. To see them, open the **Status** filter and pick
+**Archived**. That is a scope, not just a filter: the table asks the hub for the archived ones and
+shows them with their grey badge.
+
+While you are looking at them, the row offers **Restore** — one tap, no confirmation (it undoes an
+archive; nothing is lost). The service comes back exactly as it was, with its name, price, duration
+and category, and it can be booked and charged again. Needs `services.change_service`, so a manager
+can bring a service back without needing an admin. Clear the filter and you are back to the working
+list.
+
 ### Create many services at once
 
 Bulk creation validates each service **independently** — one bad row does not abort the batch — and

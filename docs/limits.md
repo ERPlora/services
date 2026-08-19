@@ -66,6 +66,7 @@ A refused redemption rolls the whole transaction back — no ledger row, no even
 | Create a service | `services.add_service` |
 | Change a service, bulk-create services | `services.change_service` |
 | Archive a service | `services.delete_service` |
+| Restore an archived service | `services.change_service` |
 | Create or change a category | `services.add_category` / `services.change_category` |
 | Delete a category | `services.delete_category` |
 | Create or change a package | `services.add_package` / `services.change_package` |
@@ -126,6 +127,11 @@ is still active — remaining uses is only one of the three conditions.
 **"I archived a service that had appointments."** That is allowed on purpose: the screen warned you
 with the count. The appointments keep their denormalised copy of the name, price and duration; only
 new bookings stop.
+
+**"I archived a service by mistake and now I cannot find it."** It is not lost. In **Services**, open
+the **Status** filter and pick **Archived**; the row offers **Restore**, and the service comes back
+as it was. The list hides archived services by default on purpose — the diary reads that same list
+to know what can be booked, so what it shows is what you can actually offer.
 
 **"A 20 discount was applied wrongly."** Check which field holds it. `discount_percent` is a
 percentage; `discount_amount_cents` is money in cents. They are separate fields precisely because
