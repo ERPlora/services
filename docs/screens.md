@@ -1,8 +1,9 @@
 # Services — Screens
 
-The module contributes one tab to the hub navigation — **Services** — plus a **Servicios** settings
-tab the shell generates from the declarative settings block. Categories and packages are managed from
-inside the Services screen.
+The module contributes three tabs to the hub navigation — **Services**, **Categories** and
+**Packages** — plus a **Servicios** settings tab the shell generates from the declarative settings
+block. Each tab is a data table: the «+» opens the create panel, the row menu offers **Edit** (the
+same panel, pre-filled) and **Archive**/**Delete** (always with a confirmation).
 
 ## Services
 
@@ -15,7 +16,7 @@ by name.
 
 ### Create a service
 
-1. Open **Services** and add one.
+1. Open **Services** and press **+**.
 2. Give it a **name** and a **price**.
 3. Choose the **pricing type**: `fixed`, `hourly`, `from`, `variable` or `free`. For `variable` or
    `from` you can set a minimum and a maximum price.
@@ -32,7 +33,9 @@ this.
 
 ### Edit or archive a service
 
-Editing needs `services.change_service`. **Archive** (row action `…` → Archive) needs
+**Edit** (row menu) opens the same panel pre-filled with the service; you can change name, price,
+duration, category and tax category — the rest of the fields keep their values. Needs
+`services.change_service`. **Archive** (row action `…` → Archive) needs
 `services.delete_service` (**admin only**): it asks you to confirm and, if `appointments` is
 installed, tells you how many upcoming appointments still use the service — they keep their
 booking; the service just stops being offered. It is a soft delete: nothing is destroyed.
@@ -52,11 +55,11 @@ Hierarchical categories (`services.categories.list`, 50 rows per page). Requires
 - **Sort and filter** by name, slug, icon, colour, parent, order or number of services.
 
 A category has a name, a unique slug, an icon, a colour, an image, a sort order, an active flag and
-optionally a **parent** — that is what makes them a tree. Creating and changing need
-`services.add_category` / `services.change_category`; deleting needs `services.delete_category`
-(**admin only**).
-
-Deleting a parent category **cascades to its children**.
+optionally a **parent** — that is what makes them a tree. From the **Categories** tab you create
+(name, parent, order), edit (row menu → Edit; a category cannot be its own parent) and delete (row
+menu → Delete, with a confirmation that says how many services are left without a category — they
+keep existing). Creating and changing need `services.add_category` / `services.change_category`;
+deleting needs `services.delete_category` (**admin only**).
 
 ## Packages
 
@@ -69,14 +72,18 @@ Bundles of services with a discount (`services.packages.list`, 50 rows per page)
 
 ### Create a package
 
-1. Open packages and add one. Give it a **name**.
+1. Open **Packages** and press **+**. Give it a **name**.
 2. Pick the **discount type**:
    - `percentage` — set the percentage;
-   - `fixed` — set the amount in cents.
-3. Alternatively set a **fixed price** for the whole bundle, which overrides the discount.
-4. Add the **services** it contains, each with a quantity (the number of sessions).
-5. Optionally set **max uses** and **validity in days**.
+   - `fixed` — set the amount (typed in euros; stored in cents).
+3. Alternatively set a **closed price** for the whole bundle, which overrides the discount.
+4. Add the **services** it contains, each with its number of **sessions**. At least one line.
+5. Optionally set **uses** and **validity in days** (empty = unlimited / never expires).
 6. Save.
+
+**Edit** (row menu) changes the header — name, discount, closed price, validity, uses. The services
+included are the package's identity and cannot be changed once created: delete it and create a new
+one (vouchers already sold keep their balance). **Delete** asks for confirmation first.
 
 The package header and all its lines are written together, and a service repeated in the list is
 de-duplicated. Requires `services.add_package`.
