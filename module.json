@@ -522,6 +522,12 @@
         "file": "dist/handler.wasm",
         "function": "create_package"
       },
+      "reads": [
+        {
+          "query": "services.services.list",
+          "required": true
+        }
+      ],
       "schema": "schemas/package_create.json",
       "emit": [
         "services.package.created"
