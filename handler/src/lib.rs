@@ -184,6 +184,17 @@ pub fn bulk_create_services_pure(input: Value) -> HandlerOutput {
             continue;
         }
 
+        // La categoría fiscal es OBLIGATORIA por ítem (services#41), igual que en
+        // `services.services.create` desde services#33: un servicio se vende como línea de venta
+        // con su IVA, así que sin ella el lote nace invendible. El schema ya la exige antes de
+        // llegar aquí; esto es la segunda puerta, y falla el ÍTEM (no el lote) para no perder los
+        // demás. NUNCA se inventa un default: eso sería inventarse dato fiscal.
+        let tax_category_key = str_field(item, "tax_category_key").trim().to_string();
+        if tax_category_key.is_empty() {
+            push_err(&mut errors, &name, "A tax category is required");
+            continue;
+        }
+
         let pricing_type = {
             let pt = str_field(item, "pricing_type");
             if pt.is_empty() { "fixed".to_string() } else { pt }
@@ -246,6 +257,7 @@ pub fn bulk_create_services_pure(input: Value) -> HandlerOutput {
                 _ => Value::Null,
             },
         );
+        p.insert("tax_category_key".into(), json!(tax_category_key));
         p.insert("pricing_type".into(), json!(pricing_type));
         p.insert("price".into(), json!(money::round(Decimal::from_f64(price).unwrap_or(Decimal::ZERO)))); // céntimos (input cents)
         p.insert("cost".into(), json!(money::round(Decimal::from_f64(cost).unwrap_or(Decimal::ZERO))));   // céntimos
@@ -409,6 +421,56 @@ mod tests {
 
     fn input(payload: Value) -> Value {
         json!({ "payload": payload, "context": { "new_ids": ["pkg-1", "li-1", "li-2"] } })
+    }
+
+    fn batch(services: Value) -> Value {
+        json!({
+            "payload": { "services": services },
+            "context": { "new_ids": ["svc-1", "svc-2", "svc-3"] }
+        })
+    }
+
+    /// services#41 — a service of the batch is born SELLABLE: it carries the fiscal category
+    /// `services.services.create` has demanded since services#33. Without it the row lands with
+    /// `tax_category_key = NULL` and the sale is refused at the counter.
+    #[test]
+    fn bulk_created_service_carries_its_tax_category() {
+        let out = bulk_create_services_pure(batch(json!([
+            { "name": "Cut", "tax_category_key": "standard", "price": 1500 }
+        ])));
+        assert_eq!(out.operations.len(), 1);
+        assert_eq!(out.operations[0].command, "services._insert_service");
+        assert_eq!(
+            out.operations[0].params["tax_category_key"],
+            json!("standard"),
+            "the batch must write the fiscal category, not leave it NULL"
+        );
+    }
+
+    /// Defence in depth behind the schema: an item with no fiscal category is an ITEM error
+    /// (the batch keeps going with the rest), never a row saved unsellable.
+    #[test]
+    fn an_item_without_a_tax_category_is_refused_not_saved_unsellable() {
+        let out = bulk_create_services_pure(batch(json!([
+            { "name": "No tax" },
+            { "name": "Blank tax", "tax_category_key": "  " },
+            { "name": "Dye", "tax_category_key": "reduced" }
+        ])));
+        assert_eq!(out.operations.len(), 1, "only the item that knows how it taxes is saved");
+        assert_eq!(out.operations[0].params["name"], json!("Dye"));
+        assert_eq!(
+            out.operations[0].params["service_id"],
+            json!("svc-1"),
+            "the id batch is spent on the valid items, in order"
+        );
+        let errors = out.result["errors"].as_array().unwrap();
+        assert_eq!(errors.len(), 2);
+        assert_eq!(errors[0]["name"], json!("No tax"));
+        assert!(
+            errors[0]["error"].as_str().unwrap().contains("tax category"),
+            "the reason must name the fiscal category, got {:?}",
+            errors[0]["error"]
+        );
     }
 
     /// Devuelve los params del primer op (`services._insert_package`).

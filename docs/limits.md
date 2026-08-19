@@ -100,8 +100,9 @@ service with no duration gives the diary no window.
 
 **"It refused to save the service without a tax category."** That is deliberate: a service is sold as
 a sale line with its VAT, so `tax_category_key` is required at save time (not discovered at the
-counter). Services created through `bulk_create` are the exception today — they carry no tax
-category and fall back to the hub's default.
+counter). **The batch works the same way**: every line of a `bulk_create` carries its own category,
+and a line without one is reported as an error of that line — the rest of the batch is still
+created. Nothing is filled in for you: a made-up tax category is made-up fiscal data.
 
 **"It says the category is unavailable but I can see it."** It belongs to another hub. An empty
 category is allowed; a foreign one is not.

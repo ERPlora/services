@@ -335,8 +335,13 @@ accepts(
     B,
     {
         "services": [
-            {"name": "Cut"},
-            {"name": "Dye", "price": 4500, "duration_minutes": 90},
+            {"name": "Cut", "tax_category_key": "standard"},
+            {
+                "name": "Dye",
+                "tax_category_key": "reduced",
+                "price": 4500,
+                "duration_minutes": 90,
+            },
         ]
     },
     "a batch of two",
@@ -345,20 +350,50 @@ refuses(B, {"services": []}, "an empty batch")
 refuses(B, {}, "no batch")
 refuses(
     B,
-    {"services": [{"name": "Cut", "pricing_type": "nonsense"}]},
+    {
+        "services": [
+            {"name": "Cut", "tax_category_key": "standard", "pricing_type": "nonsense"}
+        ]
+    },
     "an item with a bad pricing_type",
 )
 refuses(
-    B, {"services": [{"name": "Cut", "price": -1}]}, "an item with a negative price"
+    B,
+    {"services": [{"name": "Cut", "tax_category_key": "standard", "price": -1}]},
+    "an item with a negative price",
 )
 refuses(
-    B, {"services": [{"name": "Cut", "duration_minutes": 0}]}, "an item with duration 0"
+    B,
+    {
+        "services": [
+            {"name": "Cut", "tax_category_key": "standard", "duration_minutes": 0}
+        ]
+    },
+    "an item with duration 0",
 )
 refuses(
-    B, {"services": [{"name": "Cut", "max_capacity": 0}]}, "an item with capacity 0"
+    B,
+    {"services": [{"name": "Cut", "tax_category_key": "standard", "max_capacity": 0}]},
+    "an item with capacity 0",
 )
-refuses(B, {"services": [{"name": ""}]}, "an item with an empty name")
-refuses(B, {"services": [{"name": "Cut", "foo": 1}]}, "an item with an unknown key")
+refuses(
+    B,
+    {"services": [{"name": "", "tax_category_key": "standard"}]},
+    "an item with an empty name",
+)
+refuses(
+    B,
+    {"services": [{"name": "Cut", "tax_category_key": "standard", "foo": 1}]},
+    "an item with an unknown key",
+)
+# services#41: the batch door demands the fiscal category the single-create door has demanded
+# since services#33 — otherwise the whole batch is born unsellable.
+refuses(B, {"services": [{"name": "Cut"}]}, "an item with no tax category")
+refuses(
+    B,
+    {"services": [{"name": "Cut", "tax_category_key": ""}]},
+    "an item with an emptied tax category",
+)
 
 print("\n3g. services.settings.update keeps its contract")
 accepts(
