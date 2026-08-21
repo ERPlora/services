@@ -9,7 +9,7 @@
     "name",
     "slug",
     "discount_type",
-    "discount_percent",
+    "discount_percent_bp",
     "discount_amount_cents",
     "is_active",
     "is_featured"
@@ -48,10 +48,11 @@
       ],
       "description": "Discriminator of the typed discount (migration 004): `percentage` reads `discount_percent`, `fixed` reads `discount_amount_cents`."
     },
-    "discount_percent": {
-      "type": "number",
+    "discount_percent_bp": {
+      "type": "integer",
       "minimum": 0,
-      "maximum": 100
+      "maximum": 10000,
+      "description": "Percent off when `discount_type = percentage`, as an INTEGER of BASIS POINTS (1050 = 10,50 %; 0..10000). It is not a `number` on purpose: the runtime types a bind from the value, so a `number` reaches the same statement as int8 or float8 depending on the payload, and the cached statement reads the bytes as whichever came first (services#55). Basis points keep the two decimals and have ONE shape on the wire."
     },
     "discount_amount_cents": {
       "type": "integer",

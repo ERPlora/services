@@ -1,6 +1,6 @@
 -- Lista de paquetes del hub con nº de líneas activas. Portado de PackageService.list_packages
 -- (orden por sort_order, name). El filtro is_active opcional se aplica en UI/SDK.
-SELECT p.id, p.name, p.slug, p.discount_type, p.discount_percent, p.discount_amount_cents,
+SELECT p.id, p.name, p.slug, p.discount_type, p.discount_percent_bp, p.discount_amount_cents,
        p.fixed_price, p.is_active,
        (SELECT COUNT(*)
         FROM services_packageitem i

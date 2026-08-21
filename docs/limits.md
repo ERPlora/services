@@ -43,7 +43,7 @@ A refused redemption rolls the whole transaction back — no ledger row, no even
 | `min_price <= max_price` | CHECK only (a cross-field rule) |
 | `duration_minutes >= 1`; buffers `>= 0`; `max_capacity >= 1` | schema + CHECK |
 | Flags (`is_bookable`, `is_active`, …) are `0` or `1` | schema + CHECK |
-| `discount_percent` in `0..100`; `max_uses >= 1`; `validity_days >= 1` (or null) | schema + CHECK |
+| `discount_percent_bp` in `0..10000` (basis points: `10000` = 100 %) and a WHOLE number; `max_uses >= 1`; `validity_days >= 1` (or null) | schema + CHECK |
 | A category's parent is a live category of this hub and never itself | statement (`expect_rows`) + CHECK |
 | Unknown keys and the system params (`hub_id`, `now`, …) are refused | schema (`additionalProperties: false`) |
 | Updates are **partial**: send the id plus the fields you change; omitted fields keep their value, an explicit `null` clears | `records.*.patch` |
@@ -133,6 +133,8 @@ the **Status** filter and pick **Archived**; the row offers **Restore**, and the
 as it was. The list hides archived services by default on purpose — the diary reads that same list
 to know what can be booked, so what it shows is what you can actually offer.
 
-**"A 20 discount was applied wrongly."** Check which field holds it. `discount_percent` is a
-percentage; `discount_amount_cents` is money in cents. They are separate fields precisely because
-this used to be ambiguous.
+**"A 20 discount was applied wrongly."** Check which field holds it, and in which unit.
+`discount_percent_bp` is a percentage in basis points (`2000` is 20 %); `discount_amount_cents` is
+money in cents (`2000` is 20,00 €). They are separate fields precisely because this used to be
+ambiguous — and both are whole numbers, so a payload carrying `20.5` is refused at the door rather
+than persisted as something else.

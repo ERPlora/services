@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""services#50 — every bound parameter carries the type the runtime actually sends.
+"""services#50 / services#55 — every bound parameter has ONE type, and it is the one the runtime sends.
 
 WHY THIS FILE EXISTS. `services.services.create` refused the very payload its own screen sends:
 
@@ -37,6 +37,10 @@ statement accepts the values and writes the right row; it CANNOT reproduce the b
 failure, because this harness binds literals instead of speaking the extended protocol. The type
 check above is the half that would have caught it.
 
+services#55 added the second half, and it is the one that does not need a database: no declarative
+command may declare a bound field as `number`, because a `number` has TWO shapes on the wire. That
+check runs first, container or no container, and the reasoning is written above `ALLOWED`'s grave.
+
 Usage: tests/bind_types.postgres.test.py   (exit 0 = green; SKIPPED without the container)
 """
 
@@ -49,13 +53,48 @@ from pg_harness import HUB, MANIFEST, MODULE_DIR, ScratchDb, container_available
 # String → text, i64 → bigint, f64 → double precision. Anything else is a slot no caller can fill.
 BINDABLE = {"text", "bigint", "double precision"}
 
-# Known holes, each with the issue that owns it. `discount_percent` is `"type": "number"` in its
-# schema, so the runtime binds `10` as int8 and `10.5` as float8: no single SQL cast can pin both,
-# and the answer has to come from the payload contract, not from here.
-ALLOWED = {
-    ("commands/_insert_package.sql", "discount_percent"): "services#55",
-    ("commands/package_update.sql", "discount_percent"): "services#55",
-}
+# services#55 — the OTHER half of the same contract, and the one no SQL cast can fix.
+#
+# The runtime picks the bind type from the VALUE, not from the schema: `10` is an `i64` (int8) and
+# `10.5` an `f64` (float8), through the same slot. A `"type": "number"` field therefore gives one
+# statement TWO parameter shapes, and the cache above (keyed by SQL text) freezes whichever came
+# first. Both are 8 bytes, so nothing can notice at Bind time — the bytes are simply read as the
+# other type. Measured against a real Postgres 18, on `discount_percent REAL` + its CHECK:
+#
+#     prepared float8, then the integer 10   → 22003 "value out of range: underflow"
+#     prepared float8, then the integer 0    → stores 0 (right, by luck: 8 zero bytes are 0.0 too)
+#     prepared int8,   then the decimal 10.5 → 23514, the 0..100 CHECK (the bytes read 4.6e18)
+#
+# and the same two on a `DOUBLE PRECISION` column with no CHECK — which is what a well-meant
+# `CAST(:discount_percent AS DOUBLE PRECISION)` would create — store `5e-323` and `4.6e18`
+# WITHOUT A WORD. The loud version is the accident, not the design.
+#
+# So the rule is about the payload contract, and it is mechanical: a command whose SQL binds a
+# parameter may not declare that parameter as `number`. Only `integer` (always i64) and `string`
+# (always text) have a single shape on the wire. A percentage that needs decimals is expressed as
+# an integer with a fixed scale — `discount_percent_bp`, basis points — which is the escape hatch
+# the money contract already names (`unit_price_micros`, §1), not a float in disguise.
+#
+# A `number` behind a WASM HANDLER is fine and is not checked here: the handler emits the params,
+# so it is the one that pins the type (`create_package` rounds to `f64`, always float8).
+
+
+def number_slots_bound_by_sql() -> list[str]:
+    """Schema fields typed `number` that a declarative command binds straight into a statement."""
+    bad: list[str] = []
+    for name, cmd in sorted(MANIFEST["commands"].items()):
+        if "handler" in cmd or not cmd.get("schema"):
+            continue
+        schema = json.loads((MODULE_DIR / cmd["schema"]).read_text())
+        bound: set[str] = set()
+        for rel in cmd.get("sql", []):
+            bound |= set(positional((MODULE_DIR / rel).read_text())[1])
+        for field, spec in sorted(schema.get("properties", {}).items()):
+            declared = spec.get("type")
+            declared = declared if isinstance(declared, list) else [declared]
+            if "number" in declared and field in bound:
+                bad.append(f"{name}: `{field}` is {declared} and is bound by {cmd['sql']}")
+    return bad
 
 # `erp_*` are ERPlora-SQL bridge functions (ADR-0007 §4a): the runtime rewrites them into native
 # Postgres BEFORE the statement reaches the server, so a raw PREPARE of the manifest text does not
@@ -198,11 +237,7 @@ def probe_types(db: ScratchDb) -> None:
             ),
         )
         types = [t.strip() for t in out.strip().splitlines()[-1].strip("{}").split(",")]
-        bad = [
-            f"{n}={t}"
-            for n, t in zip(names, types)
-            if t not in BINDABLE and (rel, n) not in ALLOWED
-        ]
+        bad = [f"{n}={t}" for n, t in zip(names, types) if t not in BINDABLE]
         if bad:
             failures.append(f"{rel} ({owner}): unbindable slots — {', '.join(bad)}")
             print(f"  FAIL: {rel} → {', '.join(bad)}")
@@ -211,9 +246,16 @@ def probe_types(db: ScratchDb) -> None:
 
 
 def main() -> int:
+    # Manifest-only, so it runs with or without the container: it is the half that owns services#55.
+    print("\nNo declarative command binds a `number` field (the runtime would type it by value):")
+    ambiguous = number_slots_bound_by_sql()
+    for line in ambiguous or ["every bound field has a single shape on the wire"]:
+        print(f"  {'FAIL' if ambiguous else 'ok'}: {line}")
+    failures.extend(ambiguous)
+
     if not container_available():
-        print("SKIPPED: the test Postgres container is not running")
-        return 0
+        print("\nSKIPPED: the test Postgres container is not running")
+        return 1 if failures else 0
 
     db = ScratchDb("services_bind_types")
     db.create()
@@ -265,6 +307,65 @@ def main() -> int:
                         f" WHERE hub_id = '{HUB}' AND name = '{name}'"
                     ),
                 )
+        print("\nThe percentage survives the round trip through both package doors, scaled:")
+        package_id = "pkg-bp"
+        db.run_command(
+            "services._insert_package",
+            {
+                "package_id": package_id,
+                "name": "Bono",
+                "slug": "bono",
+                "description": "",
+                "discount_type": "percentage",
+                # 10,50 % — the half point is the whole reason the field is not an integer of
+                # percent: it is what a `number` would have had to carry, and what the old REAL
+                # column lost the type of.
+                "discount_percent_bp": 1050,
+                "discount_amount_cents": 0,
+                "fixed_price": None,
+                "validity_days": None,
+                "max_uses": None,
+                "sort_order": 0,
+                "is_active": 1,
+                "is_featured": 0,
+            },
+        )
+        check(
+            "created with 1050 basis points",
+            "1050",
+            db.scalar(
+                f"SELECT discount_percent_bp FROM services_package WHERE id = '{package_id}'"
+            ),
+        )
+        db.run_command(
+            "services.packages.update",
+            {
+                "package_id": package_id,
+                "name": "Bono",
+                "slug": "bono",
+                "description": "",
+                "discount_type": "percentage",
+                "discount_percent_bp": 2575,
+                "discount_amount_cents": 0,
+                "fixed_price": None,
+                "validity_days": None,
+                "max_uses": None,
+                "is_active": 1,
+                "is_featured": 0,
+            },
+        )
+        check(
+            "updated to 2575 (25,75 %), read back whole",
+            "2575",
+            db.scalar(
+                f"SELECT discount_percent_bp FROM services_package WHERE id = '{package_id}'"
+            ),
+        )
+        check(
+            "and the list query serves that same number",
+            2575,
+            db.run_query("services.packages.list", {})[0]["discount_percent_bp"],
+        )
     except (RuntimeError, KeyError) as exc:
         failures.append(f"the run aborted: {exc}")
         print(f"\n  ABORTED: {exc}")

@@ -120,7 +120,8 @@
       "migrations/postgres/004_discount_split.sql",
       "migrations/postgres/005_tax_category_key.sql",
       "migrations/postgres/006_quantity_fixed_point.sql",
-      "migrations/postgres/007_domain_checks.sql"
+      "migrations/postgres/007_domain_checks.sql",
+      "migrations/postgres/008_discount_basis_points.sql"
     ]
   },
   "queries": {
@@ -258,7 +259,7 @@
           "name",
           "slug",
           "discount_type",
-          "discount_percent",
+          "discount_percent_bp",
           "discount_amount_cents",
           "fixed_price",
           "is_active",
@@ -276,7 +277,7 @@
           "discount_type": {
             "op": "range"
           },
-          "discount_percent": {
+          "discount_percent_bp": {
             "op": "range"
           },
           "discount_amount_cents": {

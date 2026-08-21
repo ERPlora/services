@@ -55,12 +55,18 @@ pub fn create_package(input: Json<erplora_guest_sdk::Input>) -> FnResult<Json<Ha
 // El DINERO lo redondea `erplora_guest_sdk::money` (ADR-0123): unidad mínima, HALF_UP, uno solo
 // para todo el hub. Este módulo tenía su propio `round_cents` (half-even sobre `f64`).
 
-/// Redondeo a 2 decimales HALF_UP — usado para `discount_percent` (el %), que se almacena
-/// como REAL (no es céntimos). El modo es el ÚNICO del hub (ADR-0123 §4): el half-even con
-/// epsilon que vivía aquí era el último resto del modo divergente.
-fn round2(x: f64) -> f64 {
-    let rounded = (x * 100.0).round(); // f64::round = half away from zero = HALF_UP en positivos
-    rounded / 100.0
+/// A percentage with decimals → **basis points**, the integer the catalogue stores
+/// (`1050` = 10,50 %). The scale is 10⁴ of the rate, i.e. two decimals of a percent.
+///
+/// This is the only conversion left, and it exists for ONE caller: the legacy `discount_value`,
+/// which speaks percent-with-decimals. Everything else already sends basis points (services#55):
+/// a float percentage cannot survive the trip, because the host types the bind from the value and
+/// `10` and `10.5` reach the same statement as two different Postgres types.
+///
+/// The mode is the hub's single one, HALF_UP (ADR-0123 §4), and it lives in `money::round` —
+/// not in a local `* 100.0).round()`, which is where this module's divergent rounding used to be.
+fn percent_to_basis_points(percent: f64) -> i64 {
+    money::round(Decimal::from_f64(percent).unwrap_or(Decimal::ZERO) * Decimal::from(100))
 }
 
 fn as_str(v: &Value) -> String {
@@ -333,19 +339,22 @@ pub fn create_package_pure(input: Value) -> Result<HandlerOutput, String> {
 
     // Descuento TIPADO (migración 004): el % y el importe fijo viven en columnas separadas en
     // vez del antiguo `discount_value` polimórfico.
-    //   * discount_percent      → REAL  (% cuando discount_type = 'percentage').
+    //   * discount_percent_bp   → INTEGER basis points (el % cuando discount_type = 'percentage';
+    //     migración 008 / services#55 — antes era un REAL y el % viajaba como `number`).
     //   * discount_amount_cents → INTEGER céntimos (cuando discount_type = 'fixed').
     // Compat: si el caller aún manda el legado `discount_value` (% o euros según el tipo) y NO
     // las columnas nuevas, lo derivamos al campo tipado que corresponda.
     let legacy_discount_value = parse_decimal(payload.get("discount_value"))
         .map_err(|_| "Invalid discount_value".to_string())?;
 
-    let discount_percent = match parse_decimal(payload.get("discount_percent"))
-        .map_err(|_| "Invalid discount_percent".to_string())?
+    let discount_percent_bp = match parse_int(payload.get("discount_percent_bp"))
+        .map_err(|_| "Invalid discount_percent_bp".to_string())?
     {
-        Some(p) => p,
-        None if discount_type == "percentage" => legacy_discount_value.unwrap_or(0.0),
-        None => 0.0,
+        Some(bp) => bp,
+        None if discount_type == "percentage" => {
+            percent_to_basis_points(legacy_discount_value.unwrap_or(0.0))
+        }
+        None => 0,
     };
 
     let discount_amount_cents = match parse_int(payload.get("discount_amount_cents")).ok().flatten()
@@ -379,8 +388,9 @@ pub fn create_package_pure(input: Value) -> Result<HandlerOutput, String> {
     h.insert("slug".into(), json!(slugify(&name)));
     h.insert("description".into(), json!(str_field(&payload, "description")));
     h.insert("discount_type".into(), json!(discount_type));
-    // Descuento tipado (migración 004): % → REAL; importe fijo → céntimos (INTEGER).
-    h.insert("discount_percent".into(), json!(round2(discount_percent)));
+    // Descuento tipado (migración 004/008): % → basis points; importe fijo → céntimos. Los dos
+    // son ENTEROS, que es la única forma que tiene un slot de conservar un solo tipo en el cable.
+    h.insert("discount_percent_bp".into(), json!(discount_percent_bp));
     h.insert("discount_amount_cents".into(), json!(discount_amount_cents));
     // fixed_price es dinero → céntimos (input cents).
     h.insert(
@@ -537,19 +547,45 @@ mod tests {
     }
 
     #[test]
-    fn split_percentage_goes_to_discount_percent() {
+    fn split_percentage_goes_to_discount_percent_bp() {
         let out = create_package_pure(input(json!({
             "name": "Bono 5 cortes",
             "discount_type": "percentage",
-            "discount_percent": 10.0
+            "discount_percent_bp": 1000
         })))
         .unwrap();
         let p = header_params(&out);
         assert_eq!(p["discount_type"], json!("percentage"));
-        assert_eq!(p["discount_percent"], json!(10.0));
+        assert_eq!(p["discount_percent_bp"], json!(1000));
         assert_eq!(p["discount_amount_cents"], json!(0));
         // ya NO se emite el campo polimórfico legado.
         assert!(p.get("discount_value").is_none());
+        assert!(p.get("discount_percent").is_none());
+    }
+
+    /// services#55 — the reason the percentage is an integer at all.
+    ///
+    /// The host binds a JSON number by its VALUE: an integer becomes `i64` (int8), a decimal
+    /// becomes `f64` (float8), through the same parameter of the same statement — and sqlx caches
+    /// prepared statements by SQL text, so the first payload freezes the type for every later one.
+    /// Both are 8 bytes, so the mismatch is not caught at Bind time: the bytes are read as the
+    /// other type. What the handler emits therefore has to have ONE shape, always, and an integer
+    /// number of basis points is the only shape a percentage can have and keep its decimals.
+    #[test]
+    fn the_emitted_percentage_is_always_an_integer_never_a_float() {
+        for payload in [
+            json!({ "name": "A", "discount_type": "percentage", "discount_percent_bp": 1050 }),
+            json!({ "name": "B", "discount_type": "percentage", "discount_percent_bp": 0 }),
+            json!({ "name": "C", "discount_type": "percentage", "discount_value": 10.5 }),
+            json!({ "name": "D", "discount_type": "fixed", "discount_amount_cents": 500 }),
+        ] {
+            let out = create_package_pure(input(payload.clone())).unwrap();
+            let emitted = &header_params(&out)["discount_percent_bp"];
+            assert!(
+                emitted.is_i64(),
+                "`{payload}` emitted {emitted}, which the host would bind as float8"
+            );
+        }
     }
 
     #[test]
@@ -563,7 +599,7 @@ mod tests {
         let p = header_params(&out);
         assert_eq!(p["discount_type"], json!("fixed"));
         assert_eq!(p["discount_amount_cents"], json!(1500));
-        assert_eq!(p["discount_percent"], json!(0.0));
+        assert_eq!(p["discount_percent_bp"], json!(0));
     }
 
     #[test]
@@ -576,7 +612,7 @@ mod tests {
         })))
         .unwrap();
         let p = header_params(&out);
-        assert_eq!(p["discount_percent"], json!(25.0));
+        assert_eq!(p["discount_percent_bp"], json!(2500));
         assert_eq!(p["discount_amount_cents"], json!(0));
     }
 
@@ -591,7 +627,7 @@ mod tests {
         .unwrap();
         let p = header_params(&out);
         assert_eq!(p["discount_amount_cents"], json!(1250));
-        assert_eq!(p["discount_percent"], json!(0.0));
+        assert_eq!(p["discount_percent_bp"], json!(0));
     }
 
     #[test]
@@ -601,7 +637,7 @@ mod tests {
         let out = create_package_pure(input(json!({
             "name": "Bono corte+color",
             "discount_type": "percentage",
-            "discount_percent": 5.0,
+            "discount_percent_bp": 500,
             "items": [
                 { "service_id": "s1", "quantity": 2_000_000 },
                 { "service_id": "s2" }
@@ -690,15 +726,16 @@ mod tests {
     }
 
     #[test]
-    fn discount_percent_rounds_half_up_like_the_rest_of_the_hub() {
-        // Coherencia de modo (ADR-0123 §4): el ÚNICO redondeo del hub es HALF_UP. El round2
-        // half-even local daba 12.125 → 12.12; el sistema entero redondea 12.125 → 12.13.
+    fn legacy_discount_value_rounds_half_up_like_the_rest_of_the_hub() {
+        // Coherencia de modo (ADR-0123 §4): el ÚNICO redondeo del hub es HALF_UP. Sigue vivo para
+        // el campo LEGADO, que es el único que puede traer decimales: 12,125 % → 1213 bp (12,13 %),
+        // no 1212 (half-even). Los llamantes nuevos mandan basis points y no redondea nadie.
         let out = create_package_pure(input(json!({
             "name": "Bono",
             "discount_type": "percentage",
-            "discount_percent": 12.125
+            "discount_value": 12.125
         })))
         .unwrap();
-        assert_eq!(header_params(&out)["discount_percent"], json!(12.13));
+        assert_eq!(header_params(&out)["discount_percent_bp"], json!(1213));
     }
 }
