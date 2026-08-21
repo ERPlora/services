@@ -589,11 +589,16 @@ export class ErpServicesList extends LitElement {
             <ion-input fill="outline" label-placement="floating" label=${t('ui.colName')} .value=${this.newName} @ionInput=${(e: any) => (this.newName = e.target.value)}></ion-input>
             <ion-input fill="outline" label-placement="floating" label=${t('ui.colPrice')} type="text" inputmode="decimal" .value=${this.newPrice} @ionInput=${(e: any) => (this.newPrice = e.target.value)}></ion-input>
             <ion-input fill="outline" label-placement="floating" label=${t('ui.colDuration')} type="number" step="1" .value=${this.newDuration} @ionInput=${(e: any) => (this.newDuration = e.target.value)}></ion-input>
-            <ion-select fill="outline" label-placement="floating" label=${t('ui.colCategory')} placeholder=${t('ui.placeholderCategory')} .value=${this.newCategory} @ionChange=${(e: any) => (this.newCategory = e.target.value)}>
+            <!-- Los dos selects van SIN placeholder, a propósito (services#57): con la etiqueta
+                 flotante, Ionic sube el label al hueco del borde en cuanto el campo tiene foco y
+                 pinta el placeholder DENTRO — dos textos casi iguales a unos píxeles. La etiqueta
+                 sola ya dice qué es el campo; un placeholder solo cabe si añade algo (un formato,
+                 un ejemplo), no si repite el nombre. -->
+            <ion-select fill="outline" label-placement="floating" label=${t('ui.colCategory')} .value=${this.newCategory} @ionChange=${(e: any) => (this.newCategory = e.target.value)}>
               <ion-select-option value="">${t('ui.optionNoCategory')}</ion-select-option>
               ${this.categories.map((c) => html`<ion-select-option .value=${c.id}>${c.name}</ion-select-option>`)}
             </ion-select>
-            <ion-select fill="outline" label-placement="floating" label=${t('ui.colTax')} placeholder=${t('ui.placeholderTax')} .value=${this.newTaxRateId} @ionChange=${(e: any) => (this.newTaxRateId = e.target.value)}>
+            <ion-select fill="outline" label-placement="floating" label=${t('ui.colTax')} .value=${this.newTaxRateId} @ionChange=${(e: any) => (this.newTaxRateId = e.target.value)}>
               ${this.taxOptions()}
             </ion-select>
             <!-- Sin categorías fiscales el alta es imposible (la categoría es obligatoria): se dice
