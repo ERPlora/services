@@ -52,8 +52,10 @@ ledger. Remaining uses are the maximum minus what has been used, and the expiry 
 
 - **Prices are integer cents** (ADR-0123): `price`, `min_price`, `max_price`, `cost`, the fixed price
   of a package and its fixed discount amount.
-- **A percentage discount is a percentage**; a fixed discount is cents. They are two separate,
-  typed fields — never one polymorphic value.
+- **A percentage discount is an integer of basis points** (`discount_percent_bp`: `1050` is
+  10,50 %); a fixed discount is cents. They are two separate, typed fields — never one polymorphic
+  value, and neither of them is a float: a decimal in a payload changes the type of the bind
+  underneath the statement, and the statement has no way to notice (services#55).
 - **Quantities inside a package are fixed-point integers scaled by 1 000 000** (ADR-0147):
   `2000000` means two sessions. That is a count of sessions, not money.
 - **Durations are whole minutes.**

@@ -80,7 +80,7 @@ Bundles of services with a discount (`services.packages.list`, 50 rows per page)
 `services.view_package`.
 
 - **Search** by name or slug.
-- **Sort and filter** by name, slug, discount type, percentage, fixed amount, fixed price, active
+- **Sort and filter** by name, slug, discount type, percentage (basis points), fixed amount, fixed price, active
   flag or items.
 
 ### Create a package

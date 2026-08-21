@@ -266,7 +266,7 @@ accepts(
     dict(
         PKG_MIN,
         discount_type="percentage",
-        discount_percent=10,
+        discount_percent_bp=1000,
         max_uses=5,
         validity_days=90,
     ),
@@ -290,8 +290,15 @@ accepts(
     "the legacy shape the hub e2e still sends (discount_value, empty items)",
 )
 refuses(PC, dict(PKG_MIN, discount_type="coupon"), "discount_type outside the enum")
-refuses(PC, dict(PKG_MIN, discount_percent=150), "a percentage above 100")
-refuses(PC, dict(PKG_MIN, discount_percent=-1), "a negative percentage")
+accepts(PC, dict(PKG_MIN, discount_percent_bp=1050), "10,50 % — the half point survives as 1050 bp")
+refuses(PC, dict(PKG_MIN, discount_percent_bp=10001), "a percentage above 100")
+refuses(PC, dict(PKG_MIN, discount_percent_bp=-1), "a negative percentage")
+# services#55: the whole point of basis points is that the wire type cannot change under the
+# statement. A decimal is refused HERE, at the door, instead of arriving as an f64 through a slot
+# an i64 already froze; and the retired `discount_percent` is refused by name, loudly, so a caller
+# still speaking the old scale cannot mean 0,10 % while writing 10.
+refuses(PC, dict(PKG_MIN, discount_percent_bp=10.5), "a decimal percentage (basis points are whole)")
+refuses(PC, dict(PKG_MIN, discount_percent=10), "the retired `discount_percent` key")
 refuses(PC, dict(PKG_MIN, discount_amount_cents=-100), "a negative fixed discount")
 refuses(PC, dict(PKG_MIN, fixed_price=-1), "a negative fixed price")
 refuses(PC, dict(PKG_MIN, max_uses=0), "max_uses 0")
@@ -330,7 +337,7 @@ PKG_UPD = {
     "slug": "bono-5",
     "description": "",
     "discount_type": "percentage",
-    "discount_percent": 10,
+    "discount_percent_bp": 1000,
     "discount_amount_cents": 0,
     "fixed_price": None,
     "validity_days": 90,
@@ -339,7 +346,13 @@ PKG_UPD = {
     "is_featured": 0,
 }
 accepts(PU, PKG_UPD, "the full snapshot")
-refuses(PU, dict(PKG_UPD, discount_percent=101), "a percentage above 100")
+refuses(PU, dict(PKG_UPD, discount_percent_bp=10100), "a percentage above 100")
+refuses(PU, dict(PKG_UPD, discount_percent_bp=10.5), "a decimal percentage (basis points are whole)")
+refuses(
+    PU,
+    {k: v for k, v in PKG_UPD.items() if k != "discount_percent_bp"} | {"discount_percent": 10},
+    "the retired `discount_percent` key",
+)
 refuses(PU, dict(PKG_UPD, max_uses=-1), "a negative max_uses")
 refuses(
     PU,

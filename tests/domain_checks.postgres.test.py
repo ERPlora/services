@@ -92,7 +92,7 @@ PKG_ROW = {
     "name": "P",
     "description": "",
     "discount_type": "percentage",
-    "discount_percent": 0,
+    "discount_percent_bp": 0,
     "discount_amount_cents": 0,
     "fixed_price": None,
     "validity_days": None,
@@ -117,10 +117,12 @@ def main() -> int:
         return 0
 
     print("1. migration 007 is declared and applies on top of the previous ones")
+    # Declared, not LAST: the list is append-only and pinning the tip here made every later
+    # migration fail a test about CHECK constraints (008 did, services#55).
     check(
-        "last postgres migration",
-        "migrations/postgres/007_domain_checks.sql",
-        MANIFEST["migrations"]["postgres"][-1],
+        "007 is in the declared postgres migrations",
+        True,
+        "migrations/postgres/007_domain_checks.sql" in MANIFEST["migrations"]["postgres"],
     )
     db = ScratchDb("services_domain_checks_test")
     db.create()  # raises if any migration fails
@@ -148,7 +150,9 @@ def main() -> int:
         refused(db, "capacity 0", lambda: insert_service(db, max_capacity=0))
         refused(db, "a flag of 2", lambda: insert_service(db, is_bookable=2))
         refused(
-            db, "a percentage of 150", lambda: insert_package(db, discount_percent=150)
+            db,
+            "a percentage of 150 (15000 basis points)",
+            lambda: insert_package(db, discount_percent_bp=15000),
         )
         refused(
             db,
@@ -217,7 +221,7 @@ def main() -> int:
             db.scalar("SELECT count(*) FROM services_service WHERE name = 'Fine'"),
         )
         insert_package(
-            db, name="Voucher", discount_percent=100, max_uses=10, validity_days=365
+            db, name="Voucher", discount_percent_bp=10000, max_uses=10, validity_days=365
         )
         check(
             "a 100% voucher with uses and validity",

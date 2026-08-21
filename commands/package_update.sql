@@ -8,7 +8,7 @@ UPDATE services_package SET
   slug           = :slug,
   description    = :description,
   discount_type         = :discount_type,
-  discount_percent      = :discount_percent,
+  discount_percent_bp   = CAST(:discount_percent_bp AS BIGINT),
   discount_amount_cents = CAST(:discount_amount_cents AS BIGINT),
   fixed_price           = CAST(:fixed_price AS BIGINT),
   validity_days  = CAST(:validity_days AS BIGINT),

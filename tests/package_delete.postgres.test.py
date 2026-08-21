@@ -67,7 +67,7 @@ def seed_package(db: ScratchDb, hub: str, name: str, service_ids: list[str]) -> 
             "slug": name.lower(),
             "description": "",
             "discount_type": "percentage",
-            "discount_percent": 10,
+            "discount_percent_bp": 1000,
             "discount_amount_cents": 0,
             "fixed_price": None,
             "validity_days": None,

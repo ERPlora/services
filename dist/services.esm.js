@@ -4339,6 +4339,7 @@ define("erp-services-list", ErpServicesList);
 // modules/services/ui/components/erp-services-packages/erp-services-packages.ts
 var CATALOG3 = { es: es_default, en: en_default };
 var SESSION_SCALE = 1e6;
+var PERCENT_DECIMALS = 2;
 var EMPTY_FORM = { name: "", discountType: "percentage", discountValue: "", fixedPrice: "", validityDays: "", maxUses: "" };
 function erplora3() {
   const c5 = globalThis.erplora;
@@ -4357,6 +4358,13 @@ function toMinorOrNull(v3) {
   const s5 = String(v3 ?? "").trim().replace(",", ".");
   if (!s5) return null;
   return majorToMinor(s5, decimals());
+}
+function toBasisPoints(v3) {
+  const s5 = String(v3 ?? "").trim().replace(",", ".");
+  return s5 ? majorToMinor(s5, PERCENT_DECIMALS) : 0;
+}
+function formatPercent(bp) {
+  return Number(minorToMajor(bp || 0, PERCENT_DECIMALS)).toLocaleString(erplora3().locale, { maximumFractionDigits: PERCENT_DECIMALS });
 }
 function toIntOrNull(v3) {
   const s5 = String(v3 ?? "").trim();
@@ -4395,7 +4403,7 @@ var ErpServicesPackages = class extends i3 {
         key: "discount_type",
         header: t5("ui.colDiscount"),
         sortable: true,
-        format: (r6) => r6.discount_type === "fixed" ? `-${erplora3().formatMoney(Number(r6.discount_amount_cents) || 0)}` : `-${Number(r6.discount_percent) || 0} %`
+        format: (r6) => r6.discount_type === "fixed" ? `-${erplora3().formatMoney(Number(r6.discount_amount_cents) || 0)}` : `-${formatPercent(Number(r6.discount_percent_bp) || 0)} %`
       },
       {
         key: "fixed_price",
@@ -4485,7 +4493,7 @@ var ErpServicesPackages = class extends i3 {
       this.form = {
         name: String(full.name ?? ""),
         discountType: type,
-        discountValue: type === "fixed" ? String(minorToMajor(Number(full.discount_amount_cents) || 0, decimals())) : String(Number(full.discount_percent) || 0),
+        discountValue: type === "fixed" ? String(minorToMajor(Number(full.discount_amount_cents) || 0, decimals())) : String(minorToMajor(Number(full.discount_percent_bp) || 0, PERCENT_DECIMALS)),
         fixedPrice: full.fixed_price == null || full.fixed_price === "" ? "" : String(minorToMajor(Number(full.fixed_price) || 0, decimals())),
         validityDays: full.validity_days == null ? "" : String(full.validity_days),
         maxUses: full.max_uses == null ? "" : String(full.max_uses)
@@ -4508,7 +4516,7 @@ var ErpServicesPackages = class extends i3 {
     return {
       name: this.form.name.trim(),
       discount_type: fixed ? "fixed" : "percentage",
-      discount_percent: fixed ? null : Number(String(this.form.discountValue).replace(",", ".")) || 0,
+      discount_percent_bp: fixed ? null : toBasisPoints(this.form.discountValue),
       discount_amount_cents: fixed ? toMinorOrNull(this.form.discountValue) ?? 0 : null,
       fixed_price: toMinorOrNull(this.form.fixedPrice),
       validity_days: toIntOrNull(this.form.validityDays),
@@ -4534,7 +4542,7 @@ var ErpServicesPackages = class extends i3 {
         await erplora3().command("services.packages.update", {
           package_id: this.editingId,
           ...header,
-          discount_percent: header.discount_percent ?? 0,
+          discount_percent_bp: header.discount_percent_bp ?? 0,
           discount_amount_cents: header.discount_amount_cents ?? 0
         });
       } else {

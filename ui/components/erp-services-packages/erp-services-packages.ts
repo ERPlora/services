@@ -37,7 +37,7 @@ interface Package {
   name: string;
   slug: string;
   discount_type: 'percentage' | 'fixed';
-  discount_percent: number | null;
+  discount_percent_bp: number | null;
   discount_amount_cents: number | null;
   fixed_price: number | null;
   is_active: number;
@@ -71,6 +71,16 @@ interface LineDraft {
 /** Sessions → fixed-point 10⁶ (ADR-0147): 2 sessions = 2000000. */
 const SESSION_SCALE = 1_000_000;
 
+/**
+ * Decimals a discount percentage keeps, i.e. the scale of a BASIS POINT: 1050 = 10,50 %.
+ *
+ * The catalogue stores the percentage as a whole number of basis points, not as a float
+ * (services#55). This screen is the frontier where a human types `10,5` and where it goes back to
+ * being readable — and, as the money contract asks (§4), the crossing is a named function on each
+ * side, never an inline `* 100`.
+ */
+const PERCENT_DECIMALS = 2;
+
 const EMPTY_FORM: PackageForm = { name: '', discountType: 'percentage', discountValue: '', fixedPrice: '', validityDays: '', maxUses: '' };
 
 function erplora(): ErploraClientLike {
@@ -95,6 +105,18 @@ function toMinorOrNull(v: string): number | null {
   const s = String(v ?? '').trim().replace(',', '.');
   if (!s) return null;
   return majorToMinor(s, decimals());
+}
+
+/** Typed percentage (major units, comma or dot) → whole BASIS POINTS. '' → 0. */
+function toBasisPoints(v: string): number {
+  const s = String(v ?? '').trim().replace(',', '.');
+  return s ? majorToMinor(s, PERCENT_DECIMALS) : 0;
+}
+
+/** Basis points → the percentage as the hub's locale writes it (1050 → `10,5`). */
+function formatPercent(bp: number): string {
+  return Number(minorToMajor(bp || 0, PERCENT_DECIMALS))
+    .toLocaleString(erplora().locale, { maximumFractionDigits: PERCENT_DECIMALS });
 }
 
 /** Typed integer → number, '' → null. */
@@ -138,7 +160,7 @@ export class ErpServicesPackages extends LitElement {
         sortable: true,
         format: (r) => (r.discount_type === 'fixed'
           ? `-${erplora().formatMoney(Number(r.discount_amount_cents) || 0)}`
-          : `-${Number(r.discount_percent) || 0} %`),
+          : `-${formatPercent(Number(r.discount_percent_bp) || 0)} %`),
       },
       {
         key: 'fixed_price',
@@ -239,7 +261,7 @@ export class ErpServicesPackages extends LitElement {
         discountType: type,
         discountValue: type === 'fixed'
           ? String(minorToMajor(Number(full.discount_amount_cents) || 0, decimals()))
-          : String(Number(full.discount_percent) || 0),
+          : String(minorToMajor(Number(full.discount_percent_bp) || 0, PERCENT_DECIMALS)),
         fixedPrice: full.fixed_price == null || full.fixed_price === '' ? '' : String(minorToMajor(Number(full.fixed_price) || 0, decimals())),
         validityDays: full.validity_days == null ? '' : String(full.validity_days),
         maxUses: full.max_uses == null ? '' : String(full.max_uses),
@@ -264,7 +286,7 @@ export class ErpServicesPackages extends LitElement {
     return {
       name: this.form.name.trim(),
       discount_type: fixed ? 'fixed' : 'percentage',
-      discount_percent: fixed ? null : Number(String(this.form.discountValue).replace(',', '.')) || 0,
+      discount_percent_bp: fixed ? null : toBasisPoints(this.form.discountValue),
       discount_amount_cents: fixed ? toMinorOrNull(this.form.discountValue) ?? 0 : null,
       fixed_price: toMinorOrNull(this.form.fixedPrice),
       validity_days: toIntOrNull(this.form.validityDays),
@@ -296,7 +318,7 @@ export class ErpServicesPackages extends LitElement {
         await erplora().command('services.packages.update', {
           package_id: this.editingId,
           ...header,
-          discount_percent: header.discount_percent ?? 0,
+          discount_percent_bp: header.discount_percent_bp ?? 0,
           discount_amount_cents: header.discount_amount_cents ?? 0,
         });
       } else {

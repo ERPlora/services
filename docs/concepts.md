@@ -65,9 +65,19 @@ reason without attempting the write.
 
 ## Percentage and fixed discounts are two different fields
 
-`discount_percent` is a percentage; `discount_amount_cents` is money in cents. They are typed
+`discount_percent_bp` is a percentage; `discount_amount_cents` is money in cents. They are typed
 separately on purpose — a single polymorphic "discount value" used to exist and was removed, because
 nobody could tell whether `20` meant twenty percent or twenty cents.
+
+**Both are integers.** The percentage is counted in **basis points**: `1050` is 10,50 %, `10000` is
+100 %. It reads like an odd unit for a percentage until you look at what the alternative costs. The
+runtime types a bound parameter from the VALUE it is given, so a field declared `number` arrives as
+`int8` when the caller writes `10` and as `float8` when the caller writes `10.5` — the same slot of
+the same statement, two different types. Prepared statements are cached by their SQL text, so the
+first payload to reach a pooled connection decides the type for every payload after it, and both
+types are eight bytes wide, so the swap cannot be detected: the bytes are simply read as the other
+type. Basis points keep both decimals and give the field a single shape on the wire. The screen
+converts on the way in and on the way out; nothing between it and the column does arithmetic on it.
 
 A **fixed price** on the package overrides the discount entirely.
 

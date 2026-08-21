@@ -3,11 +3,12 @@
 // Same data-table CRUD as the rest of the Hub: «+» → create panel (name, discount, validity, uses
 // and the SERVICES included with their sessions), «edit» pre-fills the same form for the header
 // (the runtime has no line-edit command: lines are part of `create`), «delete» confirms first.
-// Money travels in MINOR units, sessions in fixed-point 10⁶ (ADR-0147): 2 sessions = 2000000.
+// Money travels in MINOR units, sessions in fixed-point 10⁶ (ADR-0147): 2 sessions = 2000000,
+// and the discount percentage in BASIS POINTS (services#55): 10,50 % = 1050.
 import { beforeEach, describe, expect, it } from 'vitest';
 
 const ROWS = [
-  { id: 'p1', name: 'Bono 5 cortes', slug: 'bono-5-cortes', discount_type: 'percentage', discount_percent: 10, discount_amount_cents: 0, fixed_price: null, is_active: 1, items: 1 },
+  { id: 'p1', name: 'Bono 5 cortes', slug: 'bono-5-cortes', discount_type: 'percentage', discount_percent_bp: 1000, discount_amount_cents: 0, fixed_price: null, is_active: 1, items: 1 },
 ];
 const FULL = { ...ROWS[0], description: '', validity_days: 90, max_uses: 5, is_featured: 0 };
 const SERVICES = [
@@ -93,7 +94,7 @@ describe('create', () => {
     expect(commands[0].payload).toEqual({
       name: 'Bono 5 cortes',
       discount_type: 'percentage',
-      discount_percent: 10,
+      discount_percent_bp: 1000,
       discount_amount_cents: null,
       fixed_price: null,
       validity_days: 90,
@@ -101,13 +102,26 @@ describe('create', () => {
       items: [{ service_id: 's1', quantity: 5000000 }],
     });
   });
+  it('a percentage with decimals travels as whole basis points, comma or dot', async () => {
+    // services#55: the screen is the frontier. Whatever the cashier types, what leaves here is an
+    // integer — so the same statement can never see an int8 and a float8 through the same slot.
+    for (const typed of ['10,5', '10.5']) {
+      commands.length = 0;
+      const el = await mount();
+      el.form = { name: 'Bono', discountType: 'percentage', discountValue: typed, fixedPrice: '', validityDays: '', maxUses: '' };
+      el.items = [{ serviceId: 's1', sessions: '1' }];
+      await el.save(new Event('submit'));
+      expect(commands[0].payload.discount_percent_bp).toBe(1050);
+      expect(Number.isInteger(commands[0].payload.discount_percent_bp)).toBe(true);
+    }
+  });
   it('a fixed discount travels in minor units; a closed price too', async () => {
     const el = await mount();
     el.form = { name: 'Pack', discountType: 'fixed', discountValue: '5,50', fixedPrice: '49,90', validityDays: '', maxUses: '' };
     el.items = [{ serviceId: 's2', sessions: '1' }];
     await el.save(new Event('submit'));
     const p = commands[0].payload;
-    expect(p.discount_percent).toBeNull();
+    expect(p.discount_percent_bp).toBeNull();
     expect(p.discount_amount_cents).toBe(550);
     expect(p.fixed_price).toBe(4990);
     expect(p.validity_days).toBeNull();
@@ -130,6 +144,7 @@ describe('edit / delete', () => {
     await settle(el);
     expect(el.editingId).toBe('p1');
     expect(el.form.name).toBe('Bono 5 cortes');
+    expect(el.form.discountValue).toBe('10');
     expect(el.form.validityDays).toBe('90');
     el.form = { ...el.form, name: 'Bono 5 cortes + peinado', maxUses: '6' };
     await el.save(new Event('submit'));
@@ -138,7 +153,7 @@ describe('edit / delete', () => {
       package_id: 'p1',
       name: 'Bono 5 cortes + peinado',
       discount_type: 'percentage',
-      discount_percent: 10,
+      discount_percent_bp: 1000,
       discount_amount_cents: 0,
       fixed_price: null,
       validity_days: 90,
