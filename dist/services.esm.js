@@ -3407,10 +3407,8 @@ var es_default = {
     placeholderName: "Nombre",
     placeholderPrice: "Precio",
     placeholderDuration: "Duraci\xF3n (min)",
-    placeholderCategory: "Categor\xEDa\u2026",
     optionNoCategory: "Sin categor\xEDa",
     colTax: "Categor\xEDa fiscal",
-    placeholderTax: "Categor\xEDa fiscal\u2026",
     taxGroup: "grupo",
     taxCategoriesMissing: "Todav\xEDa no hay categor\xEDas fiscales. Config\xFAralas en Impuestos antes de a\xF1adir servicios.",
     btnSaving: "Guardando\u2026",
@@ -3534,10 +3532,8 @@ var en_default = {
     placeholderName: "Name",
     placeholderPrice: "Price",
     placeholderDuration: "Duration (min)",
-    placeholderCategory: "Category\u2026",
     optionNoCategory: "No category",
     colTax: "Tax category",
-    placeholderTax: "Tax category\u2026",
     taxGroup: "group",
     taxCategoriesMissing: "There are no tax categories yet. Set them up in Taxes before adding services.",
     btnSaving: "Saving\u2026",
@@ -4275,11 +4271,16 @@ var ErpServicesList = class extends i3 {
             <ion-input fill="outline" label-placement="floating" label=${t5("ui.colName")} .value=${this.newName} @ionInput=${(e5) => this.newName = e5.target.value}></ion-input>
             <ion-input fill="outline" label-placement="floating" label=${t5("ui.colPrice")} type="text" inputmode="decimal" .value=${this.newPrice} @ionInput=${(e5) => this.newPrice = e5.target.value}></ion-input>
             <ion-input fill="outline" label-placement="floating" label=${t5("ui.colDuration")} type="number" step="1" .value=${this.newDuration} @ionInput=${(e5) => this.newDuration = e5.target.value}></ion-input>
-            <ion-select fill="outline" label-placement="floating" label=${t5("ui.colCategory")} placeholder=${t5("ui.placeholderCategory")} .value=${this.newCategory} @ionChange=${(e5) => this.newCategory = e5.target.value}>
+            <!-- Los dos selects van SIN placeholder, a propósito (services#57): con la etiqueta
+                 flotante, Ionic sube el label al hueco del borde en cuanto el campo tiene foco y
+                 pinta el placeholder DENTRO — dos textos casi iguales a unos píxeles. La etiqueta
+                 sola ya dice qué es el campo; un placeholder solo cabe si añade algo (un formato,
+                 un ejemplo), no si repite el nombre. -->
+            <ion-select fill="outline" label-placement="floating" label=${t5("ui.colCategory")} .value=${this.newCategory} @ionChange=${(e5) => this.newCategory = e5.target.value}>
               <ion-select-option value="">${t5("ui.optionNoCategory")}</ion-select-option>
               ${this.categories.map((c5) => b2`<ion-select-option .value=${c5.id}>${c5.name}</ion-select-option>`)}
             </ion-select>
-            <ion-select fill="outline" label-placement="floating" label=${t5("ui.colTax")} placeholder=${t5("ui.placeholderTax")} .value=${this.newTaxRateId} @ionChange=${(e5) => this.newTaxRateId = e5.target.value}>
+            <ion-select fill="outline" label-placement="floating" label=${t5("ui.colTax")} .value=${this.newTaxRateId} @ionChange=${(e5) => this.newTaxRateId = e5.target.value}>
               ${this.taxOptions()}
             </ion-select>
             <!-- Sin categorías fiscales el alta es imposible (la categoría es obligatoria): se dice
