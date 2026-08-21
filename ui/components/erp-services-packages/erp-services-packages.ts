@@ -9,6 +9,7 @@ import type { ListController, ListClient, ListParams, ListPage } from '@erplora/
 // Module i18n (ADR-0055): the `ui` catalogues are inlined at build time (esbuild).
 import esLocale from '../../../locales/es.json';
 import enLocale from '../../../locales/en.json';
+import { domainMessage } from '../../lib/domain-error';
 const CATALOG: Record<string, unknown> = { es: esLocale, en: enLocale };
 
 // «Packages» view of the services module (services#4): the CRUD of packages/vouchers (bonos) that
@@ -305,7 +306,7 @@ export class ErpServicesPackages extends LitElement {
       this.dataTable()?.close();
       await this.ctrl.load();
     } catch (e) {
-      this.formError = e instanceof Error ? e.message : t('ui.errorSavePackage');
+      this.formError = domainMessage(e, erplora().locale, t('ui.errorSavePackage'));
     } finally {
       this.saving = false;
     }
@@ -320,7 +321,7 @@ export class ErpServicesPackages extends LitElement {
       this.deleteTarget = null;
       await this.ctrl.load();
     } catch (e) {
-      this.formError = e instanceof Error ? e.message : erplora().t(CATALOG, 'ui.errorDeletePackage');
+      this.formError = domainMessage(e, erplora().locale, erplora().t(CATALOG, 'ui.errorDeletePackage'));
       this.deleteTarget = null;
     } finally {
       this.saving = false;

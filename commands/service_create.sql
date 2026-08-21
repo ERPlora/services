@@ -1,28 +1,44 @@
--- Alta de servicio. Runtime inyecta :new_id, :hub_id, :current_user_id, :now.
--- Portado de ServiceCatalogService.create_service. El slug lo calcula el SDK/handler.
--- GUARDARRAÍL QA (2026-06-25): el binder del runtime no aplica los defaults del JSON Schema
--- (gap sistémico, ver decision-log / P2 watchlist). Como esta command NO declara `schema`,
--- los campos omitidos llegan como NULL → NOT NULL constraint. Se envuelven en COALESCE para
--- que un alta mínima ({name, price, duration_minutes, tax_category_key}) funcione, espejando los
--- DEFAULT de la migración. El slug se deriva del id (:new_id) cuando el caller no lo aporta.
--- La categoría, si viene, tiene que ser de ESTE hub (services#7). La FK apunta a un id GLOBAL, así
--- que sin esta comprobación un `category_id` de otro hub se guardaba tal cual y su nombre privado
--- salía luego en la lista. `category_id` es OPCIONAL: vacío/NULL es legítimo (servicio sin
--- categoría), y por eso la condición tiene sus dos ramas.
+-- Creates a service. The runtime injects :new_id, :hub_id, :current_user_id, :now.
+-- Ported from ServiceCatalogService.create_service. The slug is derived here when the caller
+-- does not bring one.
 --
--- Si la categoría es ajena, la sentencia no afecta ninguna fila. Eso NO es un éxito silencioso: el
--- command declara `expect_rows: {op: min, n: 1}`, así que el runtime revierte la transacción entera
--- —ni fila ni evento— y devuelve `services.category_unavailable` (hub#139).
--- Los DEFAULTS del servicio salen de los AJUSTES del hub, no de números clavados aquí
--- (services#13). Con `default_duration = 90` guardado, un servicio mínimo se creaba igualmente con
--- 60: la pantalla de ajustes configuraba algo que no leía nadie, y había que corregir cada servicio
--- a mano.
+-- EVERY INTEGER BIND IS CAST TO BIGINT ON PURPOSE (services#50). It is not decoration: without it
+-- this statement could not save the payload its own screen sends, and failed with
+-- `incorrect binary data format in bind parameter 12`. The runtime always puts a JSON integer on
+-- the wire as `i64`, i.e. `int8` (`build_query!`, crates/db/src/lib.rs) — but a parameter the
+-- payload OMITS is bound as `DynNull`, whose Parse OID is 0: "server, infer this one". With
+-- `COALESCE(:cost, 0)` the server infers from the `int4` literal, so the SAME statement text ends
+-- up with a different parameter shape depending on who calls it, and sqlx's prepared-statement
+-- cache — keyed by the SQL text alone, never re-Parsed — freezes whichever shape arrived first on
+-- that pooled connection. A minimal payload first meant `int4`, and the next caller that did send
+-- a cost pushed 8 bytes into a 4-byte slot. Hence the lottery: same call, different connection,
+-- different answer. The CAST pins the type in the statement, so what Postgres infers is what the
+-- runtime sends, whoever calls first. Same idiom as customers/commands/record_purchase.sql.
+-- (int8 → the INTEGER columns of the migration is a plain assignment cast; the CHECKs still apply.)
 --
--- La cadena tiene tres escalones a propósito: lo que mandó el llamante → lo que configuró el hub →
--- el default del módulo. El último se queda porque la fila de ajustes es un singleton que puede no
--- existir (un hub instalado sin blueprint no la tiene); por eso el JOIN es LEFT y no INNER —con
--- INNER, ese hub no podría crear servicios— y por eso hay un valor final: un NULL contra una
--- columna NOT NULL es una escritura que revienta, no un default.
+-- The binder does NOT apply the JSON Schema defaults (systemic gap, see decision-log / P2
+-- watchlist), so omitted fields arrive as NULL → NOT NULL constraint. They are wrapped in COALESCE
+-- so that a minimal insert ({name, price, duration_minutes, tax_category_key}) works, mirroring the
+-- DEFAULTs of the migration.
+--
+-- The category, when it comes, has to belong to THIS hub (services#7). The FK points at a GLOBAL
+-- id, so without that check a `category_id` from another hub was stored as-is and its private name
+-- later showed up in the list. `category_id` is OPTIONAL: empty/NULL is legitimate (a service with
+-- no category), which is why the condition has its two branches.
+--
+-- If the category belongs to someone else the statement touches no row. That is NOT a silent
+-- success: the command declares `expect_rows: {op: min, n: 1}`, so the runtime rolls the whole
+-- transaction back — no row, no event — and answers `services.category_unavailable` (hub#139).
+--
+-- The service DEFAULTS come from the hub's SETTINGS, not from numbers nailed down here
+-- (services#13). With `default_duration = 90` saved, a minimal service was still created with 60:
+-- the settings screen configured something nobody read, and every service had to be fixed by hand.
+--
+-- The chain has three rungs on purpose: what the caller sent → what the hub configured → the
+-- module's default. The last one stays because the settings row is a singleton that may not exist
+-- (a hub installed without a blueprint has none); that is why the JOIN is LEFT and not INNER —with
+-- INNER that hub could not create services— and why there is a final value: a NULL against a NOT
+-- NULL column is a write that blows up, not a default.
 INSERT INTO services_service
   (id, hub_id, name, slug, description, short_description, category_id,
    pricing_type, price, min_price, max_price, cost, duration_minutes, buffer_before, buffer_after,
@@ -33,14 +49,18 @@ SELECT
    :new_id, :hub_id, :name,
    COALESCE(NULLIF(:slug, ''), 'svc-' || :new_id),
    COALESCE(:description, ''), COALESCE(:short_description, ''), :category_id,
-   COALESCE(NULLIF(:pricing_type, ''), 'fixed'), COALESCE(:price, 0), :min_price, :max_price,
-   COALESCE(:cost, 0),
-   COALESCE(:duration_minutes, st.default_duration, 60),
-   COALESCE(:buffer_before, st.default_buffer_time, 0),
-   COALESCE(:buffer_after, st.default_buffer_time, 0),
-   COALESCE(:max_capacity, 1), COALESCE(:is_bookable, 1), COALESCE(:requires_confirmation, 0),
-   COALESCE(:allow_online_booking, st.allow_online_booking, 1),
-   COALESCE(:sort_order, 0), 1, COALESCE(:is_featured, 0),
+   COALESCE(NULLIF(:pricing_type, ''), 'fixed'),
+   COALESCE(CAST(:price AS BIGINT), 0),
+   CAST(:min_price AS BIGINT), CAST(:max_price AS BIGINT),
+   COALESCE(CAST(:cost AS BIGINT), 0),
+   COALESCE(CAST(:duration_minutes AS BIGINT), st.default_duration, 60),
+   COALESCE(CAST(:buffer_before AS BIGINT), st.default_buffer_time, 0),
+   COALESCE(CAST(:buffer_after AS BIGINT), st.default_buffer_time, 0),
+   COALESCE(CAST(:max_capacity AS BIGINT), 1),
+   COALESCE(CAST(:is_bookable AS BIGINT), 1),
+   COALESCE(CAST(:requires_confirmation AS BIGINT), 0),
+   COALESCE(CAST(:allow_online_booking AS BIGINT), st.allow_online_booking, 1),
+   COALESCE(CAST(:sort_order AS BIGINT), 0), 1, COALESCE(CAST(:is_featured AS BIGINT), 0),
    COALESCE(:sku, ''), COALESCE(:barcode, ''), COALESCE(:notes, ''), :tax_category_key,
    0, :current_user_id, :current_user_id, :now, :now
 FROM (SELECT 1) AS one

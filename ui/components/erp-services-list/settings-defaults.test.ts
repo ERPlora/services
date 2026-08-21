@@ -15,6 +15,12 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
+// The bind of an integer is written `CAST(:param AS BIGINT)`, not `:param` (services#50): the
+// statement has to PIN the type or Postgres infers `int4` for whatever the payload omits, and the
+// create stops accepting its own screen's payload. That is a change of spelling, not of the chain
+// these tests are about, so the chain is matched around the cast instead of against a bare `:name`.
+const bind = (param: string) => `(?:CAST\\(\\s*)?:${param}(?:\\s+AS\\s+\\w+\\s*\\))?`;
+
 const ROOT = join(__dirname, '../../..');
 const sql = readFileSync(join(ROOT, 'commands/service_create.sql'), 'utf8')
   .split('\n')
@@ -38,14 +44,14 @@ describe('a new service is born on what the business configured', () => {
     ['buffer_after', 'default_buffer_time'],
     ['allow_online_booking', 'allow_online_booking'],
   ])('%s falls back to the configured %s before the module default', (param, setting) => {
-    const chain = new RegExp(`COALESCE\\(\\s*:${param}\\s*,\\s*[a-z]+\\.${setting}\\s*,`, 'i');
+    const chain = new RegExp(`COALESCE\\(\\s*${bind(param)}\\s*,\\s*[a-z]+\\.${setting}\\s*,`, 'i');
     expect(sql, `:${param} still ignores ${setting} and jumps straight to the hardcoded value`).toMatch(chain);
   });
 
   it('keeps a last resort, because the settings row may not exist', () => {
     // Three arguments in each of those COALESCE: caller, setting, module default.
     for (const param of ['duration_minutes', 'buffer_before', 'buffer_after', 'allow_online_booking']) {
-      const m = sql.match(new RegExp(`COALESCE\\(\\s*:${param}\\s*,([^)]*)\\)`, 'i'));
+      const m = sql.match(new RegExp(`COALESCE\\(\\s*${bind(param)}\\s*,([^)]*)\\)`, 'i'));
       expect(m, `no COALESCE for :${param}`).toBeTruthy();
       expect(m![1].split(',').length, `:${param} has no final fallback`).toBeGreaterThanOrEqual(2);
     }

@@ -10,6 +10,7 @@ import type { ListController, ListClient, ListParams, ListPage } from '@erplora/
 // internos se resuelven con `erplora.t(CATALOG, 'ui.clave')` (idioma activo, fallback locale→en→clave).
 import esLocale from '../../../locales/es.json';
 import enLocale from '../../../locales/en.json';
+import { domainMessage } from '../../lib/domain-error';
 const CATALOG: Record<string, unknown> = { es: esLocale, en: enLocale };
 
 /** Lo tecleado → UNIDADES MÍNIMAS (el dinero es INTEGER, ADR-0007/0123). «15,50» → 1550.
@@ -305,7 +306,7 @@ export class ErpServicesList extends LitElement {
       await erplora().command('services.services.restore', { service_id: String(row.id) });
       await this.ctrl.load();
     } catch (e) {
-      this.formError = e instanceof Error ? e.message : erplora().t(CATALOG, 'ui.errorRestore');
+      this.formError = domainMessage(e, erplora().locale, erplora().t(CATALOG, 'ui.errorRestore'));
     } finally {
       this.saving = false;
     }
@@ -437,7 +438,7 @@ export class ErpServicesList extends LitElement {
       this.dataTable()?.close(); // el panel de alta se cierra solo tras crear
       await this.ctrl.load(); // (además del evento; garantiza refresco inmediato)
     } catch (e) {
-      this.formError = e instanceof Error ? e.message : erplora().t(CATALOG, 'ui.errorCreate');
+      this.formError = domainMessage(e, erplora().locale, erplora().t(CATALOG, 'ui.errorCreate'));
     } finally {
       this.saving = false;
     }
@@ -467,7 +468,7 @@ export class ErpServicesList extends LitElement {
       this.dataTable()?.close();
       await this.ctrl.load();
     } catch (e) {
-      this.formError = e instanceof Error ? e.message : erplora().t(CATALOG, 'ui.errorUpdate');
+      this.formError = domainMessage(e, erplora().locale, erplora().t(CATALOG, 'ui.errorUpdate'));
     } finally {
       this.saving = false;
     }
@@ -530,7 +531,7 @@ export class ErpServicesList extends LitElement {
       this.archiveActive = null;
       await this.ctrl.load();
     } catch (e) {
-      this.formError = e instanceof Error ? e.message : erplora().t(CATALOG, 'ui.errorArchive');
+      this.formError = domainMessage(e, erplora().locale, erplora().t(CATALOG, 'ui.errorArchive'));
       this.archiveTarget = null;
     } finally {
       this.saving = false;
