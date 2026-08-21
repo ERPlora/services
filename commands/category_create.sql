@@ -8,6 +8,9 @@
 -- empty/NULL is a root category — hence the two branches. If the parent is unavailable the
 -- statement affects no row and `expect_rows` rejects the command with
 -- `services.parent_category_unavailable` (rollback, no row).
+-- The integer binds are CAST to BIGINT on purpose: that is the type the runtime puts on
+-- the wire, and pinning it in the statement is what stops Postgres from inferring `int4`
+-- for the parameters a payload omits. Full story in commands/service_create.sql (services#50).
 INSERT INTO services_category
   (id, hub_id, name, slug, description, parent_id, icon, color, sort_order, is_active,
    is_deleted, created_by, updated_by, created_at, updated_at)
@@ -15,7 +18,7 @@ SELECT
   :new_id, :hub_id, :name,
   COALESCE(NULLIF(:slug, ''), 'cat-' || :new_id),
   COALESCE(:description, ''), NULLIF(:parent_id, ''), COALESCE(:icon, ''), COALESCE(:color, ''),
-  COALESCE(:sort_order, 0), 1,
+  COALESCE(CAST(:sort_order AS BIGINT), 0), 1,
   0, :current_user_id, :current_user_id, :now, :now
 WHERE COALESCE(NULLIF(:parent_id, ''), '') = ''
    OR EXISTS (

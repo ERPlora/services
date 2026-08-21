@@ -9,6 +9,7 @@ import type { ListController, ListClient, ListParams, ListPage } from '@erplora/
 // Module i18n (ADR-0055): the `ui` catalogues are inlined at build time (esbuild).
 import esLocale from '../../../locales/es.json';
 import enLocale from '../../../locales/en.json';
+import { domainMessage } from '../../lib/domain-error';
 const CATALOG: Record<string, unknown> = { es: esLocale, en: enLocale };
 
 // «Categories» view of the services module (services#4): the CRUD of `services_category` that
@@ -183,7 +184,7 @@ export class ErpServicesCategories extends LitElement {
       this.dataTable()?.close();
       await Promise.all([this.ctrl.load(), this.loadAll()]);
     } catch (e) {
-      this.formError = e instanceof Error ? e.message : erplora().t(CATALOG, 'ui.errorSaveCategory');
+      this.formError = domainMessage(e, erplora().locale, erplora().t(CATALOG, 'ui.errorSaveCategory'));
     } finally {
       this.saving = false;
     }
@@ -198,7 +199,7 @@ export class ErpServicesCategories extends LitElement {
       this.deleteTarget = null;
       await Promise.all([this.ctrl.load(), this.loadAll()]);
     } catch (e) {
-      this.formError = e instanceof Error ? e.message : erplora().t(CATALOG, 'ui.errorDeleteCategory');
+      this.formError = domainMessage(e, erplora().locale, erplora().t(CATALOG, 'ui.errorDeleteCategory'));
       this.deleteTarget = null;
     } finally {
       this.saving = false;

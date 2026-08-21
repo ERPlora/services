@@ -9,20 +9,23 @@
 -- Si la categoría es ajena, la sentencia no afecta ninguna fila. Eso NO es un éxito silencioso: el
 -- command declara `expect_rows: {op: min, n: 1}`, así que el runtime revierte la transacción entera
 -- —ni fila ni evento— y devuelve `services.category_unavailable` (hub#139).
+-- The integer binds are CAST to BIGINT on purpose: that is the type the runtime puts on
+-- the wire, and pinning it in the statement is what stops Postgres from inferring `int4`
+-- for the parameters a payload omits. Full story in commands/service_create.sql (services#50).
 UPDATE services_service SET
   name             = :name,
   slug             = :slug,
   description      = :description,
   category_id      = :category_id,
   pricing_type     = :pricing_type,
-  price            = :price,
-  min_price        = :min_price,
-  max_price        = :max_price,
-  cost             = :cost,
-  duration_minutes = :duration_minutes,
-  is_bookable      = :is_bookable,
-  is_active        = :is_active,
-  sort_order       = :sort_order,
+  price            = CAST(:price AS BIGINT),
+  min_price        = CAST(:min_price AS BIGINT),
+  max_price        = CAST(:max_price AS BIGINT),
+  cost             = CAST(:cost AS BIGINT),
+  duration_minutes = CAST(:duration_minutes AS BIGINT),
+  is_bookable      = CAST(:is_bookable AS BIGINT),
+  is_active        = CAST(:is_active AS BIGINT),
+  sort_order       = CAST(:sort_order AS BIGINT),
   tax_category_key      = :tax_category_key,
   updated_by       = :current_user_id,
   updated_at       = :now

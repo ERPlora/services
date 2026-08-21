@@ -1770,12 +1770,53 @@ var o6 = e4(class extends i4 {
 
 // ../outfitkit/dist/ok-data-table.js
 var CSV_BOM = "\uFEFF";
+var WINDOWS_1252_C1 = [
+  8364,
+  129,
+  8218,
+  402,
+  8222,
+  8230,
+  8224,
+  8225,
+  710,
+  8240,
+  352,
+  8249,
+  338,
+  141,
+  381,
+  143,
+  144,
+  8216,
+  8217,
+  8220,
+  8221,
+  8226,
+  8211,
+  8212,
+  732,
+  8482,
+  353,
+  8250,
+  339,
+  157,
+  382,
+  376
+];
+function decodeWindows1252(bytes) {
+  let text = "";
+  for (const byte of bytes) {
+    text += String.fromCharCode(byte >= 128 && byte <= 159 ? WINDOWS_1252_C1[byte - 128] : byte);
+  }
+  return text;
+}
 function decodeCsvBuffer(buf) {
   let text;
   try {
     text = new TextDecoder("utf-8", { fatal: true }).decode(buf);
   } catch {
-    text = new TextDecoder("windows-1252").decode(buf);
+    text = decodeWindows1252(new Uint8Array(buf));
   }
   return text.charCodeAt(0) === 65279 ? text.slice(1) : text;
 }
@@ -3576,6 +3617,26 @@ var en_default = {
   }
 };
 
+// modules/services/ui/lib/domain-error.ts
+var ERRORS = {
+  es: es_default.errors ?? {},
+  en: en_default.errors ?? {}
+};
+var INTERNALS = ["sqlx", "db:", "bind parameter", "constraint", "at line ", "panicked"];
+function presentable(text) {
+  const t5 = text.trim().toLowerCase();
+  return t5.length > 0 && !INTERNALS.some((mark) => t5.includes(mark));
+}
+function domainMessage(e5, lang, fallback) {
+  const code = typeof e5 === "object" && e5 !== null ? e5.code : void 0;
+  if (typeof code === "string") {
+    const translated = ERRORS[lang]?.[code] ?? ERRORS.en[code];
+    if (translated) return translated;
+  }
+  const message = e5 instanceof Error ? e5.message : "";
+  return presentable(message) ? message : fallback;
+}
+
 // modules/services/ui/components/erp-services-categories/erp-services-categories.ts
 var CATALOG = { es: es_default, en: en_default };
 function erplora() {
@@ -3707,7 +3768,7 @@ var ErpServicesCategories = class extends i3 {
       this.dataTable()?.close();
       await Promise.all([this.ctrl.load(), this.loadAll()]);
     } catch (e5) {
-      this.formError = e5 instanceof Error ? e5.message : erplora().t(CATALOG, "ui.errorSaveCategory");
+      this.formError = domainMessage(e5, erplora().locale, erplora().t(CATALOG, "ui.errorSaveCategory"));
     } finally {
       this.saving = false;
     }
@@ -3721,7 +3782,7 @@ var ErpServicesCategories = class extends i3 {
       this.deleteTarget = null;
       await Promise.all([this.ctrl.load(), this.loadAll()]);
     } catch (e5) {
-      this.formError = e5 instanceof Error ? e5.message : erplora().t(CATALOG, "ui.errorDeleteCategory");
+      this.formError = domainMessage(e5, erplora().locale, erplora().t(CATALOG, "ui.errorDeleteCategory"));
       this.deleteTarget = null;
     } finally {
       this.saving = false;
@@ -3976,7 +4037,7 @@ var ErpServicesList = class extends i3 {
       await erplora2().command("services.services.restore", { service_id: String(row.id) });
       await this.ctrl.load();
     } catch (e5) {
-      this.formError = e5 instanceof Error ? e5.message : erplora2().t(CATALOG2, "ui.errorRestore");
+      this.formError = domainMessage(e5, erplora2().locale, erplora2().t(CATALOG2, "ui.errorRestore"));
     } finally {
       this.saving = false;
     }
@@ -4080,7 +4141,7 @@ var ErpServicesList = class extends i3 {
       this.dataTable()?.close();
       await this.ctrl.load();
     } catch (e5) {
-      this.formError = e5 instanceof Error ? e5.message : erplora2().t(CATALOG2, "ui.errorCreate");
+      this.formError = domainMessage(e5, erplora2().locale, erplora2().t(CATALOG2, "ui.errorCreate"));
     } finally {
       this.saving = false;
     }
@@ -4109,7 +4170,7 @@ var ErpServicesList = class extends i3 {
       this.dataTable()?.close();
       await this.ctrl.load();
     } catch (e5) {
-      this.formError = e5 instanceof Error ? e5.message : erplora2().t(CATALOG2, "ui.errorUpdate");
+      this.formError = domainMessage(e5, erplora2().locale, erplora2().t(CATALOG2, "ui.errorUpdate"));
     } finally {
       this.saving = false;
     }
@@ -4162,7 +4223,7 @@ var ErpServicesList = class extends i3 {
       this.archiveActive = null;
       await this.ctrl.load();
     } catch (e5) {
-      this.formError = e5 instanceof Error ? e5.message : erplora2().t(CATALOG2, "ui.errorArchive");
+      this.formError = domainMessage(e5, erplora2().locale, erplora2().t(CATALOG2, "ui.errorArchive"));
       this.archiveTarget = null;
     } finally {
       this.saving = false;
@@ -4483,7 +4544,7 @@ var ErpServicesPackages = class extends i3 {
       this.dataTable()?.close();
       await this.ctrl.load();
     } catch (e5) {
-      this.formError = e5 instanceof Error ? e5.message : t5("ui.errorSavePackage");
+      this.formError = domainMessage(e5, erplora3().locale, t5("ui.errorSavePackage"));
     } finally {
       this.saving = false;
     }
@@ -4497,7 +4558,7 @@ var ErpServicesPackages = class extends i3 {
       this.deleteTarget = null;
       await this.ctrl.load();
     } catch (e5) {
-      this.formError = e5 instanceof Error ? e5.message : erplora3().t(CATALOG3, "ui.errorDeletePackage");
+      this.formError = domainMessage(e5, erplora3().locale, erplora3().t(CATALOG3, "ui.errorDeletePackage"));
       this.deleteTarget = null;
     } finally {
       this.saving = false;
