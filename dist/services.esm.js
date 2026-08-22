@@ -3362,7 +3362,7 @@ function minorToMajor(amount, decimals2) {
   return (amount ?? 0) / 10 ** decimals2;
 }
 
-// modules/services/.wt-rowclick/locales/es.json
+// modules/services/locales/es.json
 var es_default = {
   name: "Servicios",
   description: "Cat\xE1logo de servicios con categor\xEDas y bonos, y su disponibilidad.",
@@ -3488,7 +3488,7 @@ var es_default = {
   }
 };
 
-// modules/services/.wt-rowclick/locales/en.json
+// modules/services/locales/en.json
 var en_default = {
   name: "Services",
   setup: {
@@ -3613,7 +3613,7 @@ var en_default = {
   }
 };
 
-// modules/services/.wt-rowclick/ui/lib/domain-error.ts
+// modules/services/ui/lib/domain-error.ts
 var ERRORS = {
   es: es_default.errors ?? {},
   en: en_default.errors ?? {}
@@ -3633,7 +3633,7 @@ function domainMessage(e5, lang, fallback) {
   return presentable(message) ? message : fallback;
 }
 
-// modules/services/.wt-rowclick/ui/components/erp-services-categories/erp-services-categories.ts
+// modules/services/ui/components/erp-services-categories/erp-services-categories.ts
 var CATALOG = { es: es_default, en: en_default };
 function erplora() {
   const c5 = globalThis.erplora;
@@ -3859,7 +3859,7 @@ __decorateClass([
 ], ErpServicesCategories.prototype, "allCategories", 2);
 define("erp-services-categories", ErpServicesCategories);
 
-// modules/services/.wt-rowclick/ui/components/erp-services-list/erp-services-list.ts
+// modules/services/ui/components/erp-services-list/erp-services-list.ts
 var CATALOG2 = { es: es_default, en: en_default };
 function toMinorUnits(v3) {
   const decimals2 = erplora2().currencyDecimals;
@@ -3867,7 +3867,16 @@ function toMinorUnits(v3) {
 }
 function toMajorText(minor) {
   const decimals2 = erplora2().currencyDecimals;
-  return String(minorToMajor(Number(minor) || 0, typeof decimals2 === "number" ? decimals2 : 2));
+  const d3 = typeof decimals2 === "number" ? decimals2 : 2;
+  const major = minorToMajor(Number(minor) || 0, d3);
+  return new Intl.NumberFormat(erplora2().locale || "en", {
+    minimumFractionDigits: d3,
+    maximumFractionDigits: d3,
+    useGrouping: false
+  }).format(major);
+}
+function taxCategoryDisplayName(c5) {
+  return (c5.display_name ?? "").trim() || (c5.name ?? "").trim() || c5.key;
 }
 var PRICING_TYPES = ["fixed", "hourly", "from", "variable", "free"];
 var FILTERABLE_STATUSES = ["active", "unconfigured", "inactive"];
@@ -4071,17 +4080,22 @@ var ErpServicesList = class extends i3 {
     } catch {
     }
     try {
-      this.taxRates = await erplora2().queryAll("taxes.categories.list", { sort: "name", dir: "asc" });
+      const res = await erplora2().queryAll("taxes.categories.list", { sort: "display_name", dir: "asc" });
+      this.taxRates = Array.isArray(res) ? res : [];
     } catch {
       this.taxRates = [];
     }
   }
-  // Opciones del ion-select de la categoría fiscal: una categoría por fila (value = key canónica).
-  // NO hay opción vacía: «— (por defecto)» era la puerta por la que se creaba un servicio que nadie
-  // podía cobrar. El % lo resuelve `taxes` por país+categoría (ADR-0085).
+  // Fiscal-category options for the ion-select: one category per row (value = canonical key).
+  // There is NO empty option on purpose: «— (default)» was the door through which a service
+  // nobody could charge was created. The label is the TRANSLATED `display_name`, without the
+  // technical key glued to it (services#54): nobody giving a service high has to choose between
+  // two taxonomies, they choose by name — the key still travels as the `value`, silent, because
+  // it is the identifier that does not change. The % is resolved by `taxes` per country+category
+  // (ADR-0085).
   taxOptions() {
     return this.taxRates.map(
-      (c5) => b2`<ion-select-option .value=${c5.key}>${c5.name} (${c5.key})</ion-select-option>`
+      (c5) => b2`<ion-select-option .value=${c5.key}>${taxCategoryDisplayName(c5)}</ion-select-option>`
     );
   }
   // Referencia al ok-data-table para abrir/cerrar su panel lateral (el alta se proyecta dentro).
@@ -4339,7 +4353,7 @@ __decorateClass([
 ], ErpServicesList.prototype, "archiveActive", 2);
 define("erp-services-list", ErpServicesList);
 
-// modules/services/.wt-rowclick/ui/components/erp-services-packages/erp-services-packages.ts
+// modules/services/ui/components/erp-services-packages/erp-services-packages.ts
 var CATALOG3 = { es: es_default, en: en_default };
 var SESSION_SCALE = 1e6;
 var PERCENT_DECIMALS = 2;

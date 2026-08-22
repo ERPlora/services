@@ -99,7 +99,9 @@ describe('editing pre-fills the create form and saves through services.services.
     expect(queries.find((q) => q.name === 'services.services.get')?.params).toEqual({ service_id: 's1' });
     expect(el.editingId).toBe('s1');
     expect(el.newName).toBe('Corte');
-    expect(el.newPrice, 'the price is shown in major units (cents → euros)').toBe('12');
+    // services#54: the field shows the price in the hub's locale notation («12,00» in es), same
+    // decimals and separator as the table next to it — not the raw `String(12)`.
+    expect(el.newPrice, 'the price is shown in major units, in the hub locale (cents → «12,00»)').toBe('12,00');
     expect(el.shadowRoot.querySelector('form[slot="create"]')?.textContent).toContain('ui.editingTitle');
   });
 
