@@ -3362,7 +3362,7 @@ function minorToMajor(amount, decimals2) {
   return (amount ?? 0) / 10 ** decimals2;
 }
 
-// modules/services/locales/es.json
+// modules/services/.wt-rowclick/locales/es.json
 var es_default = {
   name: "Servicios",
   description: "Cat\xE1logo de servicios con categor\xEDas y bonos, y su disponibilidad.",
@@ -3488,7 +3488,7 @@ var es_default = {
   }
 };
 
-// modules/services/locales/en.json
+// modules/services/.wt-rowclick/locales/en.json
 var en_default = {
   name: "Services",
   setup: {
@@ -3613,7 +3613,7 @@ var en_default = {
   }
 };
 
-// modules/services/ui/lib/domain-error.ts
+// modules/services/.wt-rowclick/ui/lib/domain-error.ts
 var ERRORS = {
   es: es_default.errors ?? {},
   en: en_default.errors ?? {}
@@ -3633,7 +3633,7 @@ function domainMessage(e5, lang, fallback) {
   return presentable(message) ? message : fallback;
 }
 
-// modules/services/ui/components/erp-services-categories/erp-services-categories.ts
+// modules/services/.wt-rowclick/ui/components/erp-services-categories/erp-services-categories.ts
 var CATALOG = { es: es_default, en: en_default };
 function erplora() {
   const c5 = globalThis.erplora;
@@ -3813,7 +3813,8 @@ var ErpServicesCategories = class extends i3 {
     return b2`<div class="page">
       ${this.formError ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : A}
       ${this.ctrl?.error ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : A}
-      <ok-data-table .serverSide=${true} .fill=${true} .views=${true} .addable=${can("services.add_category")} .cardTitle=${(row) => String(row.name ?? "")} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "asc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchCategoryPlaceholder")} .actions=${this.actions} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.emptyCategories")} @rowAction=${(e5) => this.onRowAction(e5)} @pageChange=${(e5) => this.ctrl.setPage(e5.detail)} @pageSizeChange=${(e5) => this.ctrl.setPageSize(e5.detail)} @sortChange=${(e5) => this.ctrl.setSort(e5.detail.sort, e5.detail.dir)} @searchChange=${(e5) => this.ctrl.setSearch(e5.detail)} @filterChange=${(e5) => this.ctrl.setFilter(e5.detail.col, e5.detail.value)}>
+      <ok-data-table .serverSide=${true} .fill=${true} .views=${true} .addable=${can("services.add_category")} .cardTitle=${(row) => String(row.name ?? "")} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "asc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchCategoryPlaceholder")} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.emptyCategories")} @rowAction=${(e5) => this.onRowAction(e5)} @rowClick=${(e5) => this.onRowAction({ detail: { actionId: "edit", row: e5.detail.row } })}
+ @pageChange=${(e5) => this.ctrl.setPage(e5.detail)} @pageSizeChange=${(e5) => this.ctrl.setPageSize(e5.detail)} @sortChange=${(e5) => this.ctrl.setSort(e5.detail.sort, e5.detail.dir)} @searchChange=${(e5) => this.ctrl.setSearch(e5.detail)} @filterChange=${(e5) => this.ctrl.setFilter(e5.detail.col, e5.detail.value)}>
         <form slot="create" class="form" @submit=${(e5) => this.save(e5)}>
           ${this.editingId ? b2`<ok-inline-feedback tone="info" icon="create-outline">
                 <b>${t5("ui.editingCategoryTitle")}</b> — ${this.newName}
@@ -3858,7 +3859,7 @@ __decorateClass([
 ], ErpServicesCategories.prototype, "allCategories", 2);
 define("erp-services-categories", ErpServicesCategories);
 
-// modules/services/ui/components/erp-services-list/erp-services-list.ts
+// modules/services/.wt-rowclick/ui/components/erp-services-list/erp-services-list.ts
 var CATALOG2 = { es: es_default, en: en_default };
 function toMinorUnits(v3) {
   const decimals2 = erplora2().currencyDecimals;
@@ -4260,7 +4261,8 @@ var ErpServicesList = class extends i3 {
     return b2`<div class="page">
         ${this.formError ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : A}
         ${this.ctrl?.error ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : A}
-        <ok-data-table .serverSide=${true} .fill=${true} .addable=${true} .views=${true} .cardTitle=${(row) => String(row.name ?? "")} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "asc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchPlaceholder")} .actions=${this.actions} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.empty")} @rowAction=${(e5) => this.onRowAction(e5)} @pageChange=${(e5) => this.ctrl.setPage(e5.detail)} @pageSizeChange=${(e5) => this.ctrl.setPageSize(e5.detail)} @sortChange=${(e5) => this.ctrl.setSort(e5.detail.sort, e5.detail.dir)} @searchChange=${(e5) => this.ctrl.setSearch(e5.detail)} @filterChange=${(e5) => this.onFilterChange(e5.detail.col, e5.detail.value)}>
+        <ok-data-table .serverSide=${true} .fill=${true} .addable=${true} .views=${true} .cardTitle=${(row) => String(row.name ?? "")} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "asc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchPlaceholder")} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.empty")} @rowAction=${(e5) => this.onRowAction(e5)} @rowClick=${(e5) => this.onRowAction({ detail: { actionId: "edit", row: e5.detail.row } })}
+ @pageChange=${(e5) => this.ctrl.setPage(e5.detail)} @pageSizeChange=${(e5) => this.ctrl.setPageSize(e5.detail)} @sortChange=${(e5) => this.ctrl.setSort(e5.detail.sort, e5.detail.dir)} @searchChange=${(e5) => this.ctrl.setSearch(e5.detail)} @filterChange=${(e5) => this.onFilterChange(e5.detail.col, e5.detail.value)}>
           <!-- Alta: se proyecta SIEMPRE (aunque el panel esté cerrado); si solo se pintara al abrir,
                el «+» de la barra desplegaría un panel vacío. -->
           <form slot="create" class="form" @submit=${(e5) => this.createService(e5)}>
@@ -4337,7 +4339,7 @@ __decorateClass([
 ], ErpServicesList.prototype, "archiveActive", 2);
 define("erp-services-list", ErpServicesList);
 
-// modules/services/ui/components/erp-services-packages/erp-services-packages.ts
+// modules/services/.wt-rowclick/ui/components/erp-services-packages/erp-services-packages.ts
 var CATALOG3 = { es: es_default, en: en_default };
 var SESSION_SCALE = 1e6;
 var PERCENT_DECIMALS = 2;
@@ -4609,7 +4611,8 @@ var ErpServicesPackages = class extends i3 {
     return b2`<div class="page">
       ${this.formError ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : A}
       ${this.ctrl?.error ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : A}
-      <ok-data-table .serverSide=${true} .fill=${true} .views=${true} .addable=${can3("services.add_package")} .cardTitle=${(row) => String(row.name ?? "")} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "asc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchPackagePlaceholder")} .actions=${this.actions} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.emptyPackages")} @rowAction=${(e5) => this.onRowAction(e5)} @pageChange=${(e5) => this.ctrl.setPage(e5.detail)} @pageSizeChange=${(e5) => this.ctrl.setPageSize(e5.detail)} @sortChange=${(e5) => this.ctrl.setSort(e5.detail.sort, e5.detail.dir)} @searchChange=${(e5) => this.ctrl.setSearch(e5.detail)} @filterChange=${(e5) => this.ctrl.setFilter(e5.detail.col, e5.detail.value)}>
+      <ok-data-table .serverSide=${true} .fill=${true} .views=${true} .addable=${can3("services.add_package")} .cardTitle=${(row) => String(row.name ?? "")} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "asc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchPackagePlaceholder")} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.emptyPackages")} @rowAction=${(e5) => this.onRowAction(e5)} @rowClick=${(e5) => this.onRowAction({ detail: { actionId: "edit", row: e5.detail.row } })}
+ @pageChange=${(e5) => this.ctrl.setPage(e5.detail)} @pageSizeChange=${(e5) => this.ctrl.setPageSize(e5.detail)} @sortChange=${(e5) => this.ctrl.setSort(e5.detail.sort, e5.detail.dir)} @searchChange=${(e5) => this.ctrl.setSearch(e5.detail)} @filterChange=${(e5) => this.ctrl.setFilter(e5.detail.col, e5.detail.value)}>
         <form slot="create" class="form" @submit=${(e5) => this.save(e5)}>
           ${this.editingId ? b2`<ok-inline-feedback tone="info" icon="create-outline">
                 <b>${t5("ui.editingPackageTitle")}</b> — ${this.form.name}
