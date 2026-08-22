@@ -221,3 +221,31 @@ describe('el precio va en céntimos — display divide y alta multiplica (#268)'
     expect((await crear('1999'))!.payload.price, '1999 ¥ son 1999 unidades mínimas').toBe(1999);
   });
 });
+
+// ── pm#155 (outfitkit#67, second half) ────────────────────────────────────────────────────────
+//
+// At 1440 px the «Actions» column fell off the screen with nothing hinting the table went on to
+// the right, so the only door into a service was a button nobody could see. OutfitKit 0.1.44
+// pins that column, but the other half of the fix is opt-in: `rowClickable` turns the whole row
+// into a door — the first thing a user tries. The list has to ask for it, and wire `rowClick`
+// to the same create-panel-pre-filled the «edit» action opens.
+describe('clicking the row opens the service (pm#155)', () => {
+  it('the table declares `rowClickable` → the whole row is a door, not just the action button', async () => {
+    const el = await montar();
+    const table = el.shadowRoot.querySelector('ok-data-table') as (HTMLElement & { rowClickable: boolean }) | null;
+    expect(
+      table?.rowClickable,
+      'without `rowClickable` the row is dead: if the actions column is off-screen there is no way in',
+    ).toBe(true);
+  });
+
+  it('`rowClick` puts the service in the edit panel, same as the «edit» action', async () => {
+    const el = await montar();
+    const table = el.shadowRoot.querySelector('ok-data-table') as HTMLElement | null;
+    table!.dispatchEvent(new CustomEvent('rowClick', { detail: { row: { id: 's1', name: 'Corte', price: '1200', pricing_type: 'fixed', duration_minutes: 30, is_bookable: 1, category_id: 'c1', category: 'Peluquería' } } }));
+    await new Promise((r) => setTimeout(r, 0));
+    await (el as unknown as { updateComplete: Promise<unknown> }).updateComplete;
+    const wc = el as unknown as { editingId: string | null };
+    expect(wc.editingId, 'the row was clicked and the edit panel did not take the service').toBe('s1');
+  });
+});

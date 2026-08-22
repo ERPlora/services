@@ -135,3 +135,30 @@ describe('create / edit / delete', () => {
     expect(commands).toEqual([]);
   });
 });
+
+// ── pm#155 (outfitkit#67, second half) ────────────────────────────────────────────────────────
+//
+// At 1440 px the «Actions» column fell off the screen with nothing hinting the table went on to
+// the right, so the only door into a category was a button nobody could see. OutfitKit 0.1.44
+// pins that column, but the other half of the fix is opt-in: `rowClickable` turns the whole row
+// into a door — the first thing a user tries. The list has to ask for it, and wire `rowClick`
+// to the same edit panel the «edit» action opens.
+describe('clicking the row opens the category (pm#155)', () => {
+  it('the table declares `rowClickable` → the whole row is a door, not just the action button', async () => {
+    const el = await mount();
+    const table = el.shadowRoot.querySelector('ok-data-table') as (HTMLElement & { rowClickable: boolean }) | null;
+    expect(
+      table?.rowClickable,
+      'without `rowClickable` the row is dead: if the actions column is off-screen there is no way in',
+    ).toBe(true);
+  });
+
+  it('`rowClick` puts the category in the edit panel, same as the «edit» action', async () => {
+    const el = await mount();
+    const table = el.shadowRoot.querySelector('ok-data-table') as HTMLElement | null;
+    table!.dispatchEvent(new CustomEvent('rowClick', { detail: { row: ROWS[0] } }));
+    await new Promise((r) => setTimeout(r, 0));
+    await el.updateComplete;
+    expect(el.editingId, 'the row was clicked and the edit panel did not take the category').toBe('c1');
+  });
+});
