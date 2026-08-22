@@ -127,8 +127,8 @@
               "integer",
               "null"
             ],
-            "minimum": 1,
-            "description": "Fixed-point 10⁶ (ADR-0147); omitted = 1 session (1000000)."
+            "minimum": 1000000,
+            "description": "Sessions of this service the voucher grants, as FIXED-POINT on a scale of 10⁶ (ADR-0147): 1 session = 1000000, 5 sessions = 5000000. Omitted = 1 session. The `minimum` is the whole scale, not 1, on purpose (services#51): a caller that writes the session COUNT (`quantity: 5`) is sending five millionths of a session, and the handler used to raise it to 1 with a `.max()` and answer `ok` — a five-session voucher sold as one. The value is ambiguous, so it is refused here, in the validation layer, instead of being guessed."
           }
         }
       }
