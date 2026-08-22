@@ -118,6 +118,9 @@
     "services.parent_category_unavailable": "That parent category is not available: it does not exist in this business or it has been deleted.",
     "services.category_update_rejected": "The category could not be updated: it does not exist in this business, or the parent you picked does not (or is the category itself).",
     "services.category_not_found": "That category does not exist in this business.",
-    "services.package_not_found": "That package does not exist in this business."
+    "services.package_not_found": "That package does not exist in this business.",
+    "services.package_no_uses_left": "This voucher has no sessions left.",
+    "services.package_expired": "This voucher has expired.",
+    "services.package_not_redeemable": "This voucher cannot be redeemed right now."
   }
 }

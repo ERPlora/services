@@ -603,20 +603,37 @@
     },
     "services.packages.redeem": {
       "permission": "services.redeem_package",
-      "transaction": true,
-      "sql": [
-        "commands/_redeem_insert.sql",
-        "commands/_redeem_assert.sql",
-        "commands/_gate_clear.sql"
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "redeem_package"
+      },
+      "reads": [
+        {
+          "query": "services.packages.redeem_check",
+          "params": {
+            "package_id": "payload.package_id",
+            "customer_id": "payload.customer_id"
+          },
+          "required": true
+        }
       ],
       "schema": "schemas/package_redeem.json",
       "emit": [
         "services.package.redeemed"
       ],
       "ai": {
-        "description": "Consumes one use of a customer's service package (bono); rejects if no uses remain or it has expired"
+        "description": "Consumes one use of a customer's service package (bono); refuses with a domain code the caller can translate — services.package_no_uses_left, services.package_expired or services.package_not_found — instead of the raw gate error"
       },
       "expose_api": true
+    },
+    "services._redeem": {
+      "permission": "services.redeem_package",
+      "sql": [
+        "commands/_redeem_insert.sql",
+        "commands/_redeem_assert.sql",
+        "commands/_gate_clear.sql"
+      ]
     },
     "services._insert_package": {
       "permission": "services.add_package",

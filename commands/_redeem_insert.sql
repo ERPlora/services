@@ -3,13 +3,14 @@
 -- las guardas se cumplen, evaluadas contra datos vivos DENTRO de la transacción del command
 -- (el conteo de usos es atómico — sin TOCTOU). Si alguna falla no inserta nada y el assert
 -- (_redeem_assert.sql) revierte la transacción.
--- Runtime inyecta :new_id, :hub_id, :current_user_id, :now. El caller aporta :package_id,
--- :customer_id y, opcionalmente, :appointment_id / :sale_id / :note.
+-- Runtime inyecta :hub_id, :current_user_id, :now. El handler WASM de services.packages.redeem
+-- aporta :redemption_id (de context.new_ids, para poder devolvérselo al caller) y el caller
+-- :package_id, :customer_id y, opcionalmente, :appointment_id / :sale_id / :note.
 INSERT INTO services_package_redemption
   (id, hub_id, package_id, customer_id, appointment_id, sale_id, note, redeemed_at,
    is_deleted, created_by, updated_by, created_at, updated_at)
 SELECT
-  :new_id, :hub_id, :package_id, :customer_id,
+  :redemption_id, :hub_id, :package_id, :customer_id,
   :appointment_id, :sale_id, COALESCE(:note, ''), :now,
   0, :current_user_id, :current_user_id, :now, :now
 FROM services_package p

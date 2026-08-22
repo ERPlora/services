@@ -120,8 +120,10 @@ it was first redeemed, when it expires and whether it has expired. Requires
    appointment, the sale and a note.
 
 The redemption is appended to the ledger and `services.package.redeemed` is emitted. If the package
-is inactive, out of uses or expired, the whole thing is **refused and rolled back**. Requires
-`services.redeem_package` — an employee has this.
+is inactive, out of uses or expired, the whole thing is **refused and rolled back**, and the refusal
+carries a code the caller can translate: `services.package_not_found`,
+`services.package_no_uses_left` or `services.package_expired` — never the database's internals.
+Requires `services.redeem_package` — an employee has this.
 
 ## Servicios — settings
 

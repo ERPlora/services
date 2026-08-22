@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "services.packages.redeem params",
-  "description": "Parámetros del command commands/_redeem_insert.sql: consume 1 uso de un paquete por un cliente. El scope hub_id, :now y :new_id los inyecta el runtime (§2.5/§2.9). El consumo se RECHAZA (revierte) si el paquete no existe/está inactivo, si se superó max_uses o si caducó (validity_days desde el primer uso).",
+  "description": "Parámetros del command services.packages.redeem: consume 1 uso de un paquete por un cliente. El scope hub_id y :now los inyecta el runtime (§2.5/§2.9); el id del consumo (:redemption_id, que el command devuelve al caller) lo toma el handler de context.new_ids. El consumo se RECHAZA con un código de dominio — services.package_not_found, services.package_no_uses_left o services.package_expired, según el motivo que calcula services.packages.redeem_check — y revierte entero (nada queda registrado).",
   "type": "object",
   "properties": {
     "package_id": {

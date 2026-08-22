@@ -5,7 +5,7 @@ opciones de reserva. Categorías **jerárquicas** y **paquetes/bonos** con descu
 usos** append-only (`redeem`). Es el catálogo contra el que reserva `appointments`.
 
 > **Module id:** `services`. **Depende de:** `taxes` (instalar services auto-instala taxes,
-> ADR-0066/0085). Módulo híbrido: SQL + handler WASM (`bulk_create_services`, `create_package`).
+> ADR-0066/0085). Módulo híbrido: SQL + handler WASM (`bulk_create_services`, `create_package`, `redeem_package`).
 
 ## Documentación de usuario — [`docs/`](docs/)
 
@@ -32,7 +32,7 @@ versión instalada y cita la de TU versión, no la de la última publicada. En i
 | command | `services.services.delete` | `delete_service` |
 | command | `services.categories.create` / `.update` / `.delete` | los `*_category` |
 | command | `services.packages.create` (WASM) / `.update` / `.delete` | los `*_package` |
-| command | `services.packages.redeem` (SQL **gated**, revierte si no hay usos o caducó) | `redeem_package` |
+| command | `services.packages.redeem` (WASM + **gate**, rechaza con código de dominio: `package_no_uses_left` / `package_expired` / `package_not_found`) | `redeem_package` |
 | command | `services.settings.update` | `manage_settings` (solo admin) |
 | emite | `services.service.*`, `services.package.*` (incl. `services.package.redeemed`) | — |
 | escucha | — | — |
