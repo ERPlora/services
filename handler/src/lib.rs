@@ -450,9 +450,32 @@ pub fn create_package_pure(input: Value) -> Result<HandlerOutput, String> {
         };
         seen.push(service_id.clone());
 
-        // Punto fijo 10⁶ (ADR-0147): ausente = 1 sesión = QUANTITY_SCALE. Se conserva el
-        // clamp legado (mínimo 1 sesión), ahora en escala.
-        let quantity = parse_int(item.get("quantity")).ok().flatten().unwrap_or(QUANTITY_SCALE).max(QUANTITY_SCALE);
+        // Punto fijo 10⁶ (ADR-0147): ausente = 1 sesión = QUANTITY_SCALE.
+        //
+        // services#51 — aquí había un `.max(QUANTITY_SCALE)` heredado del tiempo en que la columna
+        // contaba sesiones enteras: era el suelo «al menos 1 sesión». Cuando ADR-0147 pasó la
+        // columna a escala 10⁶ ese suelo dejó de ser un suelo y se convirtió en un REESCRITOR: un
+        // `quantity: 5` —que es lo que escribe un humano, un flujo o el asistente cuando quiere
+        // cinco sesiones— subía a 1_000_000 y el command respondía `ok`. Un bono de 5 sesiones
+        // vendido como 1 es dinero del cliente, y ningún error lo delataba.
+        //
+        // El valor es AMBIGUO (¿cinco sesiones, o cinco millonésimas de sesión?) y la regla de la
+        // casa para una entrada dudosa es cerrar el guard, no inventar un default. Así que un
+        // valor por debajo de la escala se RECHAZA con un código de dominio que nombra la escala.
+        // El schema lo declara también (`minimum`), para que el rechazo llegue en la capa de
+        // validación; esto es la segunda puerta, para el camino que no pase por ella.
+        let quantity = match parse_int(item.get("quantity")).ok().flatten() {
+            None => QUANTITY_SCALE,
+            Some(q) if q >= QUANTITY_SCALE => q,
+            Some(q) => {
+                return Err(format!(
+                    "services.invalid_quantity: line `{service_id}` sent quantity {q}, which is \
+                     below one session. Sessions travel as fixed-point on a scale of {QUANTITY_SCALE} \
+                     (ADR-0147), so 5 sessions is {}, not 5",
+                    5 * QUANTITY_SCALE
+                ))
+            }
+        };
         let mut p = Map::new();
         p.insert("item_id".into(), json!(item_id));
         p.insert("package_id".into(), json!(package_id));
@@ -647,6 +670,42 @@ mod tests {
         assert_eq!(out.operations[1].command, "services._insert_package_item");
         assert_eq!(out.operations[1].params["quantity"], json!(2_000_000));
         assert_eq!(out.operations[2].params["quantity"], json!(1_000_000), "el default es 1 sesión en escala");
+    }
+
+    /// services#51 — un `quantity` que no está en la escala 10⁶ NO se reescribe en silencio.
+    ///
+    /// El síntoma: `quantity: 5` (cinco sesiones, tal como lo escribe un humano, un flujo o el
+    /// asistente) salía por el `.max(QUANTITY_SCALE)` convertido en 1_000_000 y el command
+    /// respondía `ok`. Un bono de 5 sesiones vendido como 1 es dinero del cliente. El valor es
+    /// ambiguo (¿cinco sesiones o cinco millonésimas?), así que se cierra el guard: se rechaza.
+    #[test]
+    fn a_quantity_below_the_scale_is_rejected_instead_of_being_clamped_to_one_session() {
+        for sent in [2_i64, 3, 5, 10, 999_999] {
+            let err = create_package_pure(input(json!({
+                "name": "Bono 5 cortes",
+                "items": [{ "service_id": "s1", "quantity": sent }]
+            })))
+            .unwrap_err();
+            assert!(
+                err.contains("services.invalid_quantity"),
+                "a quantity of {sent} must be refused with a typed code, got: {err}"
+            );
+            assert!(
+                err.contains("1000000"),
+                "the refusal must name the scale so the caller can fix it, got: {err}"
+            );
+        }
+    }
+
+    /// El caller que YA escala no se rompe: sigue habiendo bono de 5 sesiones por API.
+    #[test]
+    fn five_sessions_on_the_wire_is_five_million() {
+        let out = create_package_pure(input(json!({
+            "name": "Bono 5 cortes",
+            "items": [{ "service_id": "s1", "quantity": 5_000_000 }]
+        })))
+        .unwrap();
+        assert_eq!(out.operations[1].params["quantity"], json!(5_000_000));
     }
 
     // ── services#42: una línea que no se puede materializar NO se salta en silencio ──────────
