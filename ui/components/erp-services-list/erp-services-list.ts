@@ -27,10 +27,22 @@ function toMinorUnits(v: string | number): number {
   return majorToMinor(String(v ?? '').replace(',', '.'), typeof decimals === 'number' ? decimals : 2);
 }
 
-/** MINOR units (what the row carries) → what a human types in the price field. 1200 → "12". */
+/** MINOR units (what the row carries) → what a human types in the price field, in the HUB's
+ *  locale (services#54): 2200 → «22,00» in es, «22.00» in en. Two fixed rules:
+ *  - the decimals are the CURRENCY's (`erplora.currencyDecimals`), so the field never shows a
+ *    different scale than the money it edits;
+ *  - `useGrouping: false`: «1.250,50» would not survive the trip back through `toMinorUnits`
+ *    (it reads `.` as a decimal dot), and a price field must round-trip through itself.
+ *  Same figure, same screen, same notation as the table's «22,00 €» two centimetres away. */
 function toMajorText(minor: unknown): string {
   const decimals = erplora().currencyDecimals;
-  return String(minorToMajor(Number(minor) || 0, typeof decimals === 'number' ? decimals : 2));
+  const d = typeof decimals === 'number' ? decimals : 2;
+  const major = minorToMajor(Number(minor) || 0, d);
+  return new Intl.NumberFormat(erplora().locale || 'en', {
+    minimumFractionDigits: d,
+    maximumFractionDigits: d,
+    useGrouping: false,
+  }).format(major);
 }
 
 interface ErploraClientLike extends ListClient {
@@ -77,12 +89,30 @@ interface Category {
   service_count: number;
 }
 
-// Fila de `taxes.categories.list` (la CATEGORÍA fiscal es lo enlazable, ADR-0085).
+// Row of `taxes.categories.list` (the fiscal CATEGORY is the linkable thing, ADR-0085).
+// `display_name` is the label `taxes` already resolves to the caller's language (taxes#38/#40,
+// same contract inventory#64 reads): it is what gets PAINTED, while the canonical `key` is what
+// gets SAVED — the label is translatable, the key is the stable identifier.
 interface TaxCategory {
   id: string;
   key: string;
   name: string;
+  /** Translated label, served by `taxes` since 2.3.8. Optional: an older hub still sends only
+   *  the seed's English `name`, and the form must keep working there. */
+  display_name?: string;
   is_system?: number;
+}
+
+/** The VISIBLE name of a fiscal category: `display_name` first, `name` as the reserve (services#54).
+ *
+ * The order is not interchangeable: `display_name` is the label already resolved to the hub's
+ * language; `name` is the seed's English literal. Preferring `name` would show English exactly
+ * when the translation exists. The reserve is needed against a hub with `taxes` < 2.3.8, where
+ * the column does not travel — showing the English of before beats a mute option. A category the
+ * hub owner created has no translation and does not want one: `taxes` returns their own text in
+ * `display_name` (its SQL's `COALESCE(..., c.name)`), so it passes through untouched. */
+function taxCategoryDisplayName(c: TaxCategory): string {
+  return (c.display_name ?? '').trim() || (c.name ?? '').trim() || c.key;
 }
 
 // Dominio cerrado de la tarifa (migrations/*/001_init.sql: fixed|hourly|from|variable|free): se
@@ -361,18 +391,30 @@ export class ErpServicesList extends LitElement {
     // es obligatoria, así que una lista vacía (módulo `taxes` sin configurar, sin permiso…) no deja
     // un select vacío sin explicación — el formulario lo dice (`ui.taxCategoriesMissing`).
     try {
-      this.taxRates = await erplora().queryAll<TaxCategory>('taxes.categories.list', { sort: 'name', dir: 'asc' });
+      // Sorted by `display_name` — what the user READS in the dropdown (services#54). Sorting by
+      // `name` left the list alphabetized in English while painted in Spanish; `taxes` accepts
+      // `display_name` in its sort whitelist, and if it ever stops doing so the query fails, this
+      // catch leaves the catalogue empty — the same degradation as always.
+      const res = await erplora().queryAll<TaxCategory>('taxes.categories.list', { sort: 'display_name', dir: 'asc' });
+      // `Array.isArray`, not `?? []`: a non-list answer would make `.map()` throw IN THE RENDER
+      // and take the whole services page down — for an IVA dropdown. The form must not depend on
+      // `taxes` answering well (same hardening as inventory).
+      this.taxRates = Array.isArray(res) ? res : [];
     } catch {
       this.taxRates = [];
     }
   }
 
-  // Opciones del ion-select de la categoría fiscal: una categoría por fila (value = key canónica).
-  // NO hay opción vacía: «— (por defecto)» era la puerta por la que se creaba un servicio que nadie
-  // podía cobrar. El % lo resuelve `taxes` por país+categoría (ADR-0085).
+  // Fiscal-category options for the ion-select: one category per row (value = canonical key).
+  // There is NO empty option on purpose: «— (default)» was the door through which a service
+  // nobody could charge was created. The label is the TRANSLATED `display_name`, without the
+  // technical key glued to it (services#54): nobody giving a service high has to choose between
+  // two taxonomies, they choose by name — the key still travels as the `value`, silent, because
+  // it is the identifier that does not change. The % is resolved by `taxes` per country+category
+  // (ADR-0085).
   private taxOptions() {
     return this.taxRates.map(
-      (c) => html`<ion-select-option .value=${c.key}>${c.name} (${c.key})</ion-select-option>`,
+      (c) => html`<ion-select-option .value=${c.key}>${taxCategoryDisplayName(c)}</ion-select-option>`,
     );
   }
 
