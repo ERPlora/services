@@ -115,8 +115,9 @@ dropped and the package was created without it, so the voucher was short of sess
 told. Now the whole package is refused and nothing is saved — fix the line and save again.
 
 **"A customer's voucher is not recognised."** Either they were never granted it — this module cannot
-grant, only redeem — or it is out of uses, expired or inactive. Run the check command; it tells you
-which.
+grant, only redeem — or it is out of uses, expired or inactive. The redemption itself says which:
+it refuses with `services.package_no_uses_left`, `services.package_expired` or
+`services.package_not_found` (the check command answers the same trio without consuming).
 
 **"The voucher expired sooner than expected."** The clock starts at the **first redemption**, not at
 purchase. That surprises everyone once.

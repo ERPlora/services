@@ -19,7 +19,7 @@ use erplora_guest_sdk::money;
 use erplora_guest_sdk::units::QUANTITY_SCALE;
 use rust_decimal::prelude::FromPrimitive;
 use rust_decimal::Decimal;
-use erplora_guest_sdk::{Event, Operation};
+use erplora_guest_sdk::{DomainError, Event, Operation, Output};
 use serde::Serialize;
 use serde_json::{json, Map, Value};
 
@@ -45,6 +45,15 @@ pub fn bulk_create_services(input: Json<erplora_guest_sdk::Input>) -> FnResult<J
 #[plugin_fn]
 pub fn create_package(input: Json<erplora_guest_sdk::Input>) -> FnResult<Json<HandlerOutput>> {
     match create_package_pure(input.into_inner().into_value()) {
+        Ok(out) => Ok(Json(out)),
+        Err(msg) => Err(WithReturnCode::new(Error::msg(msg), 1)),
+    }
+}
+
+#[cfg(feature = "guest")]
+#[plugin_fn]
+pub fn redeem_package(input: Json<erplora_guest_sdk::Input>) -> FnResult<Json<Output>> {
+    match redeem_package_pure(input.into_inner().into_value()) {
         Ok(out) => Ok(Json(out)),
         Err(msg) => Err(WithReturnCode::new(Error::msg(msg), 1)),
     }
@@ -492,6 +501,125 @@ pub fn create_package_pure(input: Value) -> Result<HandlerOutput, String> {
     })
 }
 
+// ── pieza 3: redeem_package (services#52) ───────────────────────────────────
+
+/// The read `services.packages.redeem` declares in its manifest `reads` block (ADR-0069): the
+/// module's own pre-check of the same guards the transactional gate enforces.
+const READ_REDEEM_CHECK: &str = "services.packages.redeem_check";
+
+/// Domain refusals of a redemption, in the module's namespace (the host validates it).
+///
+/// The three reasons are exactly the ones `services.packages.redeem_check` already computes —
+/// there is no new business logic here, only the mapping the declarative path could not express:
+/// until services#52 the caller got the raw CHECK of `services__gate` (`sqlx: … violates check
+/// constraint "services__gate_ok_check"`), which nobody at a counter can act on.
+fn redeem_refusal(code: &str, message: &str) -> DomainError {
+    DomainError::new(code, message)
+}
+
+/// `reason` of the read → the domain error the caller receives. The closed set comes from
+/// `queries/package_redeem_check.sql`; anything else (including an empty reason with
+/// `redeemable = 0`, which that query never produces) is a broken contract and fails CLOSED with
+/// the generic refusal — never a silent go, and never the raw gate either.
+fn refusal_for(reason: &str) -> DomainError {
+    match reason.trim() {
+        "no_uses_left" => redeem_refusal(
+            "services.package_no_uses_left",
+            "This voucher has no sessions left.",
+        ),
+        "expired" => redeem_refusal(
+            "services.package_expired",
+            "This voucher has expired.",
+        ),
+        "package_not_found" => redeem_refusal(
+            "services.package_not_found",
+            "That package does not exist in this business.",
+        ),
+        _ => redeem_refusal(
+            "services.package_not_redeemable",
+            "This voucher cannot be redeemed right now.",
+        ),
+    }
+}
+
+/// Is the pre-check's `redeemable` flag saying yes? The row carries it as an INTEGER (the query's
+/// `CASE … THEN 1 ELSE 0`); Postgres drivers may also hand it as bool or text, and all three say
+/// the same thing.
+fn redeemable_is(row: &Value) -> bool {
+    match row.get("redeemable") {
+        Some(Value::Bool(b)) => *b,
+        Some(Value::Number(n)) => n.as_i64().unwrap_or(0) != 0,
+        Some(Value::String(s)) => matches!(s.trim(), "1" | "true" | "t"),
+        _ => false,
+    }
+}
+
+/// Logic of `services.packages.redeem` (services#52).
+///
+/// The handler runs in a sandbox and cannot read the database, so the host preloads the module's
+/// own pre-check (`context.reads["services.packages.redeem_check"]`, parameterized with the
+/// payload's `package_id`/`customer_id` and `required` — hub#701: a redemption is money, it does
+/// not admit guessing). What the handler adds over the declarative path of before:
+///
+///   * a refusal NAMES its reason with a stable, namespaced, translatable code —
+///     `services.package_no_uses_left` / `services.package_expired` / `services.package_not_found`
+///     — instead of the raw CHECK of `services__gate` reaching the API, flows and the assistant;
+///   * a redeemable voucher still goes through THE SAME gated statements (`services._redeem`:
+///     conditional INSERT + assert + clear), so the gate stays the transactional authority — the
+///     read is advisory and the race (another till spends the last use between read and write)
+///     still aborts the transaction. The read improves the message; it never replaces the gate.
+///
+/// Fail-closed: without the read there is nothing to verify against, so the command refuses with
+/// the generic `services.package_not_redeemable` rather than proceeding blind.
+pub fn redeem_package_pure(input: Value) -> Result<Output, String> {
+    let payload = input.get("payload").cloned().unwrap_or(Value::Null);
+    let context = input.get("context").cloned().unwrap_or(Value::Null);
+    let empty: Vec<Value> = Vec::new();
+    let new_ids = context.get("new_ids").and_then(|v| v.as_array()).unwrap_or(&empty);
+
+    let package_id = str_field(&payload, "package_id").trim().to_string();
+    let customer_id = str_field(&payload, "customer_id").trim().to_string();
+
+    // The pre-check's row (the query always answers exactly one). `None` = the read was not
+    // preloaded (runtime without `reads` support); an empty array = a broken contract. Both fail
+    // closed: without data to verify against, the redemption does not happen.
+    let row = input
+        .pointer(format!("/context/reads/{READ_REDEEM_CHECK}/0").as_str())
+        .cloned()
+        .unwrap_or(Value::Null);
+
+    if package_id.is_empty() || customer_id.is_empty() || row.is_null() || !redeemable_is(&row) {
+        let reason: String = if row.is_null() { String::new() } else { str_field(&row, "reason") };
+        return Ok(Output::new().with_error(refusal_for(&reason)));
+    }
+
+    // Redeemable: one intention, three gated statements. The host resolves `services._redeem`
+    // (same module), injects the system params (`:hub_id`, `:current_user_id`, `:now`) and runs
+    // them in the command's transaction; the `emit` declared in the manifest
+    // (`services.package.redeemed`) fires after the commit, which is why the handler emits no
+    // event of its own.
+    let redemption_id = match new_ids.first().map(as_str) {
+        Some(id) if !id.is_empty() => id,
+        _ => return Err("context.new_ids is empty: the host did not hand out ids".to_string()),
+    };
+    let mut p = Map::new();
+    p.insert("redemption_id".into(), json!(redemption_id));
+    p.insert("package_id".into(), json!(package_id));
+    p.insert("customer_id".into(), json!(customer_id));
+    p.insert("appointment_id".into(), payload.get("appointment_id").cloned().unwrap_or(Value::Null));
+    p.insert("sale_id".into(), payload.get("sale_id").cloned().unwrap_or(Value::Null));
+    p.insert("note".into(), json!(str_field(&payload, "note")));
+
+    Ok(Output::new()
+        .with_operation(Operation::sql("services._redeem", p.clone()))
+        .with_result(json!({
+            "redeemed": true,
+            "redemption_id": redemption_id,
+            "package_id": p["package_id"],
+            "customer_id": p["customer_id"],
+        })))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -796,5 +924,158 @@ mod tests {
         })))
         .unwrap();
         assert_eq!(header_params(&out)["discount_percent_bp"], json!(1213));
+    }
+
+    // ── services#52: a refused redemption says WHY, with a domain code ──────────────────────
+    //
+    // The symptom: redeeming an exhausted voucher returned the raw gate internals —
+    // `db: sqlx: … violates check constraint "services__gate_ok_check"` — to the API, to flows
+    // and to the assistant, while the module's own pre-check already knew the reason. The three
+    // reasons come out of `context.reads["services.packages.redeem_check"]` as codes; the handler
+    // maps them to its namespaced, translatable domain errors.
+
+    /// `{payload, context}` with the pre-check read preloaded, the way the manifest declares it.
+    fn redeem_input(read_row: Option<Value>, payload: Value) -> Value {
+        let mut ctx = json!({ "new_ids": ["red-1"] });
+        if let Some(row) = read_row {
+            ctx["reads"] = json!({ "services.packages.redeem_check": [row] });
+        }
+        json!({ "payload": payload, "context": ctx })
+    }
+
+    fn redeem_payload() -> Value {
+        json!({ "package_id": "pkg-1", "customer_id": "cus-1" })
+    }
+
+    #[test]
+    fn an_exhausted_voucher_refuses_with_no_uses_left_not_the_raw_gate() {
+        let out = redeem_package_pure(redeem_input(
+            Some(json!({ "redeemable": 0, "reason": "no_uses_left" })),
+            redeem_payload(),
+        ))
+        .unwrap();
+        let error = out.error.expect("the 6th redemption of a 5-use package must REFUSE");
+        assert_eq!(error.code, "services.package_no_uses_left");
+        assert!(
+            out.operations.is_empty(),
+            "a refusal must not carry intentions: nothing persists"
+        );
+    }
+
+    #[test]
+    fn an_expired_voucher_refuses_with_expired() {
+        let out = redeem_package_pure(redeem_input(
+            Some(json!({ "redeemable": 0, "reason": "expired" })),
+            redeem_payload(),
+        ))
+        .unwrap();
+        assert_eq!(
+            out.error.expect("an expired voucher must REFUSE").code,
+            "services.package_expired"
+        );
+    }
+
+    #[test]
+    fn an_unknown_package_refuses_with_package_not_found() {
+        let out = redeem_package_pure(redeem_input(
+            Some(json!({ "redeemable": 0, "reason": "package_not_found" })),
+            redeem_payload(),
+        ))
+        .unwrap();
+        assert_eq!(
+            out.error.expect("an unknown package must REFUSE").code,
+            "services.package_not_found"
+        );
+    }
+
+    /// Acceptance criterion 2 of the issue: no response carries the plumbing's marks.
+    #[test]
+    fn no_refusal_message_carries_the_gate_internals() {
+        for reason in ["no_uses_left", "expired", "package_not_found", "anything-else"] {
+            let out = redeem_package_pure(redeem_input(
+                Some(json!({ "redeemable": 0, "reason": reason })),
+                redeem_payload(),
+            ))
+            .unwrap();
+            let msg = out.error.unwrap().message.to_lowercase();
+            for mark in ["sqlx", "services__gate", "check constraint", "db:"] {
+                assert!(
+                    !msg.contains(mark),
+                    "`{reason}` refusal leaks `{mark}`: {msg}"
+                );
+            }
+        }
+    }
+
+    /// A reason outside the closed set (or a read that never arrived) is a broken contract, and
+    /// the answer to a broken contract is to close the guard — never to proceed blind.
+    #[test]
+    fn an_unknown_reason_fails_closed_with_the_generic_refusal() {
+        let out = redeem_package_pure(redeem_input(
+            Some(json!({ "redeemable": 0, "reason": "sevilla" })),
+            redeem_payload(),
+        ))
+        .unwrap();
+        assert_eq!(
+            out.error.expect("an unmapped reason must still REFUSE").code,
+            "services.package_not_redeemable"
+        );
+    }
+
+    /// A runtime without `reads` support does not preload the check at all. Failing closed turns
+    /// the raw-CHECK path into a translated refusal instead of redeeming unverified.
+    #[test]
+    fn without_the_read_the_redemption_fails_closed_not_blind() {
+        let out = redeem_package_pure(redeem_input(None, redeem_payload())).unwrap();
+        assert_eq!(
+            out.error.expect("no read, no verification, no redemption").code,
+            "services.package_not_redeemable"
+        );
+        assert!(out.operations.is_empty(), "nothing may persist");
+    }
+
+    /// The happy path still goes through THE SAME gated statements — the read is advisory, the
+    /// gate stays the transactional authority (anti-TOCTOU), so a race at the till still aborts.
+    #[test]
+    fn a_redeemable_voucher_emits_the_gated_redeem_intention() {
+        let out = redeem_package_pure(redeem_input(
+            Some(json!({ "redeemable": 1, "reason": "" })),
+            json!({
+                "package_id": "pkg-1",
+                "customer_id": "cus-1",
+                "appointment_id": "apt-9",
+                "note": "first use"
+            }),
+        ))
+        .unwrap();
+        assert!(out.error.is_none());
+        assert_eq!(out.operations.len(), 1);
+        let op = &out.operations[0];
+        assert_eq!(op.command, "services._redeem");
+        assert_eq!(op.params["redemption_id"], json!("red-1"), "the host's id batch, front first");
+        assert_eq!(op.params["package_id"], json!("pkg-1"));
+        assert_eq!(op.params["customer_id"], json!("cus-1"));
+        assert_eq!(op.params["appointment_id"], json!("apt-9"));
+        assert_eq!(op.params["note"], json!("first use"));
+        assert!(op.params["sale_id"].is_null(), "an optional link the caller did not send is NULL, not a string");
+        // The caller gets the authoritative id back (hub#70) — appointments links the redemption.
+        assert_eq!(out.result.unwrap()["redemption_id"], json!("red-1"));
+    }
+
+    /// The flag reaches the handler as an INTEGER (the query's `CASE … THEN 1`), but a driver may
+    /// say the same thing as bool or text; all three mean yes.
+    #[test]
+    fn the_redeemable_flag_is_read_whatever_shape_the_driver_chooses() {
+        for shape in [json!(1), json!(true), json!("1")] {
+            let out = redeem_package_pure(redeem_input(
+                Some(json!({ "redeemable": shape, "reason": "" })),
+                redeem_payload(),
+            ))
+            .unwrap();
+            assert!(
+                out.error.is_none(),
+                "a redeemable voucher in shape {shape} must go through, got {out:?}"
+            );
+        }
     }
 }
