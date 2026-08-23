@@ -427,8 +427,23 @@ pub fn create_package_pure(input: Value) -> Result<HandlerOutput, String> {
     // hub llega pre-cargada en `context.reads` (ADR-0069), declarada por el manifest en
     // `services.packages.create`. Sin ese catálogo las líneas no son verificables → fail CLOSED.
     let items = payload.get("items").and_then(|v| v.as_array()).unwrap_or(&empty);
+    // services#42 — fail closed on the EMPTY package too, not only on bad lines. The schema
+    // (`schemas/package_create.json`: `items` required, `minItems: 1`) is the front door and
+    // refuses the payload with 422 before the handler runs; this guard is defense in depth for
+    // the doors that do not pass through it (an internal caller, a future flow). A package with
+    // no lines describes nothing sellable or redeemable — there is no legitimate way to reach
+    // here with `items` empty, so refusing costs nothing real and keeps the invariant in ONE
+    // place per door instead of trusting that every door remembers the schema.
+    if items.is_empty() {
+        return Err(
+            "services.package_needs_lines: a package with no lines describes nothing sellable \
+             or redeemable — add at least one service line"
+                .to_string(),
+        );
+    }
     let catalogue = catalogue_service_ids(&input);
-    if !items.is_empty() && catalogue.is_none() {
+    // (Con las líneas ya no vacías arriba, «sin catálogo» siempre es un fallo de lectura.)
+    if catalogue.is_none() {
         return Err(
             "The service catalogue could not be read, so the package lines cannot be verified"
                 .to_string(),
@@ -702,7 +717,8 @@ mod tests {
         let out = create_package_pure(input(json!({
             "name": "Bono 5 cortes",
             "discount_type": "percentage",
-            "discount_percent_bp": 1000
+            "discount_percent_bp": 1000,
+            "items": [{ "service_id": "s1" }]
         })))
         .unwrap();
         let p = header_params(&out);
@@ -725,10 +741,10 @@ mod tests {
     #[test]
     fn the_emitted_percentage_is_always_an_integer_never_a_float() {
         for payload in [
-            json!({ "name": "A", "discount_type": "percentage", "discount_percent_bp": 1050 }),
-            json!({ "name": "B", "discount_type": "percentage", "discount_percent_bp": 0 }),
-            json!({ "name": "C", "discount_type": "percentage", "discount_value": 10.5 }),
-            json!({ "name": "D", "discount_type": "fixed", "discount_amount_cents": 500 }),
+            json!({ "name": "A", "discount_type": "percentage", "discount_percent_bp": 1050, "items": [{ "service_id": "s1" }] }),
+            json!({ "name": "B", "discount_type": "percentage", "discount_percent_bp": 0, "items": [{ "service_id": "s1" }] }),
+            json!({ "name": "C", "discount_type": "percentage", "discount_value": 10.5, "items": [{ "service_id": "s1" }] }),
+            json!({ "name": "D", "discount_type": "fixed", "discount_amount_cents": 500, "items": [{ "service_id": "s1" }] }),
         ] {
             let out = create_package_pure(input(payload.clone())).unwrap();
             let emitted = &header_params(&out)["discount_percent_bp"];
@@ -744,7 +760,8 @@ mod tests {
         let out = create_package_pure(input(json!({
             "name": "Bono fijo",
             "discount_type": "fixed",
-            "discount_amount_cents": 1500
+            "discount_amount_cents": 1500,
+            "items": [{ "service_id": "s1" }]
         })))
         .unwrap();
         let p = header_params(&out);
@@ -759,7 +776,8 @@ mod tests {
         let out = create_package_pure(input(json!({
             "name": "Legado %",
             "discount_type": "percentage",
-            "discount_value": 25.0
+            "discount_value": 25.0,
+            "items": [{ "service_id": "s1" }]
         })))
         .unwrap();
         let p = header_params(&out);
@@ -770,10 +788,12 @@ mod tests {
     #[test]
     fn legacy_discount_value_fixed_euros_to_cents() {
         // Caller antiguo: discount_value = 12.50 EUROS con tipo fixed → 1250 céntimos.
+        // (Línea incluida desde services#42: un bono sin líneas ya no es un payload legal.)
         let out = create_package_pure(input(json!({
             "name": "Legado fijo",
             "discount_type": "fixed",
-            "discount_value": 12.50
+            "discount_value": 12.50,
+            "items": [{ "service_id": "s1" }]
         })))
         .unwrap();
         let p = header_params(&out);
@@ -854,6 +874,23 @@ mod tests {
         );
     }
 
+    /// services#42 — el bono VACÍO no es un payload legal. La schema es la puerta principal
+    /// (422 antes de tocar la BD); este guard es la defensa en profundidad de las puertas que
+    /// no pasan por ella. Mismo código tipado que `invalid_quantity`: traducible en el catálogo.
+    #[test]
+    fn an_empty_package_is_refused_with_a_typed_code() {
+        for payload in [
+            json!({ "name": "Bono vacío", "items": [] }),
+            json!({ "name": "Bono sin campo items" }),
+        ] {
+            let err = create_package_pure(input(payload)).unwrap_err();
+            assert!(
+                err.contains("services.package_needs_lines"),
+                "the empty package must be refused with a typed code, got: {err}"
+            );
+        }
+    }
+
     /// Las líneas del catálogo del hub sí pasan, y siguen componiendo su operación.
     #[test]
     fn lines_of_the_hub_catalogue_are_accepted() {
@@ -879,7 +916,8 @@ mod tests {
     }
 
     /// Fail-CLOSED: si el catálogo no llegó, las líneas no se pueden verificar y el bono no se
-    /// crea a medias. Sin líneas no hay nada que verificar, así que ese camino sigue abierto.
+    /// crea a medias. Y desde services#42 tampoco existe el bono SIN líneas: un paquete vacío
+    /// se rechaza ANTES de mirar el catálogo (no hay nada que verificar porque no hay producto).
     #[test]
     fn without_the_catalogue_lines_cannot_be_verified_and_the_command_is_refused() {
         assert!(create_package_pure(input_without_catalogue(json!({
@@ -887,9 +925,11 @@ mod tests {
             "items": [{ "service_id": "s1" }]
         })))
         .is_err());
+        let err = create_package_pure(input_without_catalogue(json!({ "name": "Bono sin líneas" })))
+            .unwrap_err();
         assert!(
-            create_package_pure(input_without_catalogue(json!({ "name": "Bono sin líneas" })))
-                .is_ok()
+            err.contains("services.package_needs_lines"),
+            "the empty package is refused with its typed code, got: {err}"
         );
     }
 
@@ -920,7 +960,8 @@ mod tests {
         let out = create_package_pure(input(json!({
             "name": "Bono",
             "discount_type": "percentage",
-            "discount_value": 12.125
+            "discount_value": 12.125,
+            "items": [{ "service_id": "s1" }]
         })))
         .unwrap();
         assert_eq!(header_params(&out)["discount_percent_bp"], json!(1213));

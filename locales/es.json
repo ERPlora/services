@@ -120,6 +120,7 @@
     "services.category_update_rejected": "No se ha podido actualizar la categoría: no existe en este negocio, o la categoría padre elegida no existe (o es ella misma).",
     "services.category_not_found": "Esa categoría no existe en este negocio.",
     "services.package_not_found": "Ese paquete no existe en este negocio.",
+    "services.package_needs_lines": "Un paquete necesita al menos una línea de servicio: un paquete sin líneas no se puede vender ni canjear.",
     "services.package_no_uses_left": "Este bono ya no tiene sesiones disponibles.",
     "services.package_expired": "Este bono ha caducado.",
     "services.package_not_redeemable": "Este bono no se puede canjear ahora mismo."
