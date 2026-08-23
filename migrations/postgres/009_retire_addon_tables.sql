@@ -13,7 +13,7 @@ DROP TABLE IF EXISTS services_addon;
 -- statement it precedes. A header comment above the first `DROP` therefore makes the translation
 -- miss in silence and the hub runs a real, irreversible `DROP TABLE`. Measured by compiling that
 -- very function and feeding it this file both ways. `tests/retire_addon.postgres.test.py` fails if
--- anyone tidies these lines back to the top; the hub-side fix is ERPlora/hub#1104.
+-- anyone tidies these lines back to the top; the hub-side fix is ERPlora/hub#1137.
 --
 -- WHAT IS BEING RETIRED, AND WHY IT IS SAFE. `services_addon` and `services_addon_services` were
 -- created by `001_init.sql` and never got a door: no command writes them, no query reads them, no
