@@ -311,7 +311,12 @@ def scenario_other_hub_does_not_count() -> None:
 def setup_database() -> None:
     psql(["-c", f'DROP DATABASE IF EXISTS "{DB}"'])
     psql(["-c", f'CREATE DATABASE "{DB}"'])
-    for rel in MANIFEST["migrations"]["postgres"]:
+    # A `MigrationEntry` is a bare path or `{file, kind, since}` (hub#542). This file predates
+    # `pg_harness` and keeps its own copy of the plumbing, so it reads both shapes itself. It only
+    # needs the SCHEMA, so applying the SQL as written is enough — proving that a `contract` is
+    # applied as a rename rather than a drop is `tests/retire_addon.postgres.test.py`.
+    for entry in MANIFEST["migrations"]["postgres"]:
+        rel = entry if isinstance(entry, str) else entry["file"]
         psql([], db=DB, stdin=(MODULE_DIR / rel).read_text())
 
 

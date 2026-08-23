@@ -48,6 +48,9 @@ MANIFEST_PATH = MODULE_DIR / "module.json"
 # Dialects the runtime knows about (`struct Migrations`).
 SQL_DIALECTS = ("sqlite", "postgres")
 
+# `migration_guard::Kind` — closed vocabulary. `expand` is what a bare path means.
+MIGRATION_KINDS = ("expand", "backfill", "contract")
+
 # `enum CatchUp` in hub/crates/runtime/src/manifest.rs. A boolean is not a member of this enum
 # (tables#28). This module declares no scheduled task today; the guard costs nothing and the day
 # it declares one, the trap is already covered.
@@ -167,6 +170,37 @@ def string_array(path: str, value) -> None:
         expect(f"{path}[{i}]", item, str)
 
 
+def migration_array(path: str, value) -> None:
+    """`Vec<MigrationEntry>` (hub#542): each item is a bare path OR `{file, kind, since}`.
+
+    The bare path is the whole published catalogue and reads `expand`. The object form is the ONLY
+    way to declare a `contract`, and therefore the only legitimate way for a module to write a
+    `DROP` — the runtime translates it into `RENAME … TO _deprecated_…` instead of destroying
+    anything. Reading this block as a plain string array (which it was until services#67) rejects a
+    correct manifest and, worse, quietly skips the object entries in Layer 4, so a `contract`
+    pointing at a file that is not in the package would ship green.
+    """
+    if not expect(path, value, list):
+        return
+    for i, item in enumerate(value):
+        if isinstance(item, str):
+            continue
+        if not expect(f"{path}[{i}]", item, dict):
+            continue
+        field(f"{path}[{i}]", item, "file", str, required=True)
+        field(f"{path}[{i}]", item, "kind", str)
+        field(f"{path}[{i}]", item, "since", str)
+        kind = item.get("kind", "expand")
+        if kind not in MIGRATION_KINDS:
+            failures.append(
+                f"{path}[{i}].kind: {kind!r} is not one of {MIGRATION_KINDS} "
+                f"(closed vocabulary of `migration_guard::Kind`)"
+            )
+        unknown = set(item) - {"file", "kind", "since"}
+        if unknown:
+            failures.append(f"{path}[{i}]: unknown key(s) {sorted(unknown)}")
+
+
 # ── Layer 1: the type contract, mirroring `struct Manifest` ──────────────────────────────
 
 
@@ -258,7 +292,10 @@ def check_sql_blocks(m: dict) -> None:
             if dialect not in SQL_DIALECTS:
                 failures.append(f"{block}.{dialect}: unknown SQL dialect {dialect!r}")
                 continue
-            string_array(f"{block}.{dialect}", files)
+            if block == "migrations":
+                migration_array(f"{block}.{dialect}", files)
+            else:
+                string_array(f"{block}.{dialect}", files)
 
     queries = m.get("queries", {})
     if expect("queries", queries, dict):
@@ -560,6 +597,17 @@ def check_against_canonical_schema(m: dict) -> None:
             f"Update the hub checkout, or point ERPLORA_MODULE_SCHEMA at a current copy."
         )
         return
+    # Same rule, second contract: a checkout parked before hub#1093 reads `migrations.postgres` as
+    # an array of plain strings, so it rejects the `{file, kind, since}` entry that is the ONLY way
+    # to declare a `contract` — the manifest is right and the schema is old. The staleness gate has
+    # to name every contract it can be stale about, or a correct module turns red on a checkout
+    # someone left on a branch (services#67).
+    if "migrationEntry" not in schema.get("$defs", {}):
+        notes.append(
+            f"SKIPPED canonical schema: {path} predates hub#1093 (no `$defs.migrationEntry`, so no "
+            f"`kind: contract`). Update the hub checkout, or point ERPLORA_MODULE_SCHEMA at a current copy."
+        )
+        return
 
     validator = jsonschema.Draft202012Validator(schema)
     notes.append(f"canonical schema applied: {path}")
@@ -576,10 +624,16 @@ def check_declared_files_exist(m: dict) -> None:
 
     for block in ("migrations", "seed"):
         for dialect, files in (m.get(block) or {}).items():
-            if isinstance(files, list):
-                declared += [
-                    (f"{block}.{dialect}", f) for f in files if isinstance(f, str)
-                ]
+            if not isinstance(files, list):
+                continue
+            for entry in files:
+                # A `MigrationEntry` is a bare path or `{file, kind, since}` — and the object form
+                # used to fall through this filter, so a `contract` naming a file that is not in the
+                # package shipped green.
+                if isinstance(entry, str):
+                    declared.append((f"{block}.{dialect}", entry))
+                elif isinstance(entry, dict) and isinstance(entry.get("file"), str):
+                    declared.append((f"{block}.{dialect}.file", entry["file"]))
 
     for name, q in (m.get("queries") or {}).items():
         for key in ("sql", "schema"):
