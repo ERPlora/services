@@ -121,7 +121,12 @@
       "migrations/postgres/005_tax_category_key.sql",
       "migrations/postgres/006_quantity_fixed_point.sql",
       "migrations/postgres/007_domain_checks.sql",
-      "migrations/postgres/008_discount_basis_points.sql"
+      "migrations/postgres/008_discount_basis_points.sql",
+      {
+        "file": "migrations/postgres/009_retire_addon_tables.sql",
+        "kind": "contract",
+        "since": "1.0.0"
+      }
     ]
   },
   "queries": {
