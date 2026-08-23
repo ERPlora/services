@@ -5,7 +5,8 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "name"
+    "name",
+    "items"
   ],
   "properties": {
     "name": {
@@ -109,7 +110,7 @@
     "items": {
       "type": "array",
       "maxItems": 255,
-      "description": "Lines of the package. Each names a live service of THIS hub — the handler checks it against the hub's catalogue (`reads`, ADR-0069) and REFUSES the command if a line names something else, instead of letting the insert match no row and lose the line in silence (services#42). Quantity is fixed-point 10⁶ (ADR-0147: 2000000 = 2 sessions). Duplicated service_ids collapse into one line (the `uq_services_packageitem_pkg_svc` index says so). `maxItems` is the host's id batch: 256 ids, one of them the package header.",
+      "description": "Lines of the package — at least ONE (services#42): a package with no lines describes nothing sellable or redeemable, so `items` is required and cannot be empty (the runtime refuses the payload with 422 before touching the DB, and the handler fails closed too). Each line names a live service of THIS hub — the handler checks it against the hub's catalogue (`reads`, ADR-0069) and REFUSES the command if a line names something else, instead of letting the insert match no row and lose the line in silence (services#42). Quantity is fixed-point 10⁶ (ADR-0147: 2000000 = 2 sessions). Duplicated service_ids collapse into one line (the `uq_services_packageitem_pkg_svc` index says so). `maxItems` is the host's id batch: 256 ids, one of them the package header.",
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -131,7 +132,8 @@
             "description": "Sessions of this service the voucher grants, as FIXED-POINT on a scale of 10⁶ (ADR-0147): 1 session = 1000000, 5 sessions = 5000000. Omitted = 1 session. The `minimum` is the whole scale, not 1, on purpose (services#51): a caller that writes the session COUNT (`quantity: 5`) is sending five millionths of a session, and the handler used to raise it to 1 with a `.max()` and answer `ok` — a five-session voucher sold as one. The value is ambiguous, so it is refused here, in the validation layer, instead of being guessed."
           }
         }
-      }
+      },
+      "minItems": 1
     }
   }
 }

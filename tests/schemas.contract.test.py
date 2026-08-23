@@ -277,7 +277,11 @@ accepts(
     dict(PKG_MIN, discount_type="fixed", discount_amount_cents=500, fixed_price=4000),
     "a fixed-amount package",
 )
-accepts(
+# services#42 — the legacy empty-items shape is RETIRED. It only existed because the hub e2e
+# sent it (the single known caller); that fixture now creates a real line (hub#1036), so the door
+# closes: a package with no lines describes nothing sellable or redeemable. `discount_value`
+# (legacy polymorphic) stays accepted — only the EMPTY package stops being legal.
+refuses(
     PC,
     {
         "name": "Legacy",
@@ -287,7 +291,24 @@ accepts(
         "validity_days": None,
         "items": [],
     },
-    "the legacy shape the hub e2e still sends (discount_value, empty items)",
+    "the empty-items shape (services#42): a package with no lines cannot be redeemed",
+)
+refuses(
+    PC,
+    { "name": "No lines at all", "discount_type": "percentage", "discount_percent_bp": 1000 },
+    "items omitted entirely (services#42): the lines are the product",
+)
+accepts(
+    PC,
+    {
+        "name": "Legacy",
+        "discount_type": "percentage",
+        "discount_value": 10.0,
+        "max_uses": None,
+        "validity_days": None,
+        "items": [{"service_id": "s1"}],
+    },
+    "the legacy discount_value shape WITH a line stays legal",
 )
 refuses(PC, dict(PKG_MIN, discount_type="coupon"), "discount_type outside the enum")
 accepts(PC, dict(PKG_MIN, discount_percent_bp=1050), "10,50 % — the half point survives as 1050 bp")
