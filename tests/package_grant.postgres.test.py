@@ -57,6 +57,9 @@ failures: list[str] = []
 FORTY_DAYS_AGO = "2026-07-09T10:00:00Z"  # with validity_days = 30 → expired, uses or not
 TEN_DAYS_AGO = "2026-08-08T10:00:00Z"  # with validity_days = 30 → still valid
 LONG_AGO = "2026-06-01T10:00:00Z"
+# The row was WRITTEN a week after the session was redeemed (a sync, an import, a backdated fix).
+# Keeping the two apart is what makes the backfill's anchor testable at all.
+RECORDED_LATER = "2026-06-08T10:00:00Z"
 
 
 def check(label: str, expected, actual) -> None:
@@ -432,23 +435,41 @@ def the_neighbour_is_invisible(db: ScratchDb) -> None:
 # ── 7 · raw SQL cannot write a redemption without a grant ────────────────────
 
 
-def raw_sql_cannot_skip_the_grant(db: ScratchDb) -> None:
+def raw_sql_cannot_skip_the_grant(db: ScratchDb, pkg: str) -> None:
+    """The door a migration, a support script or a future command comes through.
+
+    🔴 The package and the customer are REAL and the ordinal is free, so the ONLY thing wrong with
+    this row is that no purchase stands behind it — and the positive control below proves it, by
+    writing the SAME row with a grant and watching it land. Naming a made-up package here would get
+    the row refused by the foreign key to `services_package`, and the check would pass while proving
+    nothing: measured, with a fake package id, deleting `ck_services_redemption_grant` from the
+    migration left this battery GREEN.
+    """
     print("\n7 · the guard is in the SCHEMA: raw SQL cannot write a session with no grant")
 
-    def raw() -> None:
+    def raw(grant_id: str | None) -> None:
+        column = ", grant_id" if grant_id else ""
+        value = f", '{grant_id}'" if grant_id else ""
         db.psql(
             [
                 "-c",
                 "INSERT INTO services_package_redemption "
-                "(id, hub_id, package_id, customer_id, redeemed_at, status, use_index, is_deleted, "
-                " created_by, updated_by, created_at, updated_at) VALUES "
-                f"('{uuid.uuid4()}', '{HUB}', 'p-x', 'cus-x', '{NOW}', 'consumed', 99, 0, "
-                f" '{USER}', '{USER}', '{NOW}', '{NOW}')",
+                f"(id, hub_id, package_id, customer_id, redeemed_at, status, use_index, is_deleted, "
+                f" created_by, updated_by, created_at, updated_at{column}) VALUES "
+                f"('{uuid.uuid4()}', '{HUB}', '{pkg}', 'cus-raw', '{NOW}', 'consumed', 99, 0, "
+                f" '{USER}', '{USER}', '{NOW}', '{NOW}'{value})",
             ],
             db=db.name,
         )
 
-    refused("a redemption inserted with no grant_id", raw)
+    refused("a redemption inserted with no grant_id", lambda: raw(None))
+    refused("…and one naming a grant that does not exist", lambda: raw(str(uuid.uuid4())))
+    raw(grant(db, pkg, "cus-raw"))
+    check(
+        "…while the same row backed by a real purchase gets in",
+        1,
+        int(db.scalar("SELECT count(*) FROM services_package_redemption WHERE customer_id = 'cus-raw'")),
+    )
 
 
 # ── 8 · the sale mints the grant, and only once ──────────────────────────────
@@ -528,6 +549,11 @@ def the_backfill_keeps_every_balance(db_name_prefix: str) -> None:
         pkg = seed_package(db, HUB, "Five haircuts", 5, 30)
         seed_item(db, HUB, pkg, svc)
         # Two customers with history written by the OLD model: no grant existed.
+        # 🔴 `created_at` is deliberately a DIFFERENT instant from `redeemed_at`. They are equal in
+        # real life often enough that a backfill anchored on the wrong one would look right: with
+        # both set to the same value, anchoring the legacy grant on `created_at` instead of on the
+        # first USE passed this battery. The clock those rows were already being judged by is the
+        # first use, so that is the one that has to survive the migration.
         for i in range(3):
             db.psql(
                 [
@@ -536,7 +562,7 @@ def the_backfill_keeps_every_balance(db_name_prefix: str) -> None:
                     "(id, hub_id, package_id, customer_id, redeemed_at, status, use_index, "
                     " is_deleted, created_by, updated_by, created_at, updated_at) VALUES "
                     f"('{uuid.uuid4()}', '{HUB}', '{pkg}', 'cus-old', '{LONG_AGO}', 'consumed', "
-                    f" {i + 1}, 0, '{USER}', '{USER}', '{LONG_AGO}', '{LONG_AGO}')",
+                    f" {i + 1}, 0, '{USER}', '{USER}', '{RECORDED_LATER}', '{RECORDED_LATER}')",
                 ],
                 db=db.name,
             )
@@ -593,7 +619,7 @@ def main() -> int:
         expiry_runs_from_the_purchase(db, svc, pkg)
         the_grant_is_a_snapshot(db, svc)
         the_neighbour_is_invisible(db)
-        raw_sql_cannot_skip_the_grant(db)
+        raw_sql_cannot_skip_the_grant(db, pkg)
         the_sale_mints_the_grant_once(db, svc, pkg)
     finally:
         db.drop()
