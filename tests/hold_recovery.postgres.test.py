@@ -205,6 +205,15 @@ def options(
     )
 
 
+def balance(db: ScratchDb, customer: str, hub: str = HUB, now: str = NOW):
+    return rows_of(
+        db,
+        query_sql(
+            "services.packages.balance", {"customer_id": customer, "now": now}, hub=hub
+        ),
+    )
+
+
 def hold(
     db: ScratchDb,
     grant_id: str,
@@ -622,6 +631,13 @@ def main() -> int:
                 if r["grant_id"] == mixed_grant
             ],
         )
+        # The customer's own balance screen is the THIRD reader of that number, and a salon that
+        # tells the customer «1 left» while the till charges against 2 has a complaint on its hands.
+        # It carries the same predicate, so it has to be held to it here too — a mutant that removed
+        # it from `balance` alone survived everything else.
+        mine_balance = [r for r in balance(db, "cus-7", now=EVEN_LATER) if r["grant_id"] == mixed_grant]
+        check("the balance screen counts one use, not two", [1], [r["used"] for r in mine_balance])
+        check("so it says two are left, like the other two readers", [2], [r["remaining"] for r in mine_balance])
         check(
             "…and the stale one is STILL live: no sweep has run, this is the clock",
             1,
