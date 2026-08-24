@@ -33,7 +33,9 @@
     "services.delete_package",
     "services.redeem_package",
     "services.view_package_balance",
-    "services.manage_settings"
+    "services.manage_settings",
+    "services.hold_package",
+    "services.settle_package"
   ],
   "role_permissions": {
     "admin": [
@@ -44,7 +46,9 @@
       "services.view_category",
       "services.view_package",
       "services.view_package_balance",
-      "services.redeem_package"
+      "services.redeem_package",
+      "services.hold_package",
+      "services.settle_package"
     ],
     "manager": [
       "services.view_service",
@@ -57,7 +61,9 @@
       "services.add_package",
       "services.change_package",
       "services.redeem_package",
-      "services.view_package_balance"
+      "services.view_package_balance",
+      "services.hold_package",
+      "services.settle_package"
     ],
     "employee": [
       "services.view_service",
@@ -65,7 +71,9 @@
       "services.view_category",
       "services.view_package",
       "services.redeem_package",
-      "services.view_package_balance"
+      "services.view_package_balance",
+      "services.hold_package",
+      "services.settle_package"
     ]
   },
   "navigation": [
@@ -131,7 +139,8 @@
         "file": "migrations/postgres/010_retire_variant_table.sql",
         "kind": "contract",
         "since": "1.0.0"
-      }
+      },
+      "migrations/postgres/011_voucher_tender.sql"
     ]
   },
   "queries": {
@@ -390,6 +399,15 @@
       "ai": {
         "description": "Retrieves the general settings of the services module"
       }
+    },
+    "services.packages.tender_options": {
+      "permission": "services.view_package_balance",
+      "sql": "queries/package_tender_options.sql",
+      "schema": "schemas/package_tender_options.json",
+      "ai": {
+        "description": "Lists the vouchers (bonos) this customer can spend on a given service line, already ordered by the tie-break rule, with the preview the till shows before anything is reserved: sessions left now, sessions left AFTER redeeming, the expiry date, how many valid vouchers there were, which one will be spent (is_default) and WHY (default_reason). A voucher covers the line whole or not at all."
+      },
+      "expose_api": true
     }
   },
   "commands": {
@@ -667,6 +685,96 @@
       "ai": {
         "description": "Updates the general settings of the services module"
       }
+    },
+    "services.packages.hold_for_line": {
+      "permission": "services.hold_package",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "hold_package_for_line"
+      },
+      "reads": [
+        {
+          "query": "services.packages.tender_options",
+          "params": {
+            "customer_id": "payload.customer_id",
+            "service_id": "payload.service_id"
+          },
+          "required": true
+        },
+        {
+          "query": "services.packages.redeem_check",
+          "params": {
+            "package_id": "payload.package_id",
+            "customer_id": "payload.customer_id"
+          },
+          "required": true
+        }
+      ],
+      "schema": "schemas/package_hold_for_line.json",
+      "emit": [
+        "services.package.held"
+      ],
+      "ai": {
+        "description": "Reserves one session of a customer's voucher to cover one line of the checkout. The session is spent immediately but the redemption stays reversible with services.packages.release_hold until the sale is settled. Refuses with a domain code (services.package_not_found, services.package_no_uses_left, services.package_expired or services.package_does_not_cover_service) instead of the raw gate error. It issues NO fiscal document: a voucher of N sessions is univalent and its record came out when the voucher was SOLD."
+      },
+      "expose_api": true
+    },
+    "services.packages.release_hold": {
+      "permission": "services.hold_package",
+      "transaction": true,
+      "sql": [
+        "commands/hold_release.sql"
+      ],
+      "schema": "schemas/package_release_hold.json",
+      "expect_rows": {
+        "op": "min",
+        "n": 1,
+        "error": "services.hold_not_releasable",
+        "message": "That voucher session can no longer be given back: the sale was already paid. Refunding it is a return, and it goes through its own door."
+      },
+      "emit": [
+        "services.package.hold_released"
+      ],
+      "ai": {
+        "description": "Undoes a reserved voucher session while the sale is NOT paid, giving the session back to the voucher. Once the sale is settled it refuses with services.hold_not_releasable."
+      },
+      "expose_api": true
+    },
+    "services.packages.settle_hold": {
+      "permission": "services.settle_package",
+      "transaction": true,
+      "sql": [
+        "commands/hold_settle.sql"
+      ],
+      "schema": "schemas/package_settle_hold.json",
+      "expect_rows": {
+        "op": "min",
+        "n": 1,
+        "error": "services.hold_not_settleable",
+        "message": "That voucher session could not be settled: it does not exist here, it was already given back, or it was settled before."
+      },
+      "emit": [
+        "services.package.settled"
+      ],
+      "ai": {
+        "description": "Marks a reserved voucher session as final because the sale was paid. From here it cannot be undone. It issues no fiscal document — the record came out when the voucher was sold (art. 30 ter.1 of Directive 2006/112/CE)."
+      },
+      "expose_api": true
+    },
+    "services._hold": {
+      "permission": "services.hold_package",
+      "sql": [
+        "commands/_hold_insert.sql",
+        "commands/_redeem_assert.sql",
+        "commands/_gate_clear.sql"
+      ]
+    },
+    "services._settle_holds_for_sale": {
+      "permission": "services.settle_package",
+      "sql": [
+        "commands/settle_holds_for_sale.sql"
+      ]
     }
   },
   "records": {
@@ -696,11 +804,18 @@
     }
   },
   "events": {
-    "listen": {},
+    "listen": {
+      "sale.completed": {
+        "command": "services._settle_holds_for_sale"
+      }
+    },
     "emits": [
       "services.package.created",
       "services.package.deleted",
+      "services.package.held",
+      "services.package.hold_released",
       "services.package.redeemed",
+      "services.package.settled",
       "services.package.updated",
       "services.service.created",
       "services.service.deleted",
@@ -709,5 +824,13 @@
   },
   "ui": {
     "entry": "dist/services.esm.js"
-  }
+  },
+  "provides_slots": [
+    {
+      "slot": "sales.pos.tender",
+      "component": "erp-services-voucher-tender",
+      "permission": "services.view_package_balance",
+      "priority": 100
+    }
+  ]
 }

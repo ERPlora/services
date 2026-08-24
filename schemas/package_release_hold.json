@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "services.packages.release_hold params",
+  "description": "Deshace una reserva de sesión mientras la venta NO esté cobrada, y devuelve la sesión al bono (ADR-0386, services#70). Si la reserva ya está liquidada —el cliente se llevó el servicio— se rechaza con services.hold_not_releasable: devolver esa sesión es una DEVOLUCIÓN, y va por su propia puerta auditada (services#71).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["redemption_id"],
+  "properties": {
+    "redemption_id": { "type": "string", "minLength": 1, "description": "Id del canje reservado que se quiere deshacer (el que devolvió services.packages.hold_for_line)." }
+  }
+}

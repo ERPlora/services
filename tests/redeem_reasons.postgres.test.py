@@ -206,10 +206,15 @@ def main() -> int:
             [],
             db=db.name,
             stdin=(
+                # `use_index` is not optional since migration 011: the ordinal IS the
+                # anti-double-spend guard, and `ck_services_redemption_use_index` refuses a row
+                # without one — including this one, written by raw SQL. That refusal is the guard
+                # working, so the seed supplies the ordinal the command would have computed.
                 "INSERT INTO services_package_redemption "
-                "(id, hub_id, package_id, customer_id, note, redeemed_at, is_deleted) VALUES "
+                "(id, hub_id, package_id, customer_id, note, redeemed_at, is_deleted, "
+                "status, use_index) VALUES "
                 f"('{uuid.uuid4()}', '{HUB}', '{expiring}', 'cus-1', 'first use', "
-                f"'{FIRST_USE_LONG_AGO}', 0);"
+                f"'{FIRST_USE_LONG_AGO}', 0, 'consumed', 1);"
             ),
         )
         check_reason(db, "expired", "expired", expiring)

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "services.packages.hold_for_line params",
+  "description": "Reserva UNA sesión de un bono para cubrir UNA línea del cobro (ADR-0386, services#70). La sesión se descuenta en el momento —una sesión reservada es una sesión gastada hasta que se libere—, pero el canje sigue siendo reversible con services.packages.release_hold mientras la venta NO esté cobrada. El runtime inyecta hub_id y :now; el id del canje lo toma el handler de context.new_ids y se devuelve al caller. Se RECHAZA con un código de dominio (services.package_not_found, services.package_no_uses_left, services.package_expired o services.package_does_not_cover_service) y revierte entero. 🔴 El canje NO emite documento fiscal: un bono de N sesiones es univalente y el registro salió al VENDERLO (art. 30 ter.1 de la Directiva 2006/112/CE).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["package_id", "customer_id", "service_id", "checkout_ref", "line_ref"],
+  "properties": {
+    "package_id": { "type": "string", "minLength": 1, "description": "Id del bono que se va a gastar. El handler lo verifica contra services.packages.tender_options: si no está entre los elegibles de ESTE servicio, se rechaza." },
+    "customer_id": { "type": "string", "minLength": 1, "description": "Id del cliente dueño de las sesiones." },
+    "service_id": { "type": "string", "minLength": 1, "description": "Id del servicio de la línea que el bono cubre. El bono cubre la línea entera o no la cubre." },
+    "checkout_ref": { "type": "string", "minLength": 1, "maxLength": 128, "description": "Referencia del cobro abierto — el order_id cuando la caja trabaja un pedido, que es lo que permite que sale.completed liquide las reservas por evento. Opaca para services: se guarda y se compara, no se interpreta." },
+    "line_ref": { "type": "string", "minLength": 1, "maxLength": 128, "description": "Referencia de la línea del carrito dentro de ese cobro. Una línea la cubre UN canje y no más (índice único): un doble toque en «pagar con bono» no gasta dos sesiones." },
+    "note": { "type": ["string", "null"], "maxLength": 500, "description": "Nota libre del canje (opcional)." }
+  }
+}

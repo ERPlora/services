@@ -294,3 +294,81 @@ class ScratchDb:
             db=self.name,
         )
         return json.loads(out.strip() or "[]")
+
+
+# ── `erp_*` bridges (ADR-0007) ───────────────────────────────────────────────
+#
+# The hub's db layer lowers the portable `erp_*` calls to native Postgres before PREPARE. This
+# miniature does the same for the two this module uses. It lived in
+# `tests/redeem_reasons.postgres.test.py` first; it is here because services#70 needs it too, and
+# a second pasted copy is how two mirrors drift apart.
+
+BRIDGES = ("erp_dt", "erp_dateadd")
+
+
+def lower_bridge(name: str, args: list[str]) -> str | None:
+    if name == "erp_dt" and len(args) == 1:
+        return f"(({args[0]})::timestamptz)"
+    if name == "erp_dateadd" and len(args) == 3:
+        return f"(({args[0]})::timestamptz + (({args[1]}) || ' ' || {args[2]})::interval)"
+    return None
+
+
+def lower_bridges(sql: str) -> str:
+    """Rewrite every `erp_*(…)` call to its native Postgres expression (args may nest)."""
+    if not any(f in sql for f in BRIDGES):
+        return sql
+    call = re.compile(r"\b(erp_dt|erp_dateadd)\s*\(", re.IGNORECASE)
+    while True:
+        m = call.search(sql)
+        if not m:
+            return sql
+        depth, i = 1, m.end()
+        while i < len(sql) and depth:
+            if sql[i] == "(":
+                depth += 1
+            elif sql[i] == ")":
+                depth -= 1
+            i += 1
+        inner, args, depth, start = sql[m.end() : i - 1], [], 0, 0
+        for j, c in enumerate(inner):
+            if c == "(":
+                depth += 1
+            elif c == ")":
+                depth -= 1
+            elif c == "," and depth == 0:
+                args.append(inner[start:j])
+                start = j + 1
+        args.append(inner[start:])
+        native = lower_bridge(m.group(1).lower(), [a.strip() for a in args])
+        if native is None:
+            raise RuntimeError(f"cannot lower the bridge call {sql[m.start():i]!r}")
+        sql = sql[: m.start()] + native + sql[i:]
+
+
+def script_for(command: str, params: dict, hub: str = HUB) -> str:
+    """The exact script the dispatcher runs for a manifest command: BEGIN, its `sql[]`, COMMIT.
+
+    Same as `ScratchDb.run_command` but it RETURNS the text instead of running it, and it lowers
+    the `erp_*` bridges — which is what a command carrying date arithmetic needs.
+    """
+    p = dict(params)
+    p.setdefault("hub_id", hub)
+    p.setdefault("current_user_id", USER)
+    p.setdefault("now", NOW)
+    out = ["BEGIN;"]
+    for rel in MANIFEST["commands"][command]["sql"]:
+        stmt = dict(p)
+        stmt.setdefault("new_id", str(uuid.uuid4()))
+        out.append(lower_bridges(bind((MODULE_DIR / rel).read_text(), stmt)))
+    out.append("COMMIT;")
+    return "\n".join(out)
+
+
+def query_sql(name: str, params: dict, hub: str = HUB) -> str:
+    """A manifest query's base SELECT, bound and lowered, ready to wrap."""
+    p = dict(params)
+    p.setdefault("hub_id", hub)
+    p.setdefault("now", NOW)
+    sql = (MODULE_DIR / MANIFEST["queries"][name]["sql"]).read_text().rstrip().rstrip(";")
+    return lower_bridges(bind(sql, p))
