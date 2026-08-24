@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "services.packages.refund_check params",
+  "description": "Pre-check read-only de una devolución de sesión: ¿se puede devolver :redemption_id al bono? Devuelve refundable (0/1), reason de negocio (redemption_not_found | already_refunded | not_settled), already_refunded, las sesiones antes/después y voucher_expired — que AVISA de que el bono está caducado, pero NUNCA es un motivo de rechazo. No muta; la autoridad transaccional sigue siendo services.packages.refund_redemption.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["redemption_id"],
+  "properties": {
+    "redemption_id": { "type": "string", "minLength": 1, "description": "Id del canje que se quiere devolver." }
+  }
+}

@@ -125,6 +125,18 @@ carries a code the caller can translate: `services.package_not_found`,
 `services.package_no_uses_left` or `services.package_expired` — never the database's internals.
 Requires `services.redeem_package` — an employee has this.
 
+### The voucher's movements (`erp-services-packages` → «Movements»)
+
+The row action next to «edit» on the packages screen, gated by `services.view_package_balance`. It
+opens the voucher's ledger — every session it has moved: **reserved**, **delivered**, **released**
+and **given back** — with the customer, the sale and, for a return, who returned it, when and
+against which document. A session that came back into an already expired voucher says so, because a
+session that is on the books but cannot be spent is exactly the thing an operator must not discover
+later.
+
+It reads `services.packages.redemption_history`, which includes the soft-deleted rows on purpose:
+that is where releases and refunds live. Loading, empty and error are painted, not assumed.
+
 ### Pay a line with a voucher (`erp-services-voucher-tender`)
 
 The component the till mounts on the checkout line (slot `sales.pos.tender`). It is the only screen

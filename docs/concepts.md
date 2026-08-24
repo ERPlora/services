@@ -78,6 +78,24 @@ After settling, it refuses: `services.hold_not_releasable`. Giving that session 
 not an undo, and it goes through its own audited door. Release and settle are the same conditional
 UPDATE over the same row, so they can never both win.
 
+## …and a PAID session can be given back when the sale is returned
+
+`services.packages.refund_redemption` is that door. It soft-deletes the redemption — which is what
+gives the session back, because every count here reads live rows only — and stamps the row with who
+returned it, when, against which return document (`refund_ref`) and whether the voucher was already
+expired at that moment. The row is the audit trail; `services.packages.redemption_history` is where
+it is read, soft-deleted rows included.
+
+`refund_ref` is also the idempotence key: the same document twice is a no-op that still reports
+success, a different document over the same session is refused, and the schema refuses outright to
+hold a refund stamp on a row that is live, unpaid, or names neither an author nor a document.
+
+A session spent **at the chair** (`services.packages.redeem`) is not returnable here: it has no sale
+behind it, so `refund_check` answers `not_settled`. Undoing that is a correction, not a refund.
+
+**Expiry never refuses a return.** It is reported (`voucher_expired`) and recorded, never enforced —
+a return undoes a past act, and the act was valid when it happened. Nothing extends the voucher.
+
 ## A refused redemption rolls everything back
 
 Redeeming checks three things and refuses if any fails:

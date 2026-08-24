@@ -24,7 +24,13 @@ MUST_NOT = [
     "services.add_service",
     "services.change_service",
     "services.delete_service",
-    "services.manage_settings"
+    "services.manage_settings",
+    # services#71 — giving a PAID session back to the voucher is the voucher's half of a return,
+    # and returns are a manager decision everywhere the market has one (`sales.void_sale` is
+    # manager+admin here, and this is the same authority through another door). The cashier holds
+    # and settles; a refund carries a document and an author. Pinned here so it cannot be widened
+    # by accident.
+    "services.refund_package"
 ]
 
 errors = []

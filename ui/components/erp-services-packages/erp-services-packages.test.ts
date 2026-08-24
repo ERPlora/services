@@ -68,12 +68,14 @@ const action = (el: Mounted, actionId: string, row = ROWS[0]) =>
   el.onRowAction(new CustomEvent('rowAction', { detail: { actionId, row } }));
 
 describe('the CRUD lives inside the data-table, gated by permission', () => {
-  it('addable + form in the `create` slot + actions edit/delete', async () => {
+  it('addable + form in the `create` slot + actions edit/movements/delete', async () => {
     const el = await mount();
     const table = el.shadowRoot.querySelector('ok-data-table') as (HTMLElement & { addable: boolean }) | null;
     expect(table?.addable).toBe(true);
     expect(el.shadowRoot.querySelector('form[slot="create"]')?.closest('ok-data-table')).toBeTruthy();
-    expect(el.actions.map((a) => a.id)).toEqual(['edit', 'delete']);
+    // `movements` joined the row in services#71: the voucher's ledger (held, consumed, released,
+    // refunded) is one click from its row, gated by `services.view_package_balance`.
+    expect(el.actions.map((a) => a.id)).toEqual(['edit', 'movements', 'delete']);
   });
   it('a viewer sees no «+» and no actions', async () => {
     sdk.hasPermission = (p: string) => p === 'services.view_package';

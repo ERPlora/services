@@ -68,6 +68,15 @@ pub fn hold_package_for_line(input: Json<erplora_guest_sdk::Input>) -> FnResult<
     }
 }
 
+#[cfg(feature = "guest")]
+#[plugin_fn]
+pub fn refund_redemption(input: Json<erplora_guest_sdk::Input>) -> FnResult<Json<Output>> {
+    match refund_redemption_pure(input.into_inner().into_value()) {
+        Ok(out) => Ok(Json(out)),
+        Err(msg) => Err(WithReturnCode::new(Error::msg(msg), 1)),
+    }
+}
+
 // ── helpers de tipos (mismo criterio que el handler de sales) ───────────────
 
 // El DINERO lo redondea `erplora_guest_sdk::money` (ADR-0123): unidad mínima, HALF_UP, uno solo
@@ -767,6 +776,159 @@ pub fn hold_package_for_line_pure(input: Value) -> Result<Output, String> {
         })))
 }
 
+/// The read that decides whether a PAID session may come back (services#71).
+const READ_REFUND_CHECK: &str = "services.packages.refund_check";
+
+/// Logic of `services.packages.refund_redemption` — giving a paid voucher session back to its
+/// voucher because the sale was returned (services#71, ADR-0386).
+///
+/// The market's failure this closes is not hypothetical: **Mindbody** leaves the visit attached to
+/// a voucher it has already refunded — «it will remain attached to the returned Pricing Option as
+/// if it were still paid» — so the customer loses the session AND the voucher; **Fresha** does not
+/// let anyone try («no changes can be made once the payment has been processed»).
+///
+/// The handler runs in a sandbox and cannot read the database, so the host preloads
+/// `services.packages.refund_check`, `required`. 🔴 That read is the authority on whether this
+/// session may come back and on WHY not — the payload only says which redemption the operator
+/// picked, and a handler that took its word for the rest would let a caller reverse any session by
+/// asking nicely. It fails closed: with no read, nothing is returned.
+///
+/// WHAT THIS ADDS OVER THE DECLARATIVE PATH, and it is exactly one thing the SQL cannot express:
+/// **the difference between a retry and a second refund.** Both land on zero updated rows.
+///
+///   * the SAME return document again — a retry, a double tap, a redelivered event — is a no-op
+///     that reports success. No operation is emitted, so no second session comes back and the
+///     first refund's trail is not re-stamped;
+///   * a DIFFERENT document over the same session is refused with
+///     `services.redemption_already_refunded`. One session, one refund.
+///
+/// `commands/_refund_assert.sql` enforces the same rule inside the transaction, so the read stays
+/// advisory and the race between two tills is settled by the database, not by this code.
+///
+/// 🔴 AN EXPIRED VOUCHER DOES NOT BLOCK THE RETURN. Every other guard in this module weighs
+/// validity against `now`, which is right for a live sale and a category error when rectifying a
+/// ticket from three weeks ago: the act being undone was valid when it happened. Refusing would
+/// re-create the market's failure through another door and would make `sales`' return fail at
+/// confirm, which ADR-0386 forbids. So expiry travels back in the result (`voucher_expired`,
+/// `expires_at`) for the till to show, and the refund records it on the row. Validity is neither
+/// extended nor reset — that would hand out an entitlement nobody bought.
+///
+/// 🔴 No fiscal document comes out of here. A voucher of N sessions is UNIVALENT: the record was
+/// issued when the voucher was SOLD, and art. 30 ter.1 of Directive 2006/112/CE says the supply
+/// made in exchange for it «shall not be regarded as an independent transaction». The money side of
+/// the return is `sales`' rectificativa; this moves a balance inside an already-taxed voucher.
+pub fn refund_redemption_pure(input: Value) -> Result<Output, String> {
+    let payload = input.get("payload").cloned().unwrap_or(Value::Null);
+
+    let redemption_id = str_field(&payload, "redemption_id").trim().to_string();
+    let refund_ref = str_field(&payload, "refund_ref").trim().to_string();
+
+    // A refund with no document behind it cannot be reconciled against the money and cannot be
+    // idempotent either — `refund_ref` is the key that tells a retry from a second refund.
+    if redemption_id.is_empty() || refund_ref.is_empty() {
+        return Ok(Output::new().with_error(refund_refusal_for("")));
+    }
+
+    let row = match input.pointer(format!("/context/reads/{READ_REFUND_CHECK}/0").as_str()) {
+        Some(value) if !value.is_null() => value.clone(),
+        // No read (a runtime without `reads` support, a degraded query, or a query that answered
+        // nothing): there is nothing to verify against, so nothing comes back.
+        _ => return Ok(Output::new().with_error(refund_refusal_for(""))),
+    };
+
+    // The read must be about THIS redemption. A row answering for another one is not an
+    // authorisation for this one — it is a broken contract, and it fails closed.
+    if str_field(&row, "redemption_id").trim() != redemption_id {
+        return Ok(Output::new().with_error(refund_refusal_for("")));
+    }
+
+    let expiry = |mut result: Value| -> Value {
+        result["voucher_expired"] = row.get("voucher_expired").cloned().unwrap_or(json!(0));
+        result["expires_at"] = row.get("expires_at").cloned().unwrap_or(Value::Null);
+        result
+    };
+
+    if !flag_is(&row, "refundable") {
+        // Already returned? Then it depends on BY WHICH DOCUMENT.
+        if flag_is(&row, "already_refunded") {
+            return Ok(if str_field(&row, "refund_ref").trim() == refund_ref {
+                // The same document again: the session already came back. Say so, write nothing.
+                Output::new().with_result(expiry(json!({
+                    "refunded": true,
+                    "already": true,
+                    "redemption_id": redemption_id,
+                    "package_id": row.get("package_id").cloned().unwrap_or(Value::Null),
+                    "customer_id": row.get("customer_id").cloned().unwrap_or(Value::Null),
+                    "refund_ref": refund_ref,
+                    "remaining_before": row.get("remaining_before").cloned().unwrap_or(Value::Null),
+                    "remaining_after": row.get("remaining_before").cloned().unwrap_or(Value::Null),
+                })))
+            } else {
+                Output::new().with_error(redeem_refusal(
+                    "services.redemption_already_refunded",
+                    "That voucher session was already given back on another return.",
+                ))
+            });
+        }
+        return Ok(Output::new().with_error(refund_refusal_for(&str_field(&row, "reason"))));
+    }
+
+    let mut p = Map::new();
+    p.insert("redemption_id".into(), json!(redemption_id));
+    p.insert("refund_ref".into(), json!(refund_ref));
+    p.insert("refund_note".into(), json!(str_field(&payload, "refund_note")));
+
+    Ok(Output::new()
+        .with_operation(Operation::sql("services._refund", p))
+        .with_result(expiry(json!({
+            "refunded": true,
+            "already": false,
+            "redemption_id": redemption_id,
+            "package_id": row.get("package_id").cloned().unwrap_or(Value::Null),
+            "customer_id": row.get("customer_id").cloned().unwrap_or(Value::Null),
+            "service_id": row.get("service_id").cloned().unwrap_or(Value::Null),
+            "refund_ref": refund_ref,
+            "remaining_before": row.get("remaining_before").cloned().unwrap_or(Value::Null),
+            "remaining_after": row.get("remaining_after").cloned().unwrap_or(Value::Null),
+        }))))
+}
+
+/// `reason` of `services.packages.refund_check` → the domain error the caller receives. The closed
+/// set comes from that query; anything else — including an empty reason with `refundable = 0`,
+/// which it never produces — is a broken contract and fails CLOSED with the generic refusal. Never
+/// a silent go, and never the raw gate either.
+fn refund_refusal_for(reason: &str) -> DomainError {
+    match reason.trim() {
+        "redemption_not_found" => redeem_refusal(
+            "services.redemption_not_found",
+            "That voucher session does not exist in this business.",
+        ),
+        "not_settled" => redeem_refusal(
+            "services.redemption_not_settled",
+            "That voucher session was never paid, so there is nothing to give back. Release the hold instead.",
+        ),
+        "already_refunded" => redeem_refusal(
+            "services.redemption_already_refunded",
+            "That voucher session was already given back on another return.",
+        ),
+        _ => redeem_refusal(
+            "services.redemption_not_refundable",
+            "That voucher session cannot be given back right now.",
+        ),
+    }
+}
+
+/// An INTEGER flag of a query row (`CASE … THEN 1 ELSE 0`), read whatever shape the driver chose.
+/// Postgres drivers may hand a `0/1` back as a number, a bool or text, and all three say the same.
+fn flag_is(row: &Value, key: &str) -> bool {
+    match row.get(key) {
+        Some(Value::Bool(b)) => *b,
+        Some(Value::Number(n)) => n.as_i64().unwrap_or(0) != 0,
+        Some(Value::String(s)) => matches!(s.trim(), "1" | "true" | "t"),
+        _ => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1406,5 +1568,180 @@ mod tests {
         let mut input = eligible_input(hold_payload());
         input["context"]["new_ids"] = json!([]);
         assert!(hold_package_for_line_pure(input).is_err());
+    }
+
+    // ── services#71 · devolver la sesión al bono ─────────────────────────────────────────────
+    //
+    // Same rule, one door further: the payload says WHICH redemption the operator wants back, and
+    // whether that redemption may come back is decided by `services.packages.refund_check` — the
+    // hub's own rows. What is new here is IDEMPOTENCE, and it is a handler decision because it is
+    // the only one the SQL cannot express: the same return document arriving twice must write
+    // NOTHING and still report success, while a DIFFERENT document over the same session must be
+    // refused. The gate in `_refund_assert.sql` enforces the same rule transactionally; these
+    // tests are what prove the handler does not decide it from the payload alone.
+
+    fn refund_payload() -> Value {
+        json!({
+            "redemption_id": "red-1",
+            "refund_ref": "return-9",
+            "refund_note": "la clienta cambió de idea"
+        })
+    }
+
+    fn refund_input(check_row: Option<Value>, payload: Value) -> Value {
+        let mut reads = Map::new();
+        if let Some(row) = check_row {
+            reads.insert(READ_REFUND_CHECK.into(), json!([row]));
+        }
+        json!({
+            "payload": payload,
+            "context": { "new_ids": ["unused-1"], "reads": Value::Object(reads) }
+        })
+    }
+
+    fn refundable_row() -> Value {
+        json!({
+            "redemption_id": "red-1",
+            "package_id": "pkg-1",
+            "customer_id": "cus-1",
+            "service_id": "svc-1",
+            "refundable": 1,
+            "reason": "",
+            "already_refunded": 0,
+            "refund_ref": "",
+            "remaining_before": 4,
+            "remaining_after": 5,
+            "voucher_expired": 0
+        })
+    }
+
+    #[test]
+    fn a_paid_session_goes_back_to_its_voucher() {
+        let out = refund_redemption_pure(refund_input(Some(refundable_row()), refund_payload()))
+            .unwrap();
+        assert!(out.error.is_none(), "a refundable session must go through, got {out:?}");
+        assert_eq!(out.operations.len(), 1);
+        let op = &out.operations[0];
+        assert_eq!(op.command, "services._refund");
+        assert_eq!(op.params["redemption_id"], json!("red-1"));
+        assert_eq!(op.params["refund_ref"], json!("return-9"));
+        assert_eq!(op.params["refund_note"], json!("la clienta cambió de idea"));
+        let result = out.result.unwrap();
+        assert_eq!(result["refunded"], json!(true));
+        assert_eq!(result["already"], json!(false));
+        // The preview travels back, mirror image of the hold: what the till showed before the
+        // operator confirmed and what it prints afterwards are the same number.
+        assert_eq!(result["remaining_after"], json!(5));
+    }
+
+    /// 🔴 Idempotencia: el MISMO documento otra vez no escribe nada y NO miente al caller.
+    #[test]
+    fn the_same_return_document_twice_writes_nothing_and_still_reports_success() {
+        let mut row = refundable_row();
+        row["refundable"] = json!(0);
+        row["reason"] = json!("already_refunded");
+        row["already_refunded"] = json!(1);
+        row["refund_ref"] = json!("return-9");
+        let out = refund_redemption_pure(refund_input(Some(row), refund_payload())).unwrap();
+        assert!(out.error.is_none(), "a retry of the same document is not a failure, got {out:?}");
+        assert!(out.operations.is_empty(), "a retry must write NOTHING");
+        let result = out.result.unwrap();
+        assert_eq!(result["refunded"], json!(true));
+        assert_eq!(result["already"], json!(true), "and it says it had already happened");
+    }
+
+    /// 🔴 …y un documento DISTINTO sobre la misma sesión se rechaza: una sesión, una devolución.
+    #[test]
+    fn a_different_return_document_cannot_take_the_same_session_again() {
+        let mut row = refundable_row();
+        row["refundable"] = json!(0);
+        row["reason"] = json!("already_refunded");
+        row["already_refunded"] = json!(1);
+        row["refund_ref"] = json!("return-OTHER");
+        let out = refund_redemption_pure(refund_input(Some(row), refund_payload())).unwrap();
+        assert_eq!(
+            out.error.as_ref().map(|e| e.code.as_str()),
+            Some("services.redemption_already_refunded")
+        );
+        assert!(out.operations.is_empty());
+    }
+
+    /// El motivo de negocio llega al caller con su código, nunca el CHECK crudo del gate.
+    #[test]
+    fn the_refusal_names_its_reason() {
+        for (reason, code) in [
+            ("redemption_not_found", "services.redemption_not_found"),
+            ("not_settled", "services.redemption_not_settled"),
+        ] {
+            let mut row = refundable_row();
+            row["refundable"] = json!(0);
+            row["reason"] = json!(reason);
+            let out = refund_redemption_pure(refund_input(Some(row), refund_payload())).unwrap();
+            assert_eq!(
+                out.error.as_ref().map(|e| e.code.as_str()),
+                Some(code),
+                "reason {reason} must reach the caller as {code}"
+            );
+            assert!(out.operations.is_empty());
+        }
+    }
+
+    /// 🔴 La CADUCIDAD no es un rechazo: la devolución pasa igual y el aviso viaja de vuelta.
+    /// Evaluar la vigencia contra `now` es correcto en un cobro vivo y es un error de categoría al
+    /// rectificar el tique de hace tres semanas.
+    #[test]
+    fn an_expired_voucher_still_takes_its_session_back_and_says_so() {
+        let mut row = refundable_row();
+        row["voucher_expired"] = json!(1);
+        row["expires_at"] = json!("2026-07-31T10:00:00Z");
+        let out = refund_redemption_pure(refund_input(Some(row), refund_payload())).unwrap();
+        assert!(out.error.is_none(), "expiry must NOT block a refund, got {out:?}");
+        assert_eq!(out.operations.len(), 1);
+        let result = out.result.unwrap();
+        assert_eq!(result["voucher_expired"], json!(1), "…and the caller is told");
+        assert_eq!(result["expires_at"], json!("2026-07-31T10:00:00Z"));
+    }
+
+    /// Fail-closed: sin la lectura no hay nada contra lo que verificar, así que no se devuelve nada.
+    #[test]
+    fn without_the_read_nothing_is_refunded() {
+        let out = refund_redemption_pure(refund_input(None, refund_payload())).unwrap();
+        assert_eq!(
+            out.error.as_ref().map(|e| e.code.as_str()),
+            Some("services.redemption_not_refundable")
+        );
+        assert!(out.operations.is_empty());
+    }
+
+    /// Una devolución sin documento detrás no es auditable, así que no existe.
+    #[test]
+    fn a_refund_without_its_return_document_is_refused() {
+        for missing in ["redemption_id", "refund_ref"] {
+            let mut payload = refund_payload();
+            payload[missing] = json!("");
+            let out =
+                refund_redemption_pure(refund_input(Some(refundable_row()), payload)).unwrap();
+            assert_eq!(
+                out.error.as_ref().map(|e| e.code.as_str()),
+                Some("services.redemption_not_refundable"),
+                "an empty {missing} must refuse"
+            );
+            assert!(out.operations.is_empty());
+        }
+    }
+
+    /// 🔴 La elegibilidad la decide la LECTURA, no el payload: el handler no puede devolver una
+    /// sesión distinta de la que el hub dice que es devolvible.
+    #[test]
+    fn the_read_and_not_the_payload_decides_which_session_comes_back() {
+        let mut row = refundable_row();
+        row["redemption_id"] = json!("red-OTHER");
+        let out = refund_redemption_pure(refund_input(Some(row), refund_payload())).unwrap();
+        assert_eq!(
+            out.error.as_ref().map(|e| e.code.as_str()),
+            Some("services.redemption_not_refundable"),
+            "a read that answers about ANOTHER redemption is not an authorisation for this one"
+        );
+        assert!(out.operations.is_empty());
     }
 }

@@ -135,6 +135,24 @@
         "stable_order": "Both vouchers are equivalent; this one always goes first.",
         "generic": "This is the voucher that will be used."
       }
+    },
+    "actionMovements": "Movements",
+    "movementsTitle": "Voucher movements",
+    "movementsHint": "every session of this voucher: reserved, delivered, released and given back.",
+    "movementCustomer": "Customer",
+    "movementSale": "Sale",
+    "movementNoService": "No service on the line",
+    "movementRefundedBy": "Given back by {who} on {when}",
+    "movementRefundDoc": "Return",
+    "movementRefundedExpired": "The session went back to a voucher that had already expired: it is on the books, but it cannot be spent until the voucher is valid again.",
+    "emptyMovements": "This voucher has not been used yet.",
+    "errorMovements": "Could not load the movements",
+    "btnClose": "Close",
+    "movement": {
+      "held": "Reserved",
+      "consumed": "Delivered",
+      "released": "Released",
+      "refunded": "Given back"
     }
   },
   "errors": {
@@ -152,6 +170,10 @@
     "services.package_not_redeemable": "This voucher cannot be redeemed right now.",
     "services.package_does_not_cover_service": "This voucher does not cover that service. A voucher of haircuts pays for haircuts, not for the shampoo.",
     "services.hold_not_releasable": "That voucher session can no longer be given back: the sale was already paid. Refunding it is a return, and it goes through its own door.",
-    "services.hold_not_settleable": "That voucher session could not be settled: it does not exist here, it was already given back, or it was settled before."
+    "services.hold_not_settleable": "That voucher session could not be settled: it does not exist here, it was already given back, or it was settled before.",
+    "services.redemption_not_found": "That voucher session does not exist in this business.",
+    "services.redemption_not_settled": "That voucher session was never paid, so there is nothing to give back. Release the hold instead.",
+    "services.redemption_already_refunded": "That voucher session was already given back on another return.",
+    "services.redemption_not_refundable": "That voucher session cannot be given back right now."
   }
 }

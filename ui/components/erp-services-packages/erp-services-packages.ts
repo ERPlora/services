@@ -3,6 +3,7 @@ import { state } from 'lit/decorators.js';
 import { define } from '@erplora/outfitkit/define';
 import '@erplora/outfitkit/ok-inline-feedback';
 import '@erplora/outfitkit/ok-data-table';
+import '@erplora/outfitkit/ok-status-pill';
 import type { DataTableColumn, DataTableAction } from '@erplora/outfitkit';
 import { createListController, majorToMinor, minorToMajor } from '@erplora/module-sdk';
 import type { ListController, ListClient, ListParams, ListPage } from '@erplora/module-sdk';
@@ -42,6 +43,29 @@ interface Package {
   fixed_price: number | null;
   is_active: number;
   items: number;
+}
+
+/**
+ * Row of `services.packages.redemption_history` — one MOVEMENT of the voucher (services#71).
+ *
+ * `movement` is the query's own derived field and not something re-derived here: a screen that
+ * recomputed «is this a refund?» from `is_deleted` and `refunded_at` would be a second
+ * implementation of the rule, free to drift from the one the database applies.
+ */
+interface Movement {
+  redemption_id: string;
+  customer_id: string;
+  service_name: string | null;
+  use_index: number | null;
+  redeemed_at: string | null;
+  settled_at: string | null;
+  sale_id: string | null;
+  refunded_at: string | null;
+  refunded_by: string | null;
+  refund_ref: string | null;
+  refund_note: string;
+  refund_expired: number;
+  movement: 'held' | 'consumed' | 'released' | 'refunded' | string;
 }
 
 /** Row of `services.services.list` (the selector of the lines). */
@@ -136,6 +160,8 @@ export class ErpServicesPackages extends LitElement {
     .form ion-button[type='submit'] { align-self: flex-end; }
     .line { display: grid; grid-template-columns: 1fr 5.5rem auto; gap: 0.4rem; align-items: center; }
     .lines-title { font-size: 0.85rem; font-weight: 600; margin: 0.3rem 0 0; }
+    .movement h3 { display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; }
+    .movement .refund { font-size: 0.82rem; opacity: 0.85; }
   `;
 
   @state() form: PackageForm = { ...EMPTY_FORM };
@@ -146,6 +172,11 @@ export class ErpServicesPackages extends LitElement {
   /** Package being edited (header only); `null` = create mode. */
   @state() editingId: string | null = null;
   @state() deleteTarget: Package | null = null;
+  /** Voucher whose ledger is open; `null` = the sheet is closed. */
+  @state() movementsOf: { id: string; name: string } | null = null;
+  @state() movements: Movement[] = [];
+  @state() movementsLoading = false;
+  @state() movementsError = '';
 
   private ctrl!: ListController<Package>;
   private unsub?: () => void;
@@ -186,6 +217,10 @@ export class ErpServicesPackages extends LitElement {
     const t = (k: string): string => erplora().t(CATALOG, k);
     return [
       ...(can('services.change_package') ? [{ id: 'edit', label: t('ui.actionEdit'), icon: 'create-outline' }] : []),
+      // The voucher's ledger. Gated by the same permission as the balance, because that is what
+      // it is: the movements behind a balance. Read-only — returning a session is `sales`' return
+      // flow, not a button on the catalogue screen.
+      ...(can('services.view_package_balance') ? [{ id: 'movements', label: t('ui.actionMovements'), icon: 'time-outline' }] : []),
       ...(can('services.delete_package') ? [{ id: 'delete', label: t('ui.actionDelete'), icon: 'trash-outline', color: 'danger' }] : []),
     ];
   }
@@ -267,8 +302,26 @@ export class ErpServicesPackages extends LitElement {
         maxUses: full.max_uses == null ? '' : String(full.max_uses),
       };
       this.dataTable()?.open('create');
+    } else if (actionId === 'movements' && can('services.view_package_balance')) {
+      await this.openMovements(p);
     } else if (actionId === 'delete' && can('services.delete_package')) {
       this.deleteTarget = p;
+    }
+  }
+
+  /** Open the voucher's ledger and load it. The three states are painted, not only the happy one. */
+  private async openMovements(p: Package): Promise<void> {
+    this.movementsOf = { id: p.id, name: p.name };
+    this.movements = [];
+    this.movementsError = '';
+    this.movementsLoading = true;
+    try {
+      this.movements =
+        (await erplora().queryAll<Movement>('services.packages.redemption_history', { package_id: p.id })) ?? [];
+    } catch (e) {
+      this.movementsError = domainMessage(e, erplora().locale, erplora().t(CATALOG, 'ui.errorMovements'));
+    } finally {
+      this.movementsLoading = false;
     }
   }
 
@@ -369,6 +422,64 @@ export class ErpServicesPackages extends LitElement {
     </ion-modal>`;
   }
 
+  /** A movement's date, in the hub's locale. An unparseable or absent stamp prints as «—». */
+  private stamp(value: string | null): string {
+    if (!value) return '—';
+    const d = new Date(value);
+    return Number.isNaN(d.getTime())
+      ? value
+      : d.toLocaleString(erplora().locale, { dateStyle: 'short', timeStyle: 'short' });
+  }
+
+  private renderMovement(m: Movement) {
+    const t = (k: string, p?: Record<string, unknown>): string => erplora().t(CATALOG, k, p);
+    const refunded = m.movement === 'refunded';
+    return html`<ion-item class="movement">
+      <ion-label class="ion-text-wrap">
+        <h3>
+          <ok-status-pill size="sm" tone=${refunded ? 'warning' : m.movement === 'released' ? 'neutral' : m.movement === 'held' ? 'info' : 'success'}>${t(`ui.movement.${m.movement}`)}</ok-status-pill>
+          ${m.service_name ?? t('ui.movementNoService')}
+        </h3>
+        <p>${this.stamp(m.redeemed_at)} · ${t('ui.movementCustomer')}: ${m.customer_id}${m.sale_id ? html` · ${t('ui.movementSale')}: ${m.sale_id}` : nothing}</p>
+        ${refunded
+          ? html`<p class="refund">
+              ${t('ui.movementRefundedBy', { who: m.refunded_by ?? '—', when: this.stamp(m.refunded_at) })}
+              · ${t('ui.movementRefundDoc')}: ${m.refund_ref ?? '—'}
+              ${m.refund_note ? html` · ${m.refund_note}` : nothing}
+            </p>
+            ${Number(m.refund_expired)
+              ? html`<ok-inline-feedback tone="warning" icon="alert-circle-outline">${t('ui.movementRefundedExpired')}</ok-inline-feedback>`
+              : nothing}`
+          : nothing}
+      </ion-label>
+    </ion-item>`;
+  }
+
+  private renderMovements() {
+    const t = (k: string, p?: Record<string, unknown>): string => erplora().t(CATALOG, k, p);
+    return html`<ion-modal .isOpen=${!!this.movementsOf} @ionModalDidDismiss=${() => (this.movementsOf = null)}>
+      <ion-header class="ion-no-border">
+        <ion-toolbar>
+          <ion-title>${t('ui.movementsTitle')}</ion-title>
+          <ion-buttons slot="end">
+            <ion-button @click=${() => (this.movementsOf = null)}>${t('ui.btnClose')}</ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="ion-padding">
+        <!-- Self-styled: ion-modal is reparented to <body>, this component's CSS does not reach it. -->
+        <p><b>${this.movementsOf?.name ?? ''}</b> — ${t('ui.movementsHint')}</p>
+        ${this.movementsError
+          ? html`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.movementsError}</ok-inline-feedback>`
+          : this.movementsLoading
+            ? html`<ok-inline-feedback tone="neutral" icon="time-outline">${t('ui.loading')}</ok-inline-feedback>`
+            : this.movements.length === 0
+              ? html`<ok-inline-feedback tone="neutral" icon="information-circle-outline">${t('ui.emptyMovements')}</ok-inline-feedback>`
+              : html`<ion-list lines="full">${this.movements.map((m) => this.renderMovement(m))}</ion-list>`}
+      </ion-content>
+    </ion-modal>`;
+  }
+
   private renderLines() {
     const t = (k: string): string => erplora().t(CATALOG, k);
     return html`<p class="lines-title">${t('ui.packageLinesTitle')}</p>
@@ -413,6 +524,7 @@ export class ErpServicesPackages extends LitElement {
         </form>
       </ok-data-table>
       ${this.renderDeleteConfirm()}
+      ${this.renderMovements()}
     </div>`;
   }
 }

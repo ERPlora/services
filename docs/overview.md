@@ -44,6 +44,7 @@ with no stock.
 | `services.package.held` | one session is reserved to cover a checkout line |
 | `services.package.hold_released` | a reserved session is given back because the redemption was undone |
 | `services.package.settled` | a reserved session becomes final because the sale was paid |
+| `services.package.refunded` | a paid session goes back to the voucher because the sale was returned |
 
 **Events it listens to**
 
@@ -70,6 +71,27 @@ The redemption is **explicit and previewed**: `services.packages.tender_options`
 cover the line, how many sessions are left now and how many are left **after**, which one will be
 spent and **why**. `services.packages.hold_for_line` reserves it, `release_hold` undoes it while the
 sale is not paid, and `settle_hold` — or `sale.completed` — makes it final.
+
+## Returning a sale gives the session back (services#71)
+
+Once the sale is paid the hold can no longer be released — the customer had the service. What can
+still happen is that the **sale is returned**, and then the session goes back to the voucher through
+its own audited door, `services.packages.refund_redemption`. The redemption row survives with who
+returned it, when, and against which return document, so the movement is a **movement** and not a
+counter going up: `services.packages.redemption_history` lists every one of them from the voucher's
+sheet.
+
+It is **idempotent by `refund_ref`**: the same return document arriving twice writes nothing and
+returns one session, while a different document over the same session is refused with
+`services.redemption_already_refunded`. Neither is decided by an `if` — the conditional UPDATE and
+the gate settle it inside the transaction, so two tills cannot both win.
+
+🔴 **An expired voucher does not block the return.** Every other guard here weighs validity against
+`now`, which is right for a live sale and a category error when rectifying a ticket from three weeks
+ago. So expiry is **reported, never enforced**: `services.packages.refund_check` answers
+`voucher_expired` before the operator confirms and the refund records it on the row. Validity is
+neither extended nor reset. What does move — correctly — is the anchor: the clock runs from the
+customer's first **live** use, so returning the use that started it un-starts it.
 
 🔴 **Redeeming issues no fiscal document.** A voucher of N sessions is *univalent*: the record came
 out when the voucher was **sold**, with the service's VAT. Art. 30 ter.1 of Directive 2006/112/CE
