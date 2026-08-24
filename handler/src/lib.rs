@@ -52,6 +52,24 @@ pub fn create_package(input: Json<erplora_guest_sdk::Input>) -> FnResult<Json<Ha
 
 #[cfg(feature = "guest")]
 #[plugin_fn]
+pub fn grant_package(input: Json<erplora_guest_sdk::Input>) -> FnResult<Json<Output>> {
+    match grant_package_pure(input.into_inner().into_value()) {
+        Ok(out) => Ok(Json(out)),
+        Err(msg) => Err(WithReturnCode::new(Error::msg(msg), 1)),
+    }
+}
+
+#[cfg(feature = "guest")]
+#[plugin_fn]
+pub fn on_sale_completed(input: Json<erplora_guest_sdk::Input>) -> FnResult<Json<Output>> {
+    match on_sale_completed_pure(input.into_inner().into_value()) {
+        Ok(out) => Ok(Json(out)),
+        Err(msg) => Err(WithReturnCode::new(Error::msg(msg), 1)),
+    }
+}
+
+#[cfg(feature = "guest")]
+#[plugin_fn]
 pub fn redeem_package(input: Json<erplora_guest_sdk::Input>) -> FnResult<Json<Output>> {
     match redeem_package_pure(input.into_inner().into_value()) {
         Ok(out) => Ok(Json(out)),
@@ -556,6 +574,14 @@ fn redeem_refusal(code: &str, message: &str) -> DomainError {
 /// the generic refusal — never a silent go, and never the raw gate either.
 fn refusal_for(reason: &str) -> DomainError {
     match reason.trim() {
+        // services#73 — the refusal that did not exist because the entitlement did not exist. It is
+        // deliberately NOT folded into `package_not_found`: «that voucher is not sold here» and
+        // «nobody sold you that voucher» send the operator to two different places, and only one of
+        // them is fixed by selling it to the customer.
+        "no_grant" => redeem_refusal(
+            "services.package_no_grant",
+            "This customer does not have that voucher: nobody has sold it to them.",
+        ),
         "no_uses_left" => redeem_refusal(
             "services.package_no_uses_left",
             "This voucher has no sessions left.",
@@ -610,8 +636,11 @@ pub fn redeem_package_pure(input: Value) -> Result<Output, String> {
     let empty: Vec<Value> = Vec::new();
     let new_ids = context.get("new_ids").and_then(|v| v.as_array()).unwrap_or(&empty);
 
-    let package_id = str_field(&payload, "package_id").trim().to_string();
-    let customer_id = str_field(&payload, "customer_id").trim().to_string();
+    // 🔴 services#73: the payload names a GRANT — the customer's PURCHASE — and not a catalogue
+    // package plus a customer id. The package and the customer are read off the grant inside the
+    // statement, so a caller cannot pair somebody else's voucher with their own customer, and a
+    // customer who never bought anything has no grant to name.
+    let grant_id = str_field(&payload, "grant_id").trim().to_string();
 
     // The pre-check's row (the query always answers exactly one). `None` = the read was not
     // preloaded (runtime without `reads` support); an empty array = a broken contract. Both fail
@@ -621,7 +650,7 @@ pub fn redeem_package_pure(input: Value) -> Result<Output, String> {
         .cloned()
         .unwrap_or(Value::Null);
 
-    if package_id.is_empty() || customer_id.is_empty() || row.is_null() || !redeemable_is(&row) {
+    if grant_id.is_empty() || row.is_null() || !redeemable_is(&row) {
         let reason: String = if row.is_null() { String::new() } else { str_field(&row, "reason") };
         return Ok(Output::new().with_error(refusal_for(&reason)));
     }
@@ -637,8 +666,7 @@ pub fn redeem_package_pure(input: Value) -> Result<Output, String> {
     };
     let mut p = Map::new();
     p.insert("redemption_id".into(), json!(redemption_id));
-    p.insert("package_id".into(), json!(package_id));
-    p.insert("customer_id".into(), json!(customer_id));
+    p.insert("grant_id".into(), json!(grant_id));
     p.insert("appointment_id".into(), payload.get("appointment_id").cloned().unwrap_or(Value::Null));
     p.insert("sale_id".into(), payload.get("sale_id").cloned().unwrap_or(Value::Null));
     p.insert("note".into(), json!(str_field(&payload, "note")));
@@ -648,9 +676,261 @@ pub fn redeem_package_pure(input: Value) -> Result<Output, String> {
         .with_result(json!({
             "redeemed": true,
             "redemption_id": redemption_id,
+            "grant_id": p["grant_id"],
+        })))
+}
+
+/// The read that says whether the voucher being sold exists in this hub (services#73).
+const READ_PACKAGE_GET: &str = "services.packages.get";
+
+/// The read that says which catalogue ids ARE vouchers, for the `sale.completed` listener.
+const READ_PACKAGES_LIST: &str = "services.packages.list";
+
+/// Logic of `services.packages.grant` — the PURCHASE of a voucher (services#73, ADR-0388).
+///
+/// Until this existed the relationship customer<->voucher was materialised by the first
+/// redemption, so every customer of the hub owned N sessions of every voucher without anyone
+/// having sold them one. This is the row that says otherwise: who owns which voucher, since when
+/// and for how much.
+///
+/// The handler runs in a sandbox and cannot read the database, so the host preloads
+/// `services.packages.get` (`required`) — a grant is money, it does not admit guessing. Without it,
+/// or with an id this hub does not know, the command refuses with `services.package_not_found`
+/// instead of writing an entitlement against a voucher that does not exist.
+///
+/// 🔴 It emits NO fiscal document. A voucher of N sessions is UNIVALENT: art. 30 ter.1 of Directive
+/// 2006/112/CE says the supply made in exchange for it «shall not be regarded as an independent
+/// transaction», so the record comes out with the SALE that paid for this grant, with the service's
+/// VAT — and the later redemption issues nothing either. A document here would be the first half of
+/// a double taxation.
+pub fn grant_package_pure(input: Value) -> Result<Output, String> {
+    let payload = input.get("payload").cloned().unwrap_or(Value::Null);
+    let context = input.get("context").cloned().unwrap_or(Value::Null);
+    let empty: Vec<Value> = Vec::new();
+    let new_ids = context.get("new_ids").and_then(|v| v.as_array()).unwrap_or(&empty);
+
+    let package_id = str_field(&payload, "package_id").trim().to_string();
+    let customer_id = str_field(&payload, "customer_id").trim().to_string();
+
+    // An entitlement with no owner cannot be redeemed by anybody, so it is not an entitlement: it
+    // is a row that will be reported as a bug the week after. Refused with its own code rather than
+    // the generic one, because the fix is «pick the customer», not «pick another voucher».
+    if customer_id.is_empty() {
+        return Ok(Output::new().with_error(DomainError::new(
+            "services.grant_customer_required",
+            "Pick the customer this voucher belongs to: a voucher with no owner cannot be redeemed.",
+        )));
+    }
+
+    // Fail closed: with no read there is nothing to verify against, so nothing is granted.
+    let package = input
+        .pointer(format!("/context/reads/{READ_PACKAGE_GET}/0").as_str())
+        .cloned()
+        .unwrap_or(Value::Null);
+    if package_id.is_empty() || package.is_null() {
+        return Ok(Output::new().with_error(DomainError::new(
+            "services.package_not_found",
+            "That package does not exist in this business.",
+        )));
+    }
+
+    let grant_id = match new_ids.first().map(as_str) {
+        Some(id) if !id.is_empty() => id,
+        _ => return Err("context.new_ids is empty: the host did not hand out ids".to_string()),
+    };
+
+    let source = {
+        let s = str_field(&payload, "source");
+        if s.trim().is_empty() { "manual".to_string() } else { s.trim().to_string() }
+    };
+
+    let mut p = Map::new();
+    p.insert("grant_id".into(), json!(grant_id));
+    p.insert("package_id".into(), json!(package_id));
+    p.insert("customer_id".into(), json!(customer_id));
+    p.insert("granted_at".into(), payload.get("granted_at").cloned().unwrap_or(Value::Null));
+    p.insert("source".into(), json!(source));
+    p.insert("sale_id".into(), payload.get("sale_id").cloned().unwrap_or(Value::Null));
+    p.insert("sale_ref".into(), json!(str_field(&payload, "sale_ref")));
+    p.insert("amount_cents".into(), json!(parse_int(payload.get("amount_cents")).ok().flatten().unwrap_or(0)));
+    p.insert("net_amount_cents".into(), json!(parse_int(payload.get("net_amount_cents")).ok().flatten().unwrap_or(0)));
+    p.insert("tax_amount_cents".into(), json!(parse_int(payload.get("tax_amount_cents")).ok().flatten().unwrap_or(0)));
+    p.insert("note".into(), json!(str_field(&payload, "note")));
+
+    Ok(Output::new()
+        .with_operation(Operation::sql("services._grant", p.clone()))
+        .with_result(json!({
+            "granted": true,
+            "grant_id": grant_id,
             "package_id": p["package_id"],
             "customer_id": p["customer_id"],
+            "package_name": package.get("name").cloned().unwrap_or(Value::Null),
+            "max_uses": package.get("max_uses").cloned().unwrap_or(Value::Null),
+            "validity_days": package.get("validity_days").cloned().unwrap_or(Value::Null),
         })))
+}
+
+/// How many whole vouchers a sale line carries. Quantities travel as integers on the global 10⁶
+/// fixed-point scale (ADR-0147), so `2000000` is two vouchers — never «two millionths».
+///
+/// A fraction of a voucher is not a thing: half a right to five haircuts cannot be redeemed. The
+/// floor is 1, so a line that somehow arrives with a fractional quantity still grants the voucher
+/// once rather than silently granting nothing, which is the failure the customer would notice at
+/// the chair and nobody would notice in the data.
+fn vouchers_on_the_line(item: &Value) -> i64 {
+    let raw = parse_int(item.get("quantity")).ok().flatten().unwrap_or(QUANTITY_SCALE);
+    let whole = raw / QUANTITY_SCALE;
+    if whole < 1 { 1 } else { whole }
+}
+
+/// Split `total` cents across `units` vouchers, remainder to the FIRST one.
+///
+/// Two vouchers sold for 25,01 € are 12,51 € and 12,50 €, and the two add back up to what was
+/// charged. Spreading the remainder instead of dropping it is the whole point: these amounts are
+/// the base and the VAT the accrual is reconciled against, and a cent that evaporates in a
+/// division is a cent the declared total no longer matches.
+fn split_cents(total: i64, units: i64, index: i64) -> i64 {
+    if units <= 0 {
+        return 0;
+    }
+    let base = total / units;
+    let remainder = total - base * units;
+    if index == 0 { base + remainder } else { base }
+}
+
+/// Logic of `services._on_sale_completed` — the listener of `sale.completed` (services#70 for the
+/// settle, services#73 for the grants).
+///
+/// It does the two things this module owes a finished sale, in ONE transaction, because they are
+/// delivered by one event and the manifest binds one command per event:
+///
+///   1. **Settle the holds** of that checkout (`services._settle_holds_for_sale`). A hold nobody
+///      settles stays releasable forever — a session that could be handed back after the customer
+///      already had the haircut.
+///   2. **Grant the vouchers that were SOLD on the ticket** (`services._grant`, one per unit). This
+///      is the half services#73 was missing: without it the voucher was charged for and the
+///      customer walked out owning nothing this module could see.
+///
+/// 🔴 HOW A LINE IS RECOGNISED AS A VOUCHER, AND WHY `sales` NEEDS NO CHANGE FOR IT. The event
+/// carries `items[].product_id`, and a voucher put on a ticket carries the id of the
+/// `services_package` it sells. So the marking is the id itself, checked against this module's own
+/// catalogue (`services.packages.list`, preloaded and `required`) — `services` reads one field of
+/// an event it does not own, exactly as the settle already reads `order_id`. `sales` learns nothing
+/// about vouchers and no cross-module contract had to be negotiated.
+///
+/// 🔴 A VOUCHER SOLD WITHOUT A CUSTOMER IS NOT GRANTED, AND IT IS NOT SWALLOWED EITHER. An
+/// entitlement needs an owner: with no `customer_id` on the sale there is nobody to grant it to,
+/// and inventing a holder would be worse than not writing the row. The lines are counted and
+/// reported in the result, so the till can tell the cashier «this ticket sold a voucher with no
+/// customer» instead of the customer discovering it at their next visit. The market agrees, for the
+/// same reason: every product surveyed requires a client on a package sale.
+///
+/// IDEMPOTENCE. The relay is at-least-once and marks each listener's delivery, but a redelivery
+/// after a partial failure must not mint the voucher twice — so each grant carries a `sale_ref`
+/// (`<sale_id>#<line>#<unit>`), the conditional INSERT skips a ref a live grant already holds, and
+/// the assert still passes on that no-op. Same shape as the refund's idempotence on `refund_ref`
+/// (services#71), and the unique index of migration 013 is what makes it true under concurrency.
+pub fn on_sale_completed_pure(input: Value) -> Result<Output, String> {
+    let payload = input.get("payload").cloned().unwrap_or(Value::Null);
+    let context = input.get("context").cloned().unwrap_or(Value::Null);
+    let empty: Vec<Value> = Vec::new();
+    let new_ids = context.get("new_ids").and_then(|v| v.as_array()).unwrap_or(&empty);
+
+    let mut ops: Vec<Operation> = Vec::new();
+
+    // 1 · the settle, always and first. It is a conditional UPDATE keyed on `checkout_ref =
+    // :order_id`, so a quick sale (no order) touches zero rows — correct, not a swallowed failure.
+    let mut settle = Map::new();
+    settle.insert("order_id".into(), payload.get("order_id").cloned().unwrap_or(Value::Null));
+    settle.insert("sale_id".into(), payload.get("sale_id").cloned().unwrap_or(Value::Null));
+    ops.push(Operation::sql("services._settle_holds_for_sale", settle));
+
+    // 2 · the grants. Fail closed on the catalogue read: without it there is no way to tell a
+    // voucher line from a shampoo line, and guessing would either mint entitlements for products or
+    // silently drop the ones that were paid for.
+    let catalogue = match input.pointer(format!("/context/reads/{READ_PACKAGES_LIST}").as_str()) {
+        Some(Value::Array(rows)) => rows.clone(),
+        _ => {
+            return Err(
+                "the catalogue of vouchers was not preloaded: a sale cannot be settled without \
+                 being able to tell which of its lines sold one"
+                    .to_string(),
+            )
+        }
+    };
+    let sale_id = str_field(&payload, "sale_id").trim().to_string();
+    let customer_id = str_field(&payload, "customer_id").trim().to_string();
+    let items = payload.get("items").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+
+    let mut minted = 0usize;
+    let mut ownerless = 0i64;
+    for (line_index, item) in items.iter().enumerate() {
+        let product_id = str_field(item, "product_id");
+        let product_id = product_id.trim();
+        if product_id.is_empty() {
+            continue;
+        }
+        let package = catalogue
+            .iter()
+            .find(|row| str_field(row, "id").trim() == product_id);
+        let package = match package {
+            Some(row) => row,
+            None => continue, // not a voucher: an ordinary product or service line
+        };
+        let units = vouchers_on_the_line(item);
+        if customer_id.is_empty() {
+            ownerless += units;
+            continue;
+        }
+        let net_total = parse_int(item.get("net_amount")).ok().flatten().unwrap_or(0);
+        let tax_total = parse_int(item.get("tax_amount")).ok().flatten().unwrap_or(0);
+        for unit in 0..units {
+            let grant_id = match new_ids.get(minted).map(as_str) {
+                Some(id) if !id.is_empty() => id,
+                // Refusing is the honest answer and it is VISIBLE: the relay retries and then
+                // dead-letters the event with this message, which is a place somebody looks.
+                // Granting the first 256 and dropping the rest would be a silent short-delivery of
+                // something the customer paid for.
+                _ => {
+                    return Err(format!(
+                        "sale `{sale_id}` sells more vouchers than the host's id batch can name \
+                         ({minted} granted); the event is not settled"
+                    ))
+                }
+            };
+            let net = split_cents(net_total, units, unit);
+            let tax = split_cents(tax_total, units, unit);
+            let mut g = Map::new();
+            g.insert("grant_id".into(), json!(grant_id));
+            g.insert("package_id".into(), json!(product_id));
+            g.insert("customer_id".into(), json!(customer_id));
+            // The moment that counts is when the voucher was SOLD, not when the outbox got round
+            // to this listener — which can be seconds, or minutes after a retry. `sale.completed`
+            // does not carry a timestamp TODAY, so this is Null and the statement falls back to
+            // `:now`: honest, and within seconds of the truth. It is read anyway so that the day
+            // `sales` starts stamping the event, the anchor becomes exact with no change here.
+            g.insert("granted_at".into(), payload.get("completed_at").cloned().unwrap_or(Value::Null));
+            g.insert("source".into(), json!("sale"));
+            g.insert("sale_id".into(), json!(sale_id));
+            g.insert("sale_ref".into(), json!(format!("{sale_id}#{line_index}#{unit}")));
+            g.insert("amount_cents".into(), json!(net + tax));
+            g.insert("net_amount_cents".into(), json!(net));
+            g.insert("tax_amount_cents".into(), json!(tax));
+            g.insert("note".into(), json!(str_field(package, "name")));
+            ops.push(Operation::sql("services._grant", g));
+            minted += 1;
+        }
+    }
+
+    let mut out = Output::new().with_result(json!({
+        "sale_id": sale_id,
+        "granted": minted,
+        "ownerless_vouchers": ownerless,
+    }));
+    for op in ops {
+        out = out.with_operation(op);
+    }
+    Ok(out)
 }
 
 /// The read the till shows and the handler verifies against (services#70).
@@ -689,7 +969,10 @@ pub fn hold_package_for_line_pure(input: Value) -> Result<Output, String> {
     let empty: Vec<Value> = Vec::new();
     let new_ids = context.get("new_ids").and_then(|v| v.as_array()).unwrap_or(&empty);
 
-    let package_id = str_field(&payload, "package_id").trim().to_string();
+    // 🔴 services#73: the tender is a GRANT — the customer's purchase — not a catalogue package.
+    // `customer_id` still travels because it parameterizes the `tender_options` read; the authority
+    // on whose sessions these are is the grant, and the statement reads owner and package off it.
+    let grant_id = str_field(&payload, "grant_id").trim().to_string();
     let customer_id = str_field(&payload, "customer_id").trim().to_string();
     let service_id = str_field(&payload, "service_id").trim().to_string();
     let checkout_ref = str_field(&payload, "checkout_ref").trim().to_string();
@@ -697,7 +980,7 @@ pub fn hold_package_for_line_pure(input: Value) -> Result<Output, String> {
 
     // A hold that does not say which line it covers cannot be undone or audited later: it would
     // sit in the ledger as a spent session nobody can trace back to a service.
-    if package_id.is_empty()
+    if grant_id.is_empty()
         || customer_id.is_empty()
         || service_id.is_empty()
         || checkout_ref.is_empty()
@@ -714,7 +997,7 @@ pub fn hold_package_for_line_pure(input: Value) -> Result<Output, String> {
     };
     let chosen = options
         .iter()
-        .find(|row| str_field(row, "package_id").trim() == package_id);
+        .find(|row| str_field(row, "grant_id").trim() == grant_id);
 
     // The pre-check's row. It is required even on the happy path: without it a refusal could not
     // name its reason, and naming the reason is half of what this command is for.
@@ -752,8 +1035,7 @@ pub fn hold_package_for_line_pure(input: Value) -> Result<Output, String> {
 
     let mut p = Map::new();
     p.insert("redemption_id".into(), json!(redemption_id));
-    p.insert("package_id".into(), json!(package_id));
-    p.insert("customer_id".into(), json!(customer_id));
+    p.insert("grant_id".into(), json!(grant_id));
     p.insert("service_id".into(), json!(service_id));
     p.insert("checkout_ref".into(), json!(checkout_ref));
     p.insert("line_ref".into(), json!(line_ref));
@@ -764,8 +1046,9 @@ pub fn hold_package_for_line_pure(input: Value) -> Result<Output, String> {
         .with_result(json!({
             "held": true,
             "redemption_id": redemption_id,
-            "package_id": p["package_id"],
-            "customer_id": p["customer_id"],
+            "grant_id": p["grant_id"],
+            "package_id": chosen.get("package_id").cloned().unwrap_or(Value::Null),
+            "customer_id": json!(customer_id),
             "service_id": p["service_id"],
             "package_name": chosen.get("package_name").cloned().unwrap_or(Value::Null),
             // The preview travels back with the confirmation: what the till SHOWED before the

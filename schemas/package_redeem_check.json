@@ -1,12 +1,17 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "services.packages.redeem_check params",
-  "description": "Pre-check read-only de un consumo de bono: ¿se podría consumir 1 uso de :package_id por :customer_id? Devuelve redeemable (0/1) + reason de negocio. No muta; redeem sigue siendo la autoridad transaccional.",
+  "description": "Pre-check read-only de un consumo de bono: ¿se podría consumir 1 uso de la CONCESIÓN :grant_id? Devuelve redeemable (0/1) + reason de negocio (no_grant | package_not_found | no_uses_left | expired). `no_grant` es la primera respuesta y la razón de ser de services#73: un bono que nadie le vendió a este cliente es un bono que no puede gastar. No muta; redeem sigue siendo la autoridad transaccional.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["package_id", "customer_id"],
+  "required": [
+    "grant_id"
+  ],
   "properties": {
-    "package_id": { "type": "string", "minLength": 1, "description": "Id del paquete/bono a comprobar." },
-    "customer_id": { "type": "string", "minLength": 1, "description": "Id del cliente." }
+    "grant_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Id de la concesión a comprobar."
+    }
   }
 }

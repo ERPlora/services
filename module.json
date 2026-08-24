@@ -31,6 +31,7 @@
     "services.add_package",
     "services.change_package",
     "services.delete_package",
+    "services.grant_package",
     "services.redeem_package",
     "services.view_package_balance",
     "services.manage_settings",
@@ -49,7 +50,8 @@
       "services.view_package_balance",
       "services.redeem_package",
       "services.hold_package",
-      "services.settle_package"
+      "services.settle_package",
+      "services.grant_package"
     ],
     "manager": [
       "services.view_service",
@@ -65,7 +67,8 @@
       "services.view_package_balance",
       "services.hold_package",
       "services.settle_package",
-      "services.refund_package"
+      "services.refund_package",
+      "services.grant_package"
     ],
     "employee": [
       "services.view_service",
@@ -143,7 +146,8 @@
         "since": "1.0.0"
       },
       "migrations/postgres/011_voucher_tender.sql",
-      "migrations/postgres/012_voucher_refund.sql"
+      "migrations/postgres/012_voucher_refund.sql",
+      "migrations/postgres/013_package_grant.sql"
     ]
   },
   "queries": {
@@ -661,8 +665,7 @@
         {
           "query": "services.packages.redeem_check",
           "params": {
-            "package_id": "payload.package_id",
-            "customer_id": "payload.customer_id"
+            "grant_id": "payload.grant_id"
           },
           "required": true
         }
@@ -672,7 +675,7 @@
         "services.package.redeemed"
       ],
       "ai": {
-        "description": "Consumes one use of a customer's service package (bono); refuses with a domain code the caller can translate — services.package_no_uses_left, services.package_expired or services.package_not_found — instead of the raw gate error"
+        "description": "Consumes one session of a voucher the customer OWNS (a grant, i.e. a purchase); refuses with a domain code the caller can translate — services.package_no_grant, services.package_not_found, services.package_no_uses_left or services.package_expired — instead of the raw gate error. A customer with no grant has nothing to redeem, however many vouchers the catalogue offers."
       },
       "expose_api": true
     },
@@ -726,8 +729,7 @@
         {
           "query": "services.packages.redeem_check",
           "params": {
-            "package_id": "payload.package_id",
-            "customer_id": "payload.customer_id"
+            "grant_id": "payload.grant_id"
           },
           "required": true
         }
@@ -737,7 +739,7 @@
         "services.package.held"
       ],
       "ai": {
-        "description": "Reserves one session of a customer's voucher to cover one line of the checkout. The session is spent immediately but the redemption stays reversible with services.packages.release_hold until the sale is settled. Refuses with a domain code (services.package_not_found, services.package_no_uses_left, services.package_expired or services.package_does_not_cover_service) instead of the raw gate error. It issues NO fiscal document: a voucher of N sessions is univalent and its record came out when the voucher was SOLD."
+        "description": "Reserves one session of a voucher the customer OWNS (a grant) to cover one line of the checkout. The session is spent immediately but the redemption stays reversible with services.packages.release_hold until the sale is settled. Refuses with a domain code (services.package_no_grant, services.package_not_found, services.package_no_uses_left, services.package_expired or services.package_does_not_cover_service) instead of the raw gate error. It issues NO fiscal document: a voucher of N sessions is univalent and its record came out when the voucher was SOLD."
       },
       "expose_api": true
     },
@@ -829,6 +831,53 @@
         "commands/_refund_assert.sql",
         "commands/_gate_clear.sql"
       ]
+    },
+    "services.packages.grant": {
+      "permission": "services.grant_package",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "grant_package"
+      },
+      "reads": [
+        {
+          "query": "services.packages.get",
+          "params": {
+            "package_id": "payload.package_id"
+          },
+          "required": true
+        }
+      ],
+      "schema": "schemas/package_grant.json",
+      "emit": [
+        "services.package.granted"
+      ],
+      "ai": {
+        "description": "Grants a voucher to a customer: writes the PURCHASE row (who owns which voucher, when, for how much) without which no session can be spent. Snapshots the terms sold — sessions and validity — so a later edit of the catalogue cannot shorten what the customer paid for, and the validity clock starts here, at the purchase. It issues NO fiscal document of its own: a voucher of N sessions is univalent and the record comes out with the SALE that paid for it (art. 30 ter.1 of Directive 2006/112/CE). Use it when the voucher is handed over outside the till; a voucher sold on a ticket is granted automatically when the sale is completed."
+      },
+      "expose_api": true
+    },
+    "services._grant": {
+      "permission": "services.grant_package",
+      "sql": [
+        "commands/_grant_insert.sql",
+        "commands/_grant_assert.sql",
+        "commands/_gate_clear.sql"
+      ]
+    },
+    "services._on_sale_completed": {
+      "permission": "services.settle_package",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "on_sale_completed"
+      },
+      "reads": [
+        {
+          "query": "services.packages.list",
+          "required": true
+        }
+      ]
     }
   },
   "records": {
@@ -860,12 +909,13 @@
   "events": {
     "listen": {
       "sale.completed": {
-        "command": "services._settle_holds_for_sale"
+        "command": "services._on_sale_completed"
       }
     },
     "emits": [
       "services.package.created",
       "services.package.deleted",
+      "services.package.granted",
       "services.package.held",
       "services.package.hold_released",
       "services.package.redeemed",

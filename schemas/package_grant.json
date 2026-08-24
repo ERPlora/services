@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "services.packages.grant params",
+  "description": "Concede un bono a un cliente: escribe la fila de COMPRA (services_package_grant) sin la cual no se puede gastar ninguna sesión (services#73, ADR-0388). Congela los términos vendidos —sesiones y vigencia— para que una edición posterior del catálogo no acorte lo que el cliente ya pagó, y el reloj de caducidad arranca aquí, en la compra. El runtime inyecta hub_id y :now; el id de la concesión lo toma el handler de context.new_ids. 🔴 NO emite documento fiscal propio: un bono de N sesiones es univalente y el registro sale con la VENTA que lo pagó (art. 30 ter.1 de la Directiva 2006/112/CE). Un bono vendido en un ticket se concede solo al completarse la venta; esta puerta es para cuando se entrega fuera de la caja.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["package_id", "customer_id"],
+  "properties": {
+    "package_id": { "type": "string", "minLength": 1, "description": "Id del bono del catálogo que se vende. Tiene que existir en ESTE negocio y estar ofreciéndose." },
+    "customer_id": { "type": "string", "minLength": 1, "description": "Id del cliente que pasa a ser dueño de las sesiones. Obligatorio: un bono sin dueño no lo puede canjear nadie." },
+    "granted_at": { "type": ["string", "null"], "maxLength": 40, "description": "Momento de la COMPRA (ISO-8601). Por defecto :now. Se acepta del caller porque el instante que cuenta es cuándo se vendió el bono, no cuándo corrió la sentencia: el listener de sale.completed lo entrega el outbox y puede llegar segundos —o, tras un reintento, minutos— después." },
+    "source": { "type": ["string", "null"], "enum": ["sale", "manual", null], "description": "Cómo llegó aquí: `sale` (lo vendió la caja) o `manual` (lo concedió un operador). Por defecto `manual`. El valor `legacy` lo reserva la migración 013 para las concesiones que reconstruyó de canjes antiguos." },
+    "sale_id": { "type": ["string", "null"], "maxLength": 128, "description": "Id de la venta que lo pagó (opcional). Opaco para services." },
+    "sale_ref": { "type": ["string", "null"], "maxLength": 160, "description": "Referencia exacta de la línea y la unidad de esa venta. Es la CLAVE DE IDEMPOTENCIA: un sale.completed reentregado no puede conceder el bono dos veces (índice único parcial)." },
+    "amount_cents": { "type": ["integer", "null"], "minimum": 0, "description": "Importe BRUTO cobrado por este bono, en céntimos (ADR-0007/0123)." },
+    "net_amount_cents": { "type": ["integer", "null"], "minimum": 0, "description": "Base imponible de ese importe, en céntimos. Es la mitad que necesita el devengo: qué se declaró y por cuánto." },
+    "tax_amount_cents": { "type": ["integer", "null"], "minimum": 0, "description": "IVA de ese importe, en céntimos. El del SERVICIO, porque el bono univalente se devenga al venderse con el tipo del servicio." },
+    "note": { "type": ["string", "null"], "maxLength": 500, "description": "Nota libre de la concesión (opcional)." }
+  }
+}

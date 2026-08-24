@@ -364,10 +364,20 @@ def expiry_runs_from_the_purchase(db: ScratchDb, svc: str, pkg: str) -> None:
         )[0]["reason"],
     )
     refused("redeeming an expired grant", lambda: redeem(db, stale))
+    # The expiry is not a stored string: it is the pair (granted_at, validity_days) snapshotted on
+    # the grant, read through the same `erp_dateadd` bridge as everywhere else in this module.
+    balance = [
+        r for r in rows(db, "services.packages.balance", {"customer_id": dora})
+        if r["grant_id"] == stale
+    ]
+    check("the balance names the grant", 1, len(balance))
+    check("anchored on the purchase, not on a first use it never had", FORTY_DAYS_AGO, balance[0]["granted_at"])
+    check("with no session spent", 0, balance[0]["used"])
+    check("and reported as expired", 1, balance[0]["is_expired"])
     check(
-        "the grant carries its materialised expiry",
-        "2026-08-08T10:00:00Z",
-        db.scalar(f"SELECT expires_at FROM services_package_grant WHERE id = '{stale}'"),
+        "the expiry is 30 days after the PURCHASE",
+        "2026-08-08T10:00:00+00:00",
+        balance[0]["expires_at"],
     )
 
 

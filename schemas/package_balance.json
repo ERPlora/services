@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "services.packages.balance params",
-  "description": "Parámetros de queries/package_balance.sql. El scope hub_id y :now los inyecta el runtime (§2.5/§2.9).",
+  "description": "Parámetros de queries/package_balance.sql: los bonos que este cliente POSEE y lo que queda en cada uno — una fila por CONCESIÓN, así que un cliente que compró el mismo bono dos veces ve dos (services#73). El scope hub_id y :now los inyecta el runtime (§2.5/§2.9).",
   "type": "object",
   "properties": {
     "customer_id": {
@@ -9,6 +9,8 @@
       "description": "Id del cliente cuyo saldo de bonos/paquetes se consulta."
     }
   },
-  "required": ["customer_id"],
+  "required": [
+    "customer_id"
+  ],
   "additionalProperties": false
 }
