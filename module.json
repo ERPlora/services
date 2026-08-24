@@ -126,6 +126,11 @@
         "file": "migrations/postgres/009_retire_addon_tables.sql",
         "kind": "contract",
         "since": "1.0.0"
+      },
+      {
+        "file": "migrations/postgres/010_retire_variant_table.sql",
+        "kind": "contract",
+        "since": "1.0.0"
       }
     ]
   },
