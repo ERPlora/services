@@ -656,8 +656,12 @@ def main() -> int:
         print("\nM. …and when even the age is identical, the order is still not left to chance")
         db.psql([], db=db.name, stdin=(
             f"UPDATE services_package_grant SET granted_at = '{NOW}' WHERE id = '{twin_b_grant}';"))
-        runs = [[r["package_id"] for r in options(db, "cus-11", wash)] for _ in range(4)]
-        check("no tie is left to chance", sorted([twin_a, twin_b]), runs[0])
+        # 🔴 The last-resort key is the GRANT id (services#73), not the package id, so that is what
+        # this asserts on. Comparing package ids here passed on a COIN FLIP — two random UUIDs sort
+        # the same way about half the time — and it was green locally and red in CI on the same
+        # commit. An assertion that is right 50 % of the time is not an assertion.
+        runs = [[r["grant_id"] for r in options(db, "cus-11", wash)] for _ in range(4)]
+        check("no tie is left to chance", sorted([twin_a_grant, twin_b_grant]), runs[0])
         check("and it is stable across four looks at the same screen", [runs[0]] * 4, runs)
         check("the last resort is named too", "stable_order",
               options(db, "cus-11", wash)[0]["default_reason"])
