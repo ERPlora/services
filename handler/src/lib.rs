@@ -1562,7 +1562,7 @@ mod tests {
     }
 
     fn redeem_payload() -> Value {
-        json!({ "package_id": "pkg-1", "customer_id": "cus-1" })
+        json!({ "grant_id": "grant-1" })
     }
 
     #[test]
@@ -1659,8 +1659,7 @@ mod tests {
         let out = redeem_package_pure(redeem_input(
             Some(json!({ "redeemable": 1, "reason": "" })),
             json!({
-                "package_id": "pkg-1",
-                "customer_id": "cus-1",
+                "grant_id": "grant-1",
                 "appointment_id": "apt-9",
                 "note": "first use"
             }),
@@ -1671,8 +1670,12 @@ mod tests {
         let op = &out.operations[0];
         assert_eq!(op.command, "services._redeem");
         assert_eq!(op.params["redemption_id"], json!("red-1"), "the host's id batch, front first");
-        assert_eq!(op.params["package_id"], json!("pkg-1"));
-        assert_eq!(op.params["customer_id"], json!("cus-1"));
+        assert_eq!(op.params["grant_id"], json!("grant-1"));
+        assert!(
+            op.params.get("package_id").is_none() && op.params.get("customer_id").is_none(),
+            "services#73: the owner and the voucher are read off the grant inside the statement, \
+             never taken from the payload — a pair on the wire is a pair a caller can forge"
+        );
         assert_eq!(op.params["appointment_id"], json!("apt-9"));
         assert_eq!(op.params["note"], json!("first use"));
         assert!(op.params["sale_id"].is_null(), "an optional link the caller did not send is NULL, not a string");
@@ -1706,9 +1709,10 @@ mod tests {
     // handler no se fía del payload para datos de negocio, y que el manifest declare la read no
     // prueba que el handler la use — estos tests son lo que lo prueba.
 
-    fn tender_option(package_id: &str) -> Value {
+    fn tender_option(grant_id: &str) -> Value {
         json!({
-            "package_id": package_id,
+            "grant_id": grant_id,
+            "package_id": "pkg-1",
             "package_name": "Bono 5 cortes",
             "remaining_before": 5,
             "remaining_after": 4,
@@ -1720,7 +1724,7 @@ mod tests {
 
     fn hold_payload() -> Value {
         json!({
-            "package_id": "pkg-1",
+            "grant_id": "grant-1",
             "customer_id": "cus-1",
             "service_id": "svc-1",
             "checkout_ref": "order-7",
@@ -1745,7 +1749,7 @@ mod tests {
 
     fn eligible_input(payload: Value) -> Value {
         hold_input(
-            Some(json!([tender_option("pkg-1")])),
+            Some(json!([tender_option("grant-1")])),
             Some(json!({ "redeemable": 1, "reason": "" })),
             payload,
         )
@@ -1759,8 +1763,12 @@ mod tests {
         let op = &out.operations[0];
         assert_eq!(op.command, "services._hold");
         assert_eq!(op.params["redemption_id"], json!("red-1"), "the host's id batch, front first");
-        assert_eq!(op.params["package_id"], json!("pkg-1"));
-        assert_eq!(op.params["customer_id"], json!("cus-1"));
+        assert_eq!(op.params["grant_id"], json!("grant-1"));
+        assert!(
+            op.params.get("package_id").is_none() && op.params.get("customer_id").is_none(),
+            "services#73: the owner and the voucher come off the grant inside the statement, so a \
+             till cannot charge one customer's line to another customer's voucher"
+        );
         assert_eq!(op.params["service_id"], json!("svc-1"), "which LINE the session covers");
         assert_eq!(op.params["checkout_ref"], json!("order-7"));
         assert_eq!(op.params["line_ref"], json!("line-1"));
@@ -1778,7 +1786,7 @@ mod tests {
     #[test]
     fn a_voucher_that_does_not_cover_this_service_is_refused_however_the_payload_insists() {
         let out = hold_package_for_line_pure(hold_input(
-            Some(json!([tender_option("pkg-otro")])),
+            Some(json!([tender_option("grant-otro")])),
             Some(json!({ "redeemable": 1, "reason": "" })),
             hold_payload(),
         ))
@@ -1819,7 +1827,7 @@ mod tests {
     fn without_the_reads_nothing_is_held() {
         for input in [
             hold_input(None, Some(json!({ "redeemable": 1, "reason": "" })), hold_payload()),
-            hold_input(Some(json!([tender_option("pkg-1")])), None, hold_payload()),
+            hold_input(Some(json!([tender_option("grant-1")])), None, hold_payload()),
             hold_input(None, None, hold_payload()),
         ] {
             let out = hold_package_for_line_pure(input).unwrap();
@@ -1832,7 +1840,7 @@ mod tests {
     /// que deshacer ni línea que liberar, y la reserva quedaría huérfana en la tabla.
     #[test]
     fn a_hold_without_its_checkout_and_line_is_refused() {
-        for missing in ["service_id", "checkout_ref", "line_ref", "package_id", "customer_id"] {
+        for missing in ["service_id", "checkout_ref", "line_ref", "grant_id", "customer_id"] {
             let mut payload = hold_payload();
             payload[missing] = json!("");
             let out = hold_package_for_line_pure(eligible_input(payload)).unwrap();

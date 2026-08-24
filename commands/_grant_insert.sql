@@ -28,9 +28,12 @@
 -- is when the voucher was SOLD, not when this statement ran: the listener of `sale.completed` is
 -- delivered by the outbox and can legitimately run seconds — or, after a retry, minutes — later.
 --
--- The integer binds are CAST to BIGINT on purpose: that is the type the runtime puts on the wire,
--- and pinning it in the statement is what stops Postgres from inferring `int4` for the parameters a
--- payload omits. Full story in commands/service_create.sql (services#50).
+-- The integer binds are CAST to BIGINT INSIDE the `COALESCE`, and the order is the point: that is
+-- the type the runtime puts on the wire, and pinning it on the PARAMETER is what stops Postgres
+-- from inferring `int4` from the `0` literal for a value the payload omits. Wrapping the whole
+-- COALESCE instead casts the RESULT and leaves the slot as `int4`, which is the shape that pushed
+-- 8 bytes into a 4-byte slot in services#50. `tests/bind_types.postgres.test.py` PREPAREs every
+-- statement and refuses the wrong one. Full story in commands/service_create.sql.
 INSERT INTO services_package_grant
   (id, hub_id, package_id, customer_id, granted_at, source, sale_id, sale_ref,
    amount_cents, net_amount_cents, tax_amount_cents, max_uses, validity_days, note,
@@ -38,9 +41,9 @@ INSERT INTO services_package_grant
 SELECT
   :grant_id, :hub_id, p.id, :customer_id, COALESCE(:granted_at, :now),
   COALESCE(:source, 'manual'), :sale_id, COALESCE(:sale_ref, ''),
-  CAST(COALESCE(:amount_cents, 0) AS BIGINT),
-  CAST(COALESCE(:net_amount_cents, 0) AS BIGINT),
-  CAST(COALESCE(:tax_amount_cents, 0) AS BIGINT),
+  COALESCE(CAST(:amount_cents AS BIGINT), 0),
+  COALESCE(CAST(:net_amount_cents AS BIGINT), 0),
+  COALESCE(CAST(:tax_amount_cents AS BIGINT), 0),
   p.max_uses, p.validity_days, COALESCE(:note, ''),
   0, :current_user_id, :current_user_id, :now, :now
 FROM services_package p

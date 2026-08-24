@@ -164,6 +164,8 @@
     "services.category_update_rejected": "The category could not be updated: it does not exist in this business, or the parent you picked does not (or is the category itself).",
     "services.category_not_found": "That category does not exist in this business.",
     "services.package_not_found": "That package does not exist in this business.",
+    "services.package_no_grant": "This customer does not have that voucher: nobody has sold it to them.",
+    "services.grant_customer_required": "Pick the customer this voucher belongs to: a voucher with no owner cannot be redeemed.",
     "services.package_needs_lines": "A package needs at least one service line: a package with no lines cannot be sold or redeemed.",
     "services.package_no_uses_left": "This voucher has no sessions left.",
     "services.package_expired": "This voucher has expired.",

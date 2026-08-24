@@ -16,14 +16,17 @@ This file pins the CONTRACT (the Rust unit tests pin the mapping itself, and
 `tests/redeem_reasons.postgres.test.py` pins the SQL):
 
   1. the command routes to the handler `redeem_package` and declares the read of
-     `services.packages.redeem_check`, parameterized with the payload's ids and `required`
-     (a redemption is money: it does not admit guessing, hub#701);
+     `services.packages.redeem_check`, parameterized with the payload's GRANT id and `required`
+     (a redemption is money: it does not admit guessing, hub#701). Since services#73 the payload
+     names the customer's PURCHASE and not a catalogue package plus a customer id: the owner and
+     the voucher are read off the grant, so the pair cannot be forged on the wire;
   2. the gated statements (conditional INSERT + assert + clear) live in the private command
      `services._redeem`, reachable only as the handler's intention;
   3. those statements bind `:redemption_id` — the id the handler takes from the host's batch and
      hands back to the caller — and no longer the per-statement `:new_id`;
-  4. the three refusal codes (+ the closed-guard fallback) exist in BOTH locales, so what reaches
-     a Spanish screen is a sentence, not a code or a stack trace.
+  4. the four refusal codes (+ the closed-guard fallback) exist in BOTH locales, so what reaches
+     a Spanish screen is a sentence, not a code or a stack trace. `services.package_no_grant` is
+     the one services#73 added, and it is the honest answer to «this customer never bought that».
 
 Usage: tests/redeem_reasons.contract.test.py   (exit 0 = green)
 """
@@ -83,7 +86,7 @@ def main() -> int:
         check("read query", "services.packages.redeem_check", read.get("query"))
         check(
             "read params come from the payload",
-            {"package_id": "payload.package_id", "customer_id": "payload.customer_id"},
+            {"grant_id": "payload.grant_id"},
             read.get("params"),
         )
         check(
@@ -123,6 +126,8 @@ def main() -> int:
 
     print("\n4. the refusal codes exist in BOTH locales (en source + es, ADR-0055)")
     codes = [
+        "services.package_no_grant",
+        "services.grant_customer_required",
         "services.package_no_uses_left",
         "services.package_expired",
         "services.package_not_found",
