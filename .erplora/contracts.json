@@ -6,6 +6,7 @@
       "services.categories.list",
       "services.packages.get",
       "services.packages.list",
+      "services.packages.tender_options",
       "services.services.get",
       "services.services.list",
       "taxes.categories.list"
@@ -19,6 +20,8 @@
       "services.categories.update",
       "services.packages.create",
       "services.packages.delete",
+      "services.packages.hold_for_line",
+      "services.packages.release_hold",
       "services.packages.update",
       "services.services.create",
       "services.services.delete",

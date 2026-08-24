@@ -20,8 +20,11 @@ with no stock.
 - **It does not track stock.** A service has no units in the back room.
 - **It does not grant a package to a customer when they buy it.** It can **redeem** a use; creating
   the entitlement in the first place is the checkout's job.
-- **It has no screens for variants or add-ons.** Both exist in the data model but have no query or
-  command declared. <!-- TODO: verify -->
+- **It has no variants or add-ons.** Both schemas were retired — add-ons in services#67 (the priced
+  option belongs to `modifiers`, ADR-0376) and variants in services#69 — because neither ever had a
+  query, a command or a screen.
+- **It does not charge money and it does not issue an invoice.** A voucher redemption moves a
+  balance; the fiscal record came out when the voucher was SOLD.
 
 ## Modules it connects to
 
@@ -37,9 +40,16 @@ with no stock.
 |---|---|
 | `services.service.created` / `.updated` / `.deleted` | a service changes |
 | `services.package.created` / `.updated` / `.deleted` | a package changes |
-| `services.package.redeemed` | one use of a customer's package is consumed |
+| `services.package.redeemed` | one use of a customer's package is consumed (at the chair) |
+| `services.package.held` | one session is reserved to cover a checkout line |
+| `services.package.hold_released` | a reserved session is given back because the redemption was undone |
+| `services.package.settled` | a reserved session becomes final because the sale was paid |
 
-**Events it listens to** — none.
+**Events it listens to**
+
+| Event | What it does |
+|---|---|
+| `sale.completed` (from `sales`) | settles every voucher session held against that checkout, so a session already delivered can no longer be undone. A quick sale with no `order_id` settles nothing here and goes through `services.packages.settle_hold` instead. |
 
 ## Packages, in one paragraph
 
@@ -47,6 +57,26 @@ A package bundles several services with a discount, an optional maximum number o
 optional validity in days. When a customer uses one, a **redemption** is written to an append-only
 ledger. Remaining uses are the maximum minus what has been used, and the expiry clock starts at the
 **first** redemption, not at purchase.
+
+## The voucher as a tender (ADR-0386)
+
+A voucher is N uses of **concrete services**, not a wallet, so at the till it covers a **LINE** —
+the eligible service's line, whole or not at all — and whatever it does not cover (the shampoo) is
+charged with its own tender. Partial authorisation, where the tender covers what it can and passes
+the rest on, belongs to a **gift card** (money in euros), which is a different family and is not
+this.
+
+The redemption is **explicit and previewed**: `services.packages.tender_options` says which vouchers
+cover the line, how many sessions are left now and how many are left **after**, which one will be
+spent and **why**. `services.packages.hold_for_line` reserves it, `release_hold` undoes it while the
+sale is not paid, and `settle_hold` — or `sale.completed` — makes it final.
+
+🔴 **Redeeming issues no fiscal document.** A voucher of N sessions is *univalent*: the record came
+out when the voucher was **sold**, with the service's VAT. Art. 30 ter.1 of Directive 2006/112/CE
+says the supply made in exchange for the voucher «shall not be regarded as an independent
+transaction», so a second document here would be double taxation. Vouchers are not in the Spanish
+LIVA — Directive 2016/1065 was never transposed — so what governs is the Directive plus the DGT
+Resolution of 28/12/2018.
 
 ## Where its numbers come from
 

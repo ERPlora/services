@@ -109,7 +109,34 @@
     "deletePackageHint": "el paquete y sus {count} línea(s) desaparecen del catálogo; los bonos ya vendidos conservan su saldo.",
     "errorPackageNoLines": "Añade al menos un servicio: un paquete sin líneas no se puede canjear.",
     "errorSavePackage": "No se pudo guardar el paquete",
-    "errorDeletePackage": "No se pudo eliminar el paquete"
+    "errorDeletePackage": "No se pudo eliminar el paquete",
+    "tender": {
+      "title": "Pagar esta línea con un bono",
+      "candidates": "{count} bonos válidos",
+      "remainingAfter": "Quedan {before} sesiones · {after} después de esta",
+      "unlimited": "Sesiones ilimitadas",
+      "expires": "Caduca el {date}",
+      "none": "Este cliente no tiene ningún bono que cubra este servicio.",
+      "loadFailed": "No se han podido cargar los bonos del cliente. Inténtalo otra vez antes de cobrar el precio completo.",
+      "holdFailed": "No se ha podido reservar la sesión de ese bono.",
+      "releaseFailed": "No se ha podido devolver la sesión de ese bono.",
+      "held": "{name}: sesión gastada. Quedan {after}.",
+      "heldUnlimited": "{name}: sesión gastada.",
+      "btnConfirm": "Gastar una sesión",
+      "btnHolding": "Reservando…",
+      "btnUndo": "Deshacer",
+      "btnRetry": "Reintentar",
+      "reason": {
+        "only_option": "Es el único bono que cubre este servicio.",
+        "finite_before_unlimited": "Se gasta primero porque tiene un número limitado de sesiones.",
+        "expires_first": "Se gasta primero porque es el que antes caduca.",
+        "already_started": "Se gasta primero para terminar el bono que ya estaba empezado.",
+        "fewest_sessions_left": "Se gasta primero porque es al que le quedan menos sesiones.",
+        "oldest_voucher": "Se gasta primero porque es el bono más antiguo.",
+        "stable_order": "Los dos bonos son equivalentes; este va siempre primero.",
+        "generic": "Este es el bono que se va a gastar."
+      }
+    }
   },
   "errors": {
     "services.category_unavailable": "Esa categoría no está disponible: no existe en este negocio o se ha eliminado.",
@@ -123,6 +150,9 @@
     "services.package_needs_lines": "Un paquete necesita al menos una línea de servicio: un paquete sin líneas no se puede vender ni canjear.",
     "services.package_no_uses_left": "Este bono ya no tiene sesiones disponibles.",
     "services.package_expired": "Este bono ha caducado.",
-    "services.package_not_redeemable": "Este bono no se puede canjear ahora mismo."
+    "services.package_not_redeemable": "Este bono no se puede canjear ahora mismo.",
+    "services.package_does_not_cover_service": "Este bono no cubre ese servicio. Un bono de cortes paga cortes, no el champú.",
+    "services.hold_not_releasable": "Esa sesión del bono ya no se puede devolver: la venta está cobrada. Devolverla es una devolución, y va por su propia puerta.",
+    "services.hold_not_settleable": "Esa sesión del bono no se ha podido liquidar: no existe aquí, ya se devolvió, o ya estaba liquidada."
   }
 }

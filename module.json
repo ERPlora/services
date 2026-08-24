@@ -824,5 +824,13 @@
   },
   "ui": {
     "entry": "dist/services.esm.js"
-  }
+  },
+  "provides_slots": [
+    {
+      "slot": "sales.pos.tender",
+      "component": "erp-services-voucher-tender",
+      "permission": "services.view_package_balance",
+      "priority": 100
+    }
+  ]
 }

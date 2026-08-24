@@ -108,7 +108,34 @@
     "deletePackageHint": "the package and its {count} line(s) disappear from the catalogue; vouchers already sold keep their balance.",
     "errorPackageNoLines": "Add at least one service: a package with no lines cannot be redeemed.",
     "errorSavePackage": "Could not save the package",
-    "errorDeletePackage": "Could not delete the package"
+    "errorDeletePackage": "Could not delete the package",
+    "tender": {
+      "title": "Pay this line with a voucher",
+      "candidates": "{count} valid vouchers",
+      "remainingAfter": "{before} sessions left · {after} after this one",
+      "unlimited": "Unlimited sessions",
+      "expires": "Expires {date}",
+      "none": "This customer has no voucher that covers this service.",
+      "loadFailed": "The customer's vouchers could not be loaded. Try again before charging full price.",
+      "holdFailed": "That voucher session could not be reserved.",
+      "releaseFailed": "That voucher session could not be given back.",
+      "held": "{name}: session used. {after} left.",
+      "heldUnlimited": "{name}: session used.",
+      "btnConfirm": "Use one session",
+      "btnHolding": "Reserving…",
+      "btnUndo": "Undo",
+      "btnRetry": "Try again",
+      "reason": {
+        "only_option": "The only voucher that covers this service.",
+        "finite_before_unlimited": "Used first because it has a limited number of sessions.",
+        "expires_first": "Used first because it expires soonest.",
+        "already_started": "Used first to finish the voucher already started.",
+        "fewest_sessions_left": "Used first because it has the fewest sessions left.",
+        "oldest_voucher": "Used first because it is the oldest voucher.",
+        "stable_order": "Both vouchers are equivalent; this one always goes first.",
+        "generic": "This is the voucher that will be used."
+      }
+    }
   },
   "errors": {
     "services.category_unavailable": "That category is not available: it does not exist in this business or it has been deleted.",
@@ -122,6 +149,9 @@
     "services.package_needs_lines": "A package needs at least one service line: a package with no lines cannot be sold or redeemed.",
     "services.package_no_uses_left": "This voucher has no sessions left.",
     "services.package_expired": "This voucher has expired.",
-    "services.package_not_redeemable": "This voucher cannot be redeemed right now."
+    "services.package_not_redeemable": "This voucher cannot be redeemed right now.",
+    "services.package_does_not_cover_service": "This voucher does not cover that service. A voucher of haircuts pays for haircuts, not for the shampoo.",
+    "services.hold_not_releasable": "That voucher session can no longer be given back: the sale was already paid. Refunding it is a return, and it goes through its own door.",
+    "services.hold_not_settleable": "That voucher session could not be settled: it does not exist here, it was already given back, or it was settled before."
   }
 }

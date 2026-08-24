@@ -52,13 +52,40 @@ is the checkout's job, not this module's. Services offers the contract; it never
 
 So if a customer "has a voucher" that this module does not know about, the grant step is missing.
 
+## A voucher cannot be spent twice, and that is enforced by the database
+
+The rule «this voucher has N sessions» is a count, and a count is a check-then-act against a SECOND
+till: under Postgres's default isolation both transactions read the same snapshot, both see «one
+session left», and both write. That is the bug Odoo has had open since 2021 (#79235) — the card is
+never marked exhausted — and it is the reason the guard is not an `IF`.
+
+Every redemption carries a **use ordinal** (`use_index`), unique per hub, voucher and customer among
+the live rows. Two tills redeeming at the same time compute the same ordinal and the unique index
+lets exactly one of them commit; the loser's whole transaction rolls back, so there is no row, no
+event and no session spent. A second index does the same for the checkout line: one line is covered
+by ONE redemption, so a double tap on «pay with voucher» cannot charge one line to two sessions.
+
+Both hold against raw SQL that skips the commands entirely, which is the point of putting them in
+the schema rather than in a statement.
+
+## A reserved session can be given back — until the sale is paid
+
+At the till the redemption happens in two steps. `services.packages.hold_for_line` **reserves** the
+session (it is spent from that moment: nothing else can take it), and the sale being paid **settles**
+it. Between the two, `services.packages.release_hold` undoes it and the session comes back.
+
+After settling, it refuses: `services.hold_not_releasable`. Giving that session back is a **refund**,
+not an undo, and it goes through its own audited door. Release and settle are the same conditional
+UPDATE over the same row, so they can never both win.
+
 ## A refused redemption rolls everything back
 
 Redeeming checks three things and refuses if any fails:
 
 - the package does not exist or is inactive → `package_not_found`;
 - the maximum uses are already consumed → `no_uses_left`;
-- the validity window has passed → `expired`.
+- the validity window has passed → `expired`;
+- and, at the till, the voucher does not cover that line's service → `package_does_not_cover_service`.
 
 The refusal is a **rollback**, not a partial write. Use the check command first if you want the
 reason without attempting the write.

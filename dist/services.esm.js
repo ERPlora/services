@@ -3547,7 +3547,34 @@ var es_default = {
     deletePackageHint: "el paquete y sus {count} l\xEDnea(s) desaparecen del cat\xE1logo; los bonos ya vendidos conservan su saldo.",
     errorPackageNoLines: "A\xF1ade al menos un servicio: un paquete sin l\xEDneas no se puede canjear.",
     errorSavePackage: "No se pudo guardar el paquete",
-    errorDeletePackage: "No se pudo eliminar el paquete"
+    errorDeletePackage: "No se pudo eliminar el paquete",
+    tender: {
+      title: "Pagar esta l\xEDnea con un bono",
+      candidates: "{count} bonos v\xE1lidos",
+      remainingAfter: "Quedan {before} sesiones \xB7 {after} despu\xE9s de esta",
+      unlimited: "Sesiones ilimitadas",
+      expires: "Caduca el {date}",
+      none: "Este cliente no tiene ning\xFAn bono que cubra este servicio.",
+      loadFailed: "No se han podido cargar los bonos del cliente. Int\xE9ntalo otra vez antes de cobrar el precio completo.",
+      holdFailed: "No se ha podido reservar la sesi\xF3n de ese bono.",
+      releaseFailed: "No se ha podido devolver la sesi\xF3n de ese bono.",
+      held: "{name}: sesi\xF3n gastada. Quedan {after}.",
+      heldUnlimited: "{name}: sesi\xF3n gastada.",
+      btnConfirm: "Gastar una sesi\xF3n",
+      btnHolding: "Reservando\u2026",
+      btnUndo: "Deshacer",
+      btnRetry: "Reintentar",
+      reason: {
+        only_option: "Es el \xFAnico bono que cubre este servicio.",
+        finite_before_unlimited: "Se gasta primero porque tiene un n\xFAmero limitado de sesiones.",
+        expires_first: "Se gasta primero porque es el que antes caduca.",
+        already_started: "Se gasta primero para terminar el bono que ya estaba empezado.",
+        fewest_sessions_left: "Se gasta primero porque es al que le quedan menos sesiones.",
+        oldest_voucher: "Se gasta primero porque es el bono m\xE1s antiguo.",
+        stable_order: "Los dos bonos son equivalentes; este va siempre primero.",
+        generic: "Este es el bono que se va a gastar."
+      }
+    }
   },
   errors: {
     "services.category_unavailable": "Esa categor\xEDa no est\xE1 disponible: no existe en este negocio o se ha eliminado.",
@@ -3561,7 +3588,10 @@ var es_default = {
     "services.package_needs_lines": "Un paquete necesita al menos una l\xEDnea de servicio: un paquete sin l\xEDneas no se puede vender ni canjear.",
     "services.package_no_uses_left": "Este bono ya no tiene sesiones disponibles.",
     "services.package_expired": "Este bono ha caducado.",
-    "services.package_not_redeemable": "Este bono no se puede canjear ahora mismo."
+    "services.package_not_redeemable": "Este bono no se puede canjear ahora mismo.",
+    "services.package_does_not_cover_service": "Este bono no cubre ese servicio. Un bono de cortes paga cortes, no el champ\xFA.",
+    "services.hold_not_releasable": "Esa sesi\xF3n del bono ya no se puede devolver: la venta est\xE1 cobrada. Devolverla es una devoluci\xF3n, y va por su propia puerta.",
+    "services.hold_not_settleable": "Esa sesi\xF3n del bono no se ha podido liquidar: no existe aqu\xED, ya se devolvi\xF3, o ya estaba liquidada."
   }
 };
 
@@ -3676,7 +3706,34 @@ var en_default = {
     deletePackageHint: "the package and its {count} line(s) disappear from the catalogue; vouchers already sold keep their balance.",
     errorPackageNoLines: "Add at least one service: a package with no lines cannot be redeemed.",
     errorSavePackage: "Could not save the package",
-    errorDeletePackage: "Could not delete the package"
+    errorDeletePackage: "Could not delete the package",
+    tender: {
+      title: "Pay this line with a voucher",
+      candidates: "{count} valid vouchers",
+      remainingAfter: "{before} sessions left \xB7 {after} after this one",
+      unlimited: "Unlimited sessions",
+      expires: "Expires {date}",
+      none: "This customer has no voucher that covers this service.",
+      loadFailed: "The customer's vouchers could not be loaded. Try again before charging full price.",
+      holdFailed: "That voucher session could not be reserved.",
+      releaseFailed: "That voucher session could not be given back.",
+      held: "{name}: session used. {after} left.",
+      heldUnlimited: "{name}: session used.",
+      btnConfirm: "Use one session",
+      btnHolding: "Reserving\u2026",
+      btnUndo: "Undo",
+      btnRetry: "Try again",
+      reason: {
+        only_option: "The only voucher that covers this service.",
+        finite_before_unlimited: "Used first because it has a limited number of sessions.",
+        expires_first: "Used first because it expires soonest.",
+        already_started: "Used first to finish the voucher already started.",
+        fewest_sessions_left: "Used first because it has the fewest sessions left.",
+        oldest_voucher: "Used first because it is the oldest voucher.",
+        stable_order: "Both vouchers are equivalent; this one always goes first.",
+        generic: "This is the voucher that will be used."
+      }
+    }
   },
   errors: {
     "services.category_unavailable": "That category is not available: it does not exist in this business or it has been deleted.",
@@ -3690,7 +3747,10 @@ var en_default = {
     "services.package_needs_lines": "A package needs at least one service line: a package with no lines cannot be sold or redeemed.",
     "services.package_no_uses_left": "This voucher has no sessions left.",
     "services.package_expired": "This voucher has expired.",
-    "services.package_not_redeemable": "This voucher cannot be redeemed right now."
+    "services.package_not_redeemable": "This voucher cannot be redeemed right now.",
+    "services.package_does_not_cover_service": "This voucher does not cover that service. A voucher of haircuts pays for haircuts, not for the shampoo.",
+    "services.hold_not_releasable": "That voucher session can no longer be given back: the sale was already paid. Refunding it is a return, and it goes through its own door.",
+    "services.hold_not_settleable": "That voucher session could not be settled: it does not exist here, it was already given back, or it was settled before."
   }
 };
 
@@ -4752,3 +4812,313 @@ __decorateClass([
   r5()
 ], ErpServicesPackages.prototype, "deleteTarget", 2);
 define("erp-services-packages", ErpServicesPackages);
+
+// ui/components/erp-services-voucher-tender/erp-services-voucher-tender.ts
+var CATALOG4 = { es: es_default, en: en_default };
+var REASONS = [
+  "only_option",
+  "finite_before_unlimited",
+  "expires_first",
+  "already_started",
+  "fewest_sessions_left",
+  "oldest_voucher",
+  "stable_order"
+];
+function erplora4() {
+  const c5 = globalThis.erplora;
+  if (!c5) throw new Error("erplora SDK no inicializado por el shell");
+  return c5;
+}
+function can4(permission) {
+  const client = erplora4();
+  return typeof client.hasPermission === "function" ? client.hasPermission(permission) : true;
+}
+var ErpServicesVoucherTender = class extends i3 {
+  constructor() {
+    super(...arguments);
+    this.customerId = "";
+    this.serviceId = "";
+    this.checkoutRef = "";
+    this.lineRef = "";
+    this.options = [];
+    this.selectedId = "";
+    this.held = null;
+    this.feedback = "";
+    this.loading = true;
+    this.loadFailed = false;
+    this.busy = false;
+  }
+  static {
+    this.styles = i`
+    :host { display: block; font-family: system-ui, sans-serif; color: var(--ion-text-color, #1c1b18); }
+    .box { display: flex; flex-direction: column; gap: 0.6rem; }
+    .head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
+    .title { font-size: 0.95rem; font-weight: 600; margin: 0; }
+    .candidates { font-size: 0.8rem; color: var(--ion-color-medium, #6b6b6b); }
+    .option { display: grid; grid-template-columns: auto 1fr; gap: 0.5rem; align-items: start;
+              padding: 0.55rem 0.6rem; border: 1px solid var(--ion-color-step-200, #e2e0dc);
+              border-radius: 0.6rem; cursor: pointer; }
+    .option[aria-checked='true'] { border-color: var(--ion-color-primary, #3b7d4f); background: var(--ion-color-step-50, #f7f6f3); }
+    .name { font-weight: 600; }
+    .counter { font-variant-numeric: tabular-nums; }
+    .meta { font-size: 0.8rem; color: var(--ion-color-medium, #6b6b6b); display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .reason { font-size: 0.8rem; }
+    .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .actions ion-button { flex: 1 1 9rem; }
+    @media (min-width: 40rem) { .actions ion-button { flex: 0 0 auto; } }
+  `;
+  }
+  connectedCallback() {
+    super.connectedCallback();
+    void this.load();
+  }
+  updated(changed) {
+    if (!this.held && (changed.has("customerId") || changed.has("serviceId") || changed.has("lineRef"))) {
+      void this.load();
+    }
+  }
+  t(key, params) {
+    return erplora4().t(CATALOG4, key, params);
+  }
+  async load() {
+    if (!this.customerId || !this.serviceId) {
+      this.options = [];
+      this.loading = false;
+      return;
+    }
+    this.loading = true;
+    this.loadFailed = false;
+    try {
+      const rows = await erplora4().query("services.packages.tender_options", {
+        customer_id: this.customerId,
+        service_id: this.serviceId
+      });
+      this.options = Array.isArray(rows) ? rows : [];
+      const stillThere = this.options.some((o7) => o7.package_id === this.selectedId);
+      if (!stillThere) {
+        this.selectedId = this.options.find((o7) => Number(o7.is_default) === 1)?.package_id ?? this.options[0]?.package_id ?? "";
+      }
+    } catch (e5) {
+      this.options = [];
+      this.loadFailed = true;
+      this.feedback = domainMessage(e5, erplora4().locale, this.t("ui.tender.loadFailed"));
+    } finally {
+      this.loading = false;
+    }
+  }
+  select(packageId) {
+    this.selectedId = packageId;
+    this.feedback = "";
+  }
+  /** The explicit redemption: nothing is spent until this runs. */
+  async confirm() {
+    const option = this.options.find((o7) => o7.package_id === this.selectedId);
+    if (!option || this.busy) return;
+    this.busy = true;
+    this.feedback = "";
+    try {
+      const out = await erplora4().command("services.packages.hold_for_line", {
+        package_id: option.package_id,
+        customer_id: this.customerId,
+        service_id: this.serviceId,
+        checkout_ref: this.checkoutRef,
+        line_ref: this.lineRef
+      });
+      this.held = {
+        redemption_id: String(out?.redemption_id ?? ""),
+        package_name: String(out?.package_name ?? option.package_name),
+        remaining_after: out?.remaining_after ?? option.remaining_after
+      };
+      this.dispatchEvent(
+        new CustomEvent("erp:voucher-held", {
+          bubbles: true,
+          composed: true,
+          detail: {
+            redemptionId: this.held.redemption_id,
+            packageId: option.package_id,
+            lineRef: this.lineRef,
+            checkoutRef: this.checkoutRef
+          }
+        })
+      );
+    } catch (e5) {
+      this.feedback = domainMessage(e5, erplora4().locale, this.t("ui.tender.holdFailed"));
+    } finally {
+      this.busy = false;
+    }
+  }
+  /** Undo, which the runtime allows only while the sale is not paid. */
+  async undo() {
+    const held = this.held;
+    if (!held || this.busy) return;
+    this.busy = true;
+    this.feedback = "";
+    try {
+      await erplora4().command("services.packages.release_hold", {
+        redemption_id: held.redemption_id
+      });
+      this.held = null;
+      this.dispatchEvent(
+        new CustomEvent("erp:voucher-released", {
+          bubbles: true,
+          composed: true,
+          detail: { redemptionId: held.redemption_id, lineRef: this.lineRef }
+        })
+      );
+      await this.load();
+    } catch (e5) {
+      this.feedback = domainMessage(e5, erplora4().locale, this.t("ui.tender.releaseFailed"));
+    } finally {
+      this.busy = false;
+    }
+  }
+  renderCounter(o7) {
+    if (Number(o7.is_unlimited) === 1 || o7.remaining_after === null) {
+      return b2`<span class="counter">${this.t("ui.tender.unlimited")}</span>`;
+    }
+    return b2`<span class="counter"
+      >${this.t("ui.tender.remainingAfter", {
+      before: o7.remaining_before,
+      after: o7.remaining_after
+    })}</span
+    >`;
+  }
+  renderReason(o7) {
+    if (Number(o7.is_default) !== 1) return A;
+    const known = REASONS.includes(o7.default_reason);
+    return b2`<div class="reason">
+      ${known ? this.t(`ui.tender.reason.${o7.default_reason}`) : this.t("ui.tender.reason.generic")}
+    </div>`;
+  }
+  renderOption(o7) {
+    const chosen = o7.package_id === this.selectedId;
+    return b2`<label
+      class="option"
+      role="radio"
+      aria-checked=${chosen ? "true" : "false"}
+      data-test="option"
+    >
+      <ion-radio
+        .value=${o7.package_id}
+        ?checked=${chosen}
+        @click=${() => this.select(o7.package_id)}
+      ></ion-radio>
+      <div>
+        <div class="name">${o7.package_name}</div>
+        <div class="meta">
+          ${this.renderCounter(o7)}
+          ${o7.expires_at ? b2`<span
+                >${this.t("ui.tender.expires", {
+      date: new Date(o7.expires_at).toLocaleDateString(erplora4().locale)
+    })}</span
+              >` : A}
+        </div>
+        ${this.renderReason(o7)}
+      </div>
+    </label>`;
+  }
+  renderHeld() {
+    const held = this.held;
+    if (!held) return A;
+    return b2`<div class="box">
+      <ok-inline-feedback tone="success" icon="checkmark-circle-outline">
+        ${held.remaining_after === null ? this.t("ui.tender.heldUnlimited", { name: held.package_name }) : this.t("ui.tender.held", { name: held.package_name, after: held.remaining_after })}
+      </ok-inline-feedback>
+      ${this.feedback ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline"
+            >${this.feedback}</ok-inline-feedback
+          >` : A}
+      <div class="actions">
+        <ion-button
+          data-test="undo"
+          fill="clear"
+          ?disabled=${this.busy}
+          @click=${() => this.undo()}
+          >${this.t("ui.tender.btnUndo")}</ion-button
+        >
+      </div>
+    </div>`;
+  }
+  render() {
+    if (this.held) return this.renderHeld();
+    if (this.loading) {
+      return b2`<div class="box"><ion-skeleton-text animated style="height: 3.5rem"></ion-skeleton-text></div>`;
+    }
+    if (this.loadFailed) {
+      const detail = this.feedback && this.feedback !== this.t("ui.tender.loadFailed") ? this.feedback : "";
+      return b2`<div class="box">
+        <ok-inline-feedback tone="danger" icon="alert-circle-outline">
+          ${this.t("ui.tender.loadFailed")}${detail ? b2` <span class="meta">${detail}</span>` : A}
+        </ok-inline-feedback>
+        <div class="actions">
+          <ion-button fill="clear" data-test="retry" @click=${() => this.load()}
+            >${this.t("ui.tender.btnRetry")}</ion-button
+          >
+        </div>
+      </div>`;
+    }
+    if (this.options.length === 0) {
+      return b2`<div class="box">
+        <ok-inline-feedback tone="neutral" icon="information-circle-outline"
+          >${this.t("ui.tender.none")}</ok-inline-feedback
+        >
+      </div>`;
+    }
+    const candidates = Number(this.options[0]?.candidate_count ?? this.options.length);
+    return b2`<div class="box">
+      <div class="head">
+        <h3 class="title">${this.t("ui.tender.title")}</h3>
+        ${candidates > 1 ? b2`<span class="candidates"
+              >${this.t("ui.tender.candidates", { count: candidates })}</span
+            >` : A}
+      </div>
+      <div role="radiogroup" class="box">
+        ${this.options.map((o7) => this.renderOption(o7))}
+      </div>
+      ${this.feedback ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline"
+            >${this.feedback}</ok-inline-feedback
+          >` : A}
+      ${can4("services.hold_package") ? b2`<div class="actions">
+            <ion-button
+              data-test="confirm"
+              ?disabled=${this.busy || !this.selectedId}
+              @click=${() => this.confirm()}
+              >${this.busy ? this.t("ui.tender.btnHolding") : this.t("ui.tender.btnConfirm")}</ion-button
+            >
+          </div>` : A}
+    </div>`;
+  }
+};
+__decorateClass([
+  n4({ type: String, attribute: "customer-id" })
+], ErpServicesVoucherTender.prototype, "customerId", 2);
+__decorateClass([
+  n4({ type: String, attribute: "service-id" })
+], ErpServicesVoucherTender.prototype, "serviceId", 2);
+__decorateClass([
+  n4({ type: String, attribute: "checkout-ref" })
+], ErpServicesVoucherTender.prototype, "checkoutRef", 2);
+__decorateClass([
+  n4({ type: String, attribute: "line-ref" })
+], ErpServicesVoucherTender.prototype, "lineRef", 2);
+__decorateClass([
+  r5()
+], ErpServicesVoucherTender.prototype, "options", 2);
+__decorateClass([
+  r5()
+], ErpServicesVoucherTender.prototype, "selectedId", 2);
+__decorateClass([
+  r5()
+], ErpServicesVoucherTender.prototype, "held", 2);
+__decorateClass([
+  r5()
+], ErpServicesVoucherTender.prototype, "feedback", 2);
+__decorateClass([
+  r5()
+], ErpServicesVoucherTender.prototype, "loading", 2);
+__decorateClass([
+  r5()
+], ErpServicesVoucherTender.prototype, "loadFailed", 2);
+__decorateClass([
+  r5()
+], ErpServicesVoucherTender.prototype, "busy", 2);
+define("erp-services-voucher-tender", ErpServicesVoucherTender);
