@@ -350,9 +350,12 @@ def two_grants_coexist(db: ScratchDb, svc: str, pkg: str) -> None:
         1,
         int(db.scalar(f"SELECT count(*) FROM services_package_redemption WHERE grant_id = '{newer}' AND is_deleted = 0")),
     )
+    # The chair path has its own guard (`_redeem_insert.sql`) and its own copy of the count, so it
+    # is exercised here too rather than left to be caught sideways by another battery.
+    redeem(db, newer)
     check(
-        "and the two ledgers stay apart: 5 on one purchase, 1 on the other",
-        [5, 1],
+        "and the two ledgers stay apart: 5 on one purchase, 2 on the other",
+        [5, 2],
         [
             int(db.scalar(f"SELECT count(*) FROM services_package_redemption WHERE grant_id = '{g}' AND is_deleted = 0"))
             for g in (older, newer)
