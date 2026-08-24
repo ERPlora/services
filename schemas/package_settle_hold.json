@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "services.packages.settle_hold params",
+  "description": "Da por definitiva una reserva de sesión porque la venta se cobró (ADR-0386, services#70): a partir de aquí la sesión está entregada y el canje ya no se puede deshacer. 🔴 No emite ningún documento fiscal — el bono de N sesiones es univalente y su registro salió al venderlo (art. 30 ter.1 de la Directiva 2006/112/CE: la prestación a cambio del bono «no se considerará una operación independiente»). Emitir un segundo documento aquí sería doble imposición.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["redemption_id", "sale_id"],
+  "properties": {
+    "redemption_id": { "type": "string", "minLength": 1, "description": "Id del canje reservado que se liquida." },
+    "sale_id": { "type": "string", "minLength": 1, "description": "Id de la venta cobrada que consumió la sesión. Queda grabado en el canje para poder auditarlo y para que la devolución (services#71) sepa qué sesión devolver." }
+  }
+}

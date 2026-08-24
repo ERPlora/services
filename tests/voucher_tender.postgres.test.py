@@ -25,6 +25,7 @@ Usage: tests/voucher_tender.postgres.test.py   (exit 0 = green; SKIPPED without 
 """
 
 import json
+import re
 import subprocess
 import sys
 import time
@@ -205,11 +206,9 @@ def _rows_touched(db: ScratchDb, command: str, params: dict, hub: str) -> int:
     script = script_for(command, params, hub=hub)
     # `-c` per statement would open its own transaction; the script keeps the command's one.
     out = db.psql(["-e"], db=db.name, stdin=script)
-    touched = 0
-    for line in out.splitlines():
-        if line.startswith("UPDATE "):
-            touched += int(line.split()[1])
-    return touched
+    # `-e` echoes the statements too, so «UPDATE services_package_redemption» is in this stream
+    # next to the command tag «UPDATE 1». Only the tag counts, and only its exact shape.
+    return sum(int(m.group(1)) for m in re.finditer(r"^UPDATE (\d+)$", out, re.MULTILINE))
 
 
 def residue(db: ScratchDb, package_id: str, customer: str = "cus-1") -> tuple[int, int]:
@@ -375,6 +374,8 @@ def main() -> int:
             rows[0]["remaining_after"] if rows else None,
         )
         check("it is the default", 1, rows[0]["is_default"] if rows else None)
+        check("with nothing to break a tie against", "only_option", rows[0]["default_reason"] if rows else None)
+        check("and it says so: one candidate", 1, rows[0]["candidate_count"] if rows else None)
         check(
             "a cuts voucher does not cover a colour", [], options(db, "cus-1", colour)
         )
@@ -391,7 +392,16 @@ def main() -> int:
         check(
             "the neighbour's voucher is invisible",
             [],
-            options(db, "cus-1", cut, hub=HUB),
+            [r for r in options(db, "cus-1", cut, hub=HUB) if r["package_id"] == foreign],
+        )
+        check(
+            "and the neighbour cannot see ours either",
+            [],
+            [
+                r
+                for r in options(db, "cus-1", foreign_cut, hub=OTHER_HUB)
+                if r["package_id"] == five_cuts
+            ],
         )
 
         print("\nC. an archived or expired voucher is NOT a tender")
@@ -540,41 +550,37 @@ def main() -> int:
         )
 
         print("\nJ. two valid vouchers: the tie-break decides, and it says WHY")
+        highlights = seed_service(db, HUB, "Highlights")
         soon = seed_package(db, HUB, "Bono caduca pronto", max_uses=5, validity_days=30)
-        seed_item(db, HUB, soon, colour)
-        never = seed_package(
-            db, HUB, "Bono sin caducidad", max_uses=5, validity_days=None
-        )
-        seed_item(db, HUB, never, colour)
+        seed_item(db, HUB, soon, highlights)
+        never = seed_package(db, HUB, "Bono sin caducidad", max_uses=5, validity_days=None)
+        seed_item(db, HUB, never, highlights)
         raw_insert(db, soon, "cus-9", 1, status="consumed", redeemed_at=RECENT)
         raw_insert(db, never, "cus-9", 1, status="consumed", redeemed_at=RECENT)
-        two = options(db, "cus-9", colour)
+        two = options(db, "cus-9", highlights)
         check("both are offered", 2, len(two))
-        check(
-            "the one that EXPIRES is spent first",
-            soon,
-            two[0]["package_id"] if two else None,
-        )
-        check(
-            "and it is flagged as the default", 1, two[0]["is_default"] if two else None
-        )
-        check(
-            "the reason is named, not implied",
-            "expires_first",
-            two[0]["default_reason"] if two else None,
-        )
-        check(
-            "the other is not the default",
-            0,
-            two[1]["is_default"] if len(two) > 1 else None,
-        )
-        check(
-            "its preview counts its own sessions",
-            4,
-            two[0]["remaining_after"] if two else None,
-        )
+        check("the one that EXPIRES is spent first", soon, two[0]["package_id"] if two else None)
+        check("and it is flagged as the default", 1, two[0]["is_default"] if two else None)
+        check("the reason is named, not implied", "expires_first", two[0]["default_reason"] if two else None)
+        check("the operator is told there WAS a choice", 2, two[0]["candidate_count"] if two else None)
+        check("the other is not the default", 0, two[1]["is_default"] if len(two) > 1 else None)
+        check("only the default carries a reason", "", two[1]["default_reason"] if len(two) > 1 else None)
+        check("it had already spent one session", 4, two[0]["remaining_before"] if two else None)
+        check("so the preview says three are left after this one", 3, two[0]["remaining_after"] if two else None)
 
-        print("\nK. no expiry on either: the one with FEWER sessions left goes first")
+        print("\nJ2. a FINITE voucher is spent before an unlimited one — even if the finite one never expires")
+        unlimited = seed_package(db, HUB, "Bono ilimitado", max_uses=None, validity_days=30)
+        finite = seed_package(db, HUB, "Bono 3 sesiones", max_uses=3, validity_days=None)
+        blowdry = seed_service(db, HUB, "Blowdry")
+        seed_item(db, HUB, unlimited, blowdry)
+        seed_item(db, HUB, finite, blowdry)
+        vs = options(db, "cus-12", blowdry)
+        check("both offered", 2, len(vs))
+        check("the finite one goes first", finite, vs[0]["package_id"] if vs else None)
+        check("named reason", "finite_before_unlimited", vs[0]["default_reason"] if vs else None)
+        check("an unlimited voucher previews no count", None, vs[1]["remaining_after"] if len(vs) > 1 else "missing")
+
+        print("\nK. nothing else separates them: the one with FEWER sessions left goes first")
         big = seed_package(db, HUB, "Bono 10", max_uses=10, validity_days=None)
         small = seed_package(db, HUB, "Bono 2", max_uses=2, validity_days=None)
         trim = seed_service(db, HUB, "Trim")
@@ -583,33 +589,29 @@ def main() -> int:
         pair = options(db, "cus-10", trim)
         check("both offered", 2, len(pair))
         check("the shortest one first", small, pair[0]["package_id"] if pair else None)
-        check(
-            "named reason",
-            "fewest_sessions_left",
-            pair[0]["default_reason"] if pair else None,
-        )
+        check("named reason", "fewest_sessions_left", pair[0]["default_reason"] if pair else None)
 
-        print(
-            "\nL. the order is TOTAL — identical vouchers still have one winner, always"
-        )
+        print("\nL. the order is TOTAL — identical vouchers still have one winner, always")
         twin_a = seed_package(db, HUB, "Bono gemelo A", max_uses=4, validity_days=None)
         twin_b = seed_package(db, HUB, "Bono gemelo B", max_uses=4, validity_days=None)
         wash = seed_service(db, HUB, "Wash")
         seed_item(db, HUB, twin_a, wash)
         seed_item(db, HUB, twin_b, wash)
-        first_run = [r["package_id"] for r in options(db, "cus-11", wash)]
-        check("no tie is left to chance", sorted([twin_a, twin_b]), first_run)
-        for _ in range(3):
-            check(
-                "and it is stable across runs",
-                first_run,
-                [r["package_id"] for r in options(db, "cus-11", wash)],
-            )
-        check(
-            "the tie-break of last resort is named",
-            "oldest_voucher",
-            options(db, "cus-11", wash)[0]["default_reason"],
-        )
+        db.psql([], db=db.name, stdin=(
+            "UPDATE services_package SET created_at = '2026-08-19T10:00:00Z' "
+            f"WHERE id = '{twin_b}';"))
+        older = options(db, "cus-11", wash)
+        check("the older voucher wins", twin_a, older[0]["package_id"] if older else None)
+        check("named reason", "oldest_voucher", older[0]["default_reason"] if older else None)
+
+        print("\nM. …and when even the age is identical, the order is still not left to chance")
+        db.psql([], db=db.name, stdin=(
+            f"UPDATE services_package SET created_at = '{NOW}' WHERE id = '{twin_b}';"))
+        runs = [[r["package_id"] for r in options(db, "cus-11", wash)] for _ in range(4)]
+        check("no tie is left to chance", sorted([twin_a, twin_b]), runs[0])
+        check("and it is stable across four looks at the same screen", [runs[0]] * 4, runs)
+        check("the last resort is named too", "stable_order",
+              options(db, "cus-11", wash)[0]["default_reason"])
     finally:
         db.drop()
 

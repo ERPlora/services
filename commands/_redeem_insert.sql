@@ -8,10 +8,23 @@
 -- :package_id, :customer_id y, opcionalmente, :appointment_id / :sale_id / :note.
 INSERT INTO services_package_redemption
   (id, hub_id, package_id, customer_id, appointment_id, sale_id, note, redeemed_at,
-   is_deleted, created_by, updated_by, created_at, updated_at)
+   status, use_index, is_deleted, created_by, updated_by, created_at, updated_at)
 SELECT
   :redemption_id, :hub_id, :package_id, :customer_id,
   :appointment_id, :sale_id, COALESCE(:note, ''), :now,
+  -- A session spent HERE is spent at the chair, with no checkout to undo: it is born
+  -- `consumed`. The till's path holds first and settles later (`services._hold`, services#70).
+  'consumed',
+  -- 🔴 The ordinal is the anti-double-spend guard (migration 011). The COUNT in guard 1 below is
+  -- the business rule («this voucher has N sessions») and it is a check-then-act against a SECOND
+  -- till: under READ COMMITTED both transactions read the same snapshot and both insert. Two
+  -- concurrent redemptions compute the SAME `MAX + 1` here, and `uq_services_redemption_use` lets
+  -- exactly one of them commit — the loser's whole transaction rolls back, so no row, no event and
+  -- no session spent. That is the difference between this and Odoo#79235, open since 2021.
+  (SELECT COALESCE(MAX(u.use_index), 0) + 1
+     FROM services_package_redemption u
+    WHERE u.hub_id = :hub_id AND u.package_id = :package_id
+      AND u.customer_id = :customer_id AND u.is_deleted = 0),
   0, :current_user_id, :current_user_id, :now, :now
 FROM services_package p
 WHERE p.id = :package_id AND p.hub_id = :hub_id AND p.is_deleted = 0 AND p.is_active = 1

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "services.packages.tender_options params",
+  "description": "Read-only: los bonos que este cliente puede gastar en ESTA línea de servicio, ya ordenados por la regla de desempate (ADR-0386, services#70). Cada fila lleva la previsualización — cuántas sesiones quedan ahora y cuántas quedan DESPUÉS de gastar esta — más is_default/default_reason, que dicen cuál se va a gastar y POR QUÉ. No muta nada: es lo que el TPV enseña antes de reservar la sesión, y también la lectura contra la que el handler de services.packages.hold_for_line verifica el payload.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["customer_id", "service_id"],
+  "properties": {
+    "customer_id": { "type": "string", "minLength": 1, "description": "Id del cliente cuyas sesiones se ofrecen." },
+    "service_id": { "type": "string", "minLength": 1, "description": "Id del servicio de la línea que se quiere cubrir. Un bono cubre la línea entera o no la cubre: no hay cobertura parcial (eso es la tarjeta regalo, otra familia de tender)." }
+  }
+}
