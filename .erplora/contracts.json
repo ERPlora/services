@@ -6,6 +6,7 @@
       "services.categories.list",
       "services.packages.get",
       "services.packages.list",
+      "services.packages.redemption_history",
       "services.packages.tender_options",
       "services.services.get",
       "services.services.list",

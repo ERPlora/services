@@ -136,6 +136,24 @@
         "stable_order": "Los dos bonos son equivalentes; este va siempre primero.",
         "generic": "Este es el bono que se va a gastar."
       }
+    },
+    "actionMovements": "Movimientos",
+    "movementsTitle": "Movimientos del bono",
+    "movementsHint": "todas las sesiones de este bono: reservadas, entregadas, liberadas y devueltas.",
+    "movementCustomer": "Cliente",
+    "movementSale": "Venta",
+    "movementNoService": "Sin servicio en la línea",
+    "movementRefundedBy": "Devuelta por {who} el {when}",
+    "movementRefundDoc": "Devolución",
+    "movementRefundedExpired": "La sesión ha vuelto a un bono que ya estaba caducado: consta en el bono, pero no se puede gastar mientras el bono no vuelva a estar vigente.",
+    "emptyMovements": "Este bono aún no se ha usado.",
+    "errorMovements": "No se han podido cargar los movimientos",
+    "btnClose": "Cerrar",
+    "movement": {
+      "held": "Reservada",
+      "consumed": "Entregada",
+      "released": "Liberada",
+      "refunded": "Devuelta"
     }
   },
   "errors": {
@@ -153,6 +171,10 @@
     "services.package_not_redeemable": "Este bono no se puede canjear ahora mismo.",
     "services.package_does_not_cover_service": "Este bono no cubre ese servicio. Un bono de cortes paga cortes, no el champú.",
     "services.hold_not_releasable": "Esa sesión del bono ya no se puede devolver: la venta está cobrada. Devolverla es una devolución, y va por su propia puerta.",
-    "services.hold_not_settleable": "Esa sesión del bono no se ha podido liquidar: no existe aquí, ya se devolvió, o ya estaba liquidada."
+    "services.hold_not_settleable": "Esa sesión del bono no se ha podido liquidar: no existe aquí, ya se devolvió, o ya estaba liquidada.",
+    "services.redemption_not_found": "Esa sesión del bono no existe en este negocio.",
+    "services.redemption_not_settled": "Esa sesión del bono nunca se cobró, así que no hay nada que devolver. Lo que procede es liberar la reserva.",
+    "services.redemption_already_refunded": "Esa sesión del bono ya se devolvió en otra devolución.",
+    "services.redemption_not_refundable": "Esa sesión del bono no se puede devolver ahora mismo."
   }
 }

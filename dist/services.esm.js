@@ -9,7 +9,7 @@ var __decorateClass = (decorators, target, key, kind) => {
   return result;
 };
 
-// ../../../module-toolkit/node_modules/@lit-labs/ssr-dom-shim/lib/element-internals.js
+// ../module-toolkit/node_modules/@lit-labs/ssr-dom-shim/lib/element-internals.js
 var ElementInternalsShim = class ElementInternals {
   get shadowRoot() {
     return this.__host.__shadowRoot;
@@ -88,7 +88,7 @@ var ElementInternalsShim = class ElementInternals {
   }
 };
 
-// ../../../module-toolkit/node_modules/@lit-labs/ssr-dom-shim/lib/events.js
+// ../module-toolkit/node_modules/@lit-labs/ssr-dom-shim/lib/events.js
 var __classPrivateFieldSet = function(receiver, state, value, kind, f3) {
   if (kind === "m") throw new TypeError("Private method is not writable");
   if (kind === "a" && !f3) throw new TypeError("Private accessor was defined without a setter");
@@ -246,7 +246,7 @@ Object.defineProperties(CustomEventShim.prototype, {
 var EventShimWithRealType = EventShim;
 var CustomEventShimWithRealType = CustomEventShim;
 
-// ../../../module-toolkit/node_modules/@lit-labs/ssr-dom-shim/lib/css.js
+// ../module-toolkit/node_modules/@lit-labs/ssr-dom-shim/lib/css.js
 var _a2;
 var CSSRuleShim = (_a2 = class CSSRule {
   constructor() {
@@ -277,7 +277,7 @@ var CSSRuleShim = (_a2 = class CSSRule {
   }
 }, _a2.STYLE_RULE = 1, _a2.CHARSET_RULE = 2, _a2.IMPORT_RULE = 3, _a2.MEDIA_RULE = 4, _a2.FONT_FACE_RULE = 5, _a2.PAGE_RULE = 6, _a2.NAMESPACE_RULE = 10, _a2.KEYFRAMES_RULE = 7, _a2.KEYFRAME_RULE = 8, _a2.SUPPORTS_RULE = 12, _a2.COUNTER_STYLE_RULE = 11, _a2.FONT_FEATURE_VALUES_RULE = 14, _a2.MARGIN_RULE = 9, _a2);
 
-// ../../../module-toolkit/node_modules/@lit-labs/ssr-dom-shim/index.js
+// ../module-toolkit/node_modules/@lit-labs/ssr-dom-shim/index.js
 globalThis.Event ??= EventShimWithRealType;
 globalThis.CustomEvent ??= CustomEventShimWithRealType;
 var constructionToken = Symbol();
@@ -674,7 +674,7 @@ var CustomElementRegistryShimWithRealType = CustomElementRegistry;
 var customElements2 = new CustomElementRegistryShimWithRealType();
 var windowShim = new WindowShim(constructionToken);
 
-// ../../../module-toolkit/node_modules/@lit/reactive-element/node/css-tag.js
+// ../module-toolkit/node_modules/@lit/reactive-element/node/css-tag.js
 var t = globalThis;
 var e = t.ShadowRoot && (void 0 === t.ShadyCSS || t.ShadyCSS.nativeShadow) && "adoptedStyleSheets" in Document.prototype && "replace" in CSSStyleSheet.prototype;
 var s = Symbol();
@@ -719,7 +719,7 @@ var c = e || void 0 === t.CSSStyleSheet ? (t5) => t5 : (t5) => t5 instanceof CSS
   return r(e5);
 })(t5) : t5;
 
-// ../../../module-toolkit/node_modules/@lit/reactive-element/node/reactive-element.js
+// ../module-toolkit/node_modules/@lit/reactive-element/node/reactive-element.js
 var { is: h, defineProperty: r2, getOwnPropertyDescriptor: o2, getOwnPropertyNames: n2, getOwnPropertySymbols: a, getPrototypeOf: c2 } = Object;
 var l = globalThis;
 l.customElements ??= customElements2;
@@ -942,7 +942,7 @@ var g = class extends (globalThis.HTMLElement ?? HTMLElementShimWithRealType) {
 };
 g.elementStyles = [], g.shadowRootOptions = { mode: "open" }, g[f("elementProperties")] = /* @__PURE__ */ new Map(), g[f("finalized")] = /* @__PURE__ */ new Map(), u?.({ ReactiveElement: g }), (l.reactiveElementVersions ??= []).push("2.1.2");
 
-// ../../node_modules/.pnpm/lit-html@3.3.3/node_modules/lit-html/lit-html.js
+// node_modules/.pnpm/lit-html@3.3.3/node_modules/lit-html/lit-html.js
 var t2 = globalThis;
 var i2 = (t5) => t5;
 var s2 = t2.trustedTypes;
@@ -1197,7 +1197,7 @@ var D = (t5, i7, s5) => {
   return h4._$AI(t5), h4;
 };
 
-// ../../node_modules/.pnpm/lit-element@4.2.2/node_modules/lit-element/lit-element.js
+// node_modules/.pnpm/lit-element@4.2.2/node_modules/lit-element/lit-element.js
 var s3 = globalThis;
 var i3 = class extends g {
   constructor() {
@@ -1226,7 +1226,7 @@ var o4 = s3.litElementPolyfillSupport;
 o4?.({ LitElement: i3 });
 (s3.litElementVersions ??= []).push("4.2.2");
 
-// ../../../module-toolkit/node_modules/@lit/reactive-element/node/decorators/property.js
+// ../module-toolkit/node_modules/@lit/reactive-element/node/decorators/property.js
 var o5 = { attribute: true, type: String, converter: b, reflect: false, hasChanged: m };
 var r4 = (t5 = o5, e5, r6) => {
   const { kind: n6, metadata: i7 } = r6;
@@ -1256,19 +1256,19 @@ function n4(t5) {
   })(t5, e5, o7);
 }
 
-// ../../../module-toolkit/node_modules/@lit/reactive-element/node/decorators/state.js
+// ../module-toolkit/node_modules/@lit/reactive-element/node/decorators/state.js
 function r5(r6) {
   return n4({ ...r6, state: true, attribute: false });
 }
 
-// ../../../outfitkit/dist/define.js
+// ../outfitkit/dist/define.js
 function define(tag, ctor) {
   if (typeof customElements !== "undefined" && !customElements.get(tag)) {
     customElements.define(tag, ctor);
   }
 }
 
-// ../../../outfitkit/dist/shared/icons.js
+// ../outfitkit/dist/shared/icons.js
 var rawAdd = '<svg viewBox="0 0 512 512" width="1.2em" height="1.2em" ><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M256 112v288m144-144H112"/></svg>';
 var rawAlertCircle = '<svg viewBox="0 0 512 512" width="1.2em" height="1.2em" ><path fill="currentColor" d="M256 48C141.31 48 48 141.31 48 256s93.31 208 208 208s208-93.31 208-208S370.69 48 256 48m0 319.91a20 20 0 1 1 20-20a20 20 0 0 1-20 20m21.72-201.15l-5.74 122a16 16 0 0 1-32 0l-5.74-121.94v-.05a21.74 21.74 0 1 1 43.44 0Z"/></svg>';
 var rawAlertCircleOutline = '<svg viewBox="0 0 512 512" width="1.2em" height="1.2em" ><path fill="none" stroke="currentColor" stroke-miterlimit="10" stroke-width="32" d="M448 256c0-106-86-192-192-192S64 150 64 256s86 192 192 192s192-86 192-192Z"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M250.26 166.05L256 288l5.73-121.95a5.74 5.74 0 0 0-5.79-6h0a5.74 5.74 0 0 0-5.68 6"/><path fill="currentColor" d="M256 367.91a20 20 0 1 1 20-20a20 20 0 0 1-20 20"/></svg>';
@@ -1416,7 +1416,7 @@ function okIcon(value) {
   return BY_NAME[value] ?? value;
 }
 
-// ../../../outfitkit/dist/ok-inline-feedback.js
+// ../outfitkit/dist/ok-inline-feedback.js
 var __defProp2 = Object.defineProperty;
 var __decorateClass2 = (decorators, target, key, kind) => {
   var result = void 0;
@@ -1633,7 +1633,7 @@ __decorateClass2([
 ], OkInlineFeedback.prototype, "hasActions");
 define("ok-inline-feedback", OkInlineFeedback);
 
-// ../../node_modules/.pnpm/lit-html@3.3.3/node_modules/lit-html/directive.js
+// node_modules/.pnpm/lit-html@3.3.3/node_modules/lit-html/directive.js
 var t3 = { ATTRIBUTE: 1, CHILD: 2, PROPERTY: 3, BOOLEAN_ATTRIBUTE: 4, EVENT: 5, ELEMENT: 6 };
 var e4 = (t5) => (...e5) => ({ _$litDirective$: t5, values: e5 });
 var i4 = class {
@@ -1653,7 +1653,7 @@ var i4 = class {
   }
 };
 
-// ../../node_modules/.pnpm/lit-html@3.3.3/node_modules/lit-html/directive-helpers.js
+// node_modules/.pnpm/lit-html@3.3.3/node_modules/lit-html/directive-helpers.js
 var { I: t4 } = j;
 var i5 = (o7) => o7;
 var s4 = () => document.createComment("");
@@ -1686,7 +1686,7 @@ var h3 = (o7) => {
   o7._$AR(), o7._$AA.remove();
 };
 
-// ../../node_modules/.pnpm/lit-html@3.3.3/node_modules/lit-html/directives/repeat.js
+// node_modules/.pnpm/lit-html@3.3.3/node_modules/lit-html/directives/repeat.js
 var u4 = (e5, s5, t5) => {
   const r6 = /* @__PURE__ */ new Map();
   for (let l3 = s5; l3 <= t5; l3++) r6.set(e5[l3], l3);
@@ -1739,7 +1739,7 @@ var c4 = e4(class extends i4 {
   }
 });
 
-// ../../node_modules/.pnpm/lit-html@3.3.3/node_modules/lit-html/directives/style-map.js
+// node_modules/.pnpm/lit-html@3.3.3/node_modules/lit-html/directives/style-map.js
 var n5 = "important";
 var i6 = " !" + n5;
 var o6 = e4(class extends i4 {
@@ -1768,7 +1768,7 @@ var o6 = e4(class extends i4 {
   }
 });
 
-// ../../../outfitkit/dist/ok-data-table.js
+// ../outfitkit/dist/ok-data-table.js
 var CSV_BOM = "\uFEFF";
 var WINDOWS_1252_C1 = [
   8364,
@@ -3310,7 +3310,7 @@ __decorateClass3([
 var OkDataTable = _OkDataTable;
 define("ok-data-table", OkDataTable);
 
-// ../../../hub/packages/module-sdk/src/index.ts
+// ../hub/packages/module-sdk/src/index.ts
 function isEmpty(v3) {
   return v3 === null || v3 === void 0 || v3 === "";
 }
@@ -3435,7 +3435,7 @@ function minorToMajor(amount, decimals2) {
   return (amount ?? 0) / 10 ** decimals2;
 }
 
-// locales/es.json
+// modules/services/locales/es.json
 var es_default = {
   name: "Servicios",
   description: "Cat\xE1logo de servicios con categor\xEDas y bonos, y su disponibilidad.",
@@ -3574,6 +3574,24 @@ var es_default = {
         stable_order: "Los dos bonos son equivalentes; este va siempre primero.",
         generic: "Este es el bono que se va a gastar."
       }
+    },
+    actionMovements: "Movimientos",
+    movementsTitle: "Movimientos del bono",
+    movementsHint: "todas las sesiones de este bono: reservadas, entregadas, liberadas y devueltas.",
+    movementCustomer: "Cliente",
+    movementSale: "Venta",
+    movementNoService: "Sin servicio en la l\xEDnea",
+    movementRefundedBy: "Devuelta por {who} el {when}",
+    movementRefundDoc: "Devoluci\xF3n",
+    movementRefundedExpired: "La sesi\xF3n ha vuelto a un bono que ya estaba caducado: consta en el bono, pero no se puede gastar mientras el bono no vuelva a estar vigente.",
+    emptyMovements: "Este bono a\xFAn no se ha usado.",
+    errorMovements: "No se han podido cargar los movimientos",
+    btnClose: "Cerrar",
+    movement: {
+      held: "Reservada",
+      consumed: "Entregada",
+      released: "Liberada",
+      refunded: "Devuelta"
     }
   },
   errors: {
@@ -3591,11 +3609,15 @@ var es_default = {
     "services.package_not_redeemable": "Este bono no se puede canjear ahora mismo.",
     "services.package_does_not_cover_service": "Este bono no cubre ese servicio. Un bono de cortes paga cortes, no el champ\xFA.",
     "services.hold_not_releasable": "Esa sesi\xF3n del bono ya no se puede devolver: la venta est\xE1 cobrada. Devolverla es una devoluci\xF3n, y va por su propia puerta.",
-    "services.hold_not_settleable": "Esa sesi\xF3n del bono no se ha podido liquidar: no existe aqu\xED, ya se devolvi\xF3, o ya estaba liquidada."
+    "services.hold_not_settleable": "Esa sesi\xF3n del bono no se ha podido liquidar: no existe aqu\xED, ya se devolvi\xF3, o ya estaba liquidada.",
+    "services.redemption_not_found": "Esa sesi\xF3n del bono no existe en este negocio.",
+    "services.redemption_not_settled": "Esa sesi\xF3n del bono nunca se cobr\xF3, as\xED que no hay nada que devolver. Lo que procede es liberar la reserva.",
+    "services.redemption_already_refunded": "Esa sesi\xF3n del bono ya se devolvi\xF3 en otra devoluci\xF3n.",
+    "services.redemption_not_refundable": "Esa sesi\xF3n del bono no se puede devolver ahora mismo."
   }
 };
 
-// locales/en.json
+// modules/services/locales/en.json
 var en_default = {
   name: "Services",
   setup: {
@@ -3733,6 +3755,24 @@ var en_default = {
         stable_order: "Both vouchers are equivalent; this one always goes first.",
         generic: "This is the voucher that will be used."
       }
+    },
+    actionMovements: "Movements",
+    movementsTitle: "Voucher movements",
+    movementsHint: "every session of this voucher: reserved, delivered, released and given back.",
+    movementCustomer: "Customer",
+    movementSale: "Sale",
+    movementNoService: "No service on the line",
+    movementRefundedBy: "Given back by {who} on {when}",
+    movementRefundDoc: "Return",
+    movementRefundedExpired: "The session went back to a voucher that had already expired: it is on the books, but it cannot be spent until the voucher is valid again.",
+    emptyMovements: "This voucher has not been used yet.",
+    errorMovements: "Could not load the movements",
+    btnClose: "Close",
+    movement: {
+      held: "Reserved",
+      consumed: "Delivered",
+      released: "Released",
+      refunded: "Given back"
     }
   },
   errors: {
@@ -3750,11 +3790,15 @@ var en_default = {
     "services.package_not_redeemable": "This voucher cannot be redeemed right now.",
     "services.package_does_not_cover_service": "This voucher does not cover that service. A voucher of haircuts pays for haircuts, not for the shampoo.",
     "services.hold_not_releasable": "That voucher session can no longer be given back: the sale was already paid. Refunding it is a return, and it goes through its own door.",
-    "services.hold_not_settleable": "That voucher session could not be settled: it does not exist here, it was already given back, or it was settled before."
+    "services.hold_not_settleable": "That voucher session could not be settled: it does not exist here, it was already given back, or it was settled before.",
+    "services.redemption_not_found": "That voucher session does not exist in this business.",
+    "services.redemption_not_settled": "That voucher session was never paid, so there is nothing to give back. Release the hold instead.",
+    "services.redemption_already_refunded": "That voucher session was already given back on another return.",
+    "services.redemption_not_refundable": "That voucher session cannot be given back right now."
   }
 };
 
-// ui/lib/domain-error.ts
+// modules/services/ui/lib/domain-error.ts
 var ERRORS = {
   es: es_default.errors ?? {},
   en: en_default.errors ?? {}
@@ -3774,7 +3818,7 @@ function domainMessage(e5, lang, fallback) {
   return presentable(message) ? message : fallback;
 }
 
-// ui/components/erp-services-categories/erp-services-categories.ts
+// modules/services/ui/components/erp-services-categories/erp-services-categories.ts
 var CATALOG = { es: es_default, en: en_default };
 function erplora() {
   const c5 = globalThis.erplora;
@@ -4000,7 +4044,7 @@ __decorateClass([
 ], ErpServicesCategories.prototype, "allCategories", 2);
 define("erp-services-categories", ErpServicesCategories);
 
-// ui/components/erp-services-list/erp-services-list.ts
+// modules/services/ui/components/erp-services-list/erp-services-list.ts
 var CATALOG2 = { es: es_default, en: en_default };
 function toMinorUnits(v3) {
   const decimals2 = erplora2().currencyDecimals;
@@ -4494,7 +4538,126 @@ __decorateClass([
 ], ErpServicesList.prototype, "archiveActive", 2);
 define("erp-services-list", ErpServicesList);
 
-// ui/components/erp-services-packages/erp-services-packages.ts
+// ../outfitkit/dist/ok-status-pill.js
+var __defProp4 = Object.defineProperty;
+var __decorateClass4 = (decorators, target, key, kind) => {
+  var result = void 0;
+  for (var i7 = decorators.length - 1, decorator; i7 >= 0; i7--)
+    if (decorator = decorators[i7])
+      result = decorator(target, key, result) || result;
+  if (result) __defProp4(target, key, result);
+  return result;
+};
+var OkStatusPill = class extends i3 {
+  constructor() {
+    super(...arguments);
+    this.tone = "neutral";
+    this.dot = false;
+    this.size = "md";
+  }
+  static {
+    this.styles = i`
+    :host {
+      /* Vars overridable (estilo Ionic), default = cadena --ok-* → --ion-* → hex.
+         --tone-color (base: fondo/punto/icono) y --tone-shade (texto) se reasignan por tone abajo. */
+      --tone-color: var(--ok-medium, var(--ion-color-medium, #5f5f5f));
+      --tone-shade: var(--ok-medium, var(--ion-color-medium-shade, #545454));
+      --background-opacity: var(--ok-pill-bg-opacity, 0.14);
+      --border-radius: var(--ok-pill-radius, 999px);
+      --font: var(--ok-font, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif);
+
+      /* Inline: el pill vive en celdas de tabla, cabeceras y listados. */
+      display: inline-flex;
+      vertical-align: middle;
+      font-family: var(--font);
+      box-sizing: border-box;
+    }
+
+    /* Mapa de tonos → color Ionic (base + shade para el texto). */
+    :host([tone='success']) {
+      --tone-color: var(--ok-success, var(--ion-color-success, #2dd55b));
+      --tone-shade: var(--ok-success, var(--ion-color-success-shade, #28bb50));
+    }
+    :host([tone='warning']) {
+      --tone-color: var(--ok-warning, var(--ion-color-warning, #ffc409));
+      --tone-shade: var(--ok-warning-shade, var(--ion-color-warning-shade, #e0ac08));
+    }
+    :host([tone='danger']) {
+      --tone-color: var(--ok-danger, var(--ion-color-danger, #c5000f));
+      --tone-shade: var(--ok-danger, var(--ion-color-danger-shade, #ad000d));
+    }
+    :host([tone='info']) {
+      --tone-color: var(--ok-info, var(--ion-color-secondary, #0163aa));
+      --tone-shade: var(--ok-info, var(--ion-color-secondary-shade, #015896));
+    }
+    :host([tone='primary']) {
+      --tone-color: var(--ok-primary, var(--ion-color-primary, #3880ff));
+      --tone-shade: var(--ok-primary, var(--ion-color-primary-shade, #3171e0));
+    }
+    /* neutral / sin tono → medium (default ya aplicado en :host). */
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4em;
+      padding: 0.25em 0.7em;
+      border-radius: var(--border-radius);
+      /* Fondo tonal: el color del tono con baja opacidad. */
+      background: color-mix(in srgb, var(--tone-color) calc(var(--background-opacity) * 100%), transparent);
+      color: var(--ok-pill-color, var(--tone-shade));
+      font-size: 0.8125rem;
+      font-weight: 600;
+      line-height: 1.4;
+      white-space: nowrap;
+    }
+    :host([size='sm']) .pill {
+      font-size: 0.72rem;
+      padding: 0.2em 0.6em;
+    }
+
+    ion-icon {
+      flex: 0 0 auto;
+      font-size: 1.05em;
+      pointer-events: none;
+    }
+
+    /* Punto de color (estilo Linear) en vez de icono. */
+    .dot {
+      flex: 0 0 auto;
+      width: 0.5em;
+      height: 0.5em;
+      border-radius: 50%;
+      background: var(--tone-color);
+    }
+  `;
+  }
+  render() {
+    return b2`
+      <span class="pill" part="pill">
+        ${this.dot ? b2`<span class="dot" part="dot" aria-hidden="true"></span>` : this.icon ? b2`<ion-icon .icon=${okIcon(this.icon)} aria-hidden="true"></ion-icon>` : null}
+        <slot>${this.label ?? ""}</slot>
+      </span>
+    `;
+  }
+};
+__decorateClass4([
+  n4({ type: String, reflect: true })
+], OkStatusPill.prototype, "tone");
+__decorateClass4([
+  n4({ type: String })
+], OkStatusPill.prototype, "label");
+__decorateClass4([
+  n4({ type: String })
+], OkStatusPill.prototype, "icon");
+__decorateClass4([
+  n4({ type: Boolean, reflect: true })
+], OkStatusPill.prototype, "dot");
+__decorateClass4([
+  n4({ type: String, reflect: true })
+], OkStatusPill.prototype, "size");
+define("ok-status-pill", OkStatusPill);
+
+// modules/services/ui/components/erp-services-packages/erp-services-packages.ts
 var CATALOG3 = { es: es_default, en: en_default };
 var SESSION_SCALE = 1e6;
 var PERCENT_DECIMALS = 2;
@@ -4540,6 +4703,10 @@ var ErpServicesPackages = class extends i3 {
     this.formError = "";
     this.editingId = null;
     this.deleteTarget = null;
+    this.movementsOf = null;
+    this.movements = [];
+    this.movementsLoading = false;
+    this.movementsError = "";
     this.onLocaleChange = () => this.requestUpdate();
   }
   static {
@@ -4551,6 +4718,8 @@ var ErpServicesPackages = class extends i3 {
     .form ion-button[type='submit'] { align-self: flex-end; }
     .line { display: grid; grid-template-columns: 1fr 5.5rem auto; gap: 0.4rem; align-items: center; }
     .lines-title { font-size: 0.85rem; font-weight: 600; margin: 0.3rem 0 0; }
+    .movement h3 { display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; }
+    .movement .refund { font-size: 0.82rem; opacity: 0.85; }
   `;
   }
   get columns() {
@@ -4586,6 +4755,10 @@ var ErpServicesPackages = class extends i3 {
     const t5 = (k2) => erplora3().t(CATALOG3, k2);
     return [
       ...can3("services.change_package") ? [{ id: "edit", label: t5("ui.actionEdit"), icon: "create-outline" }] : [],
+      // The voucher's ledger. Gated by the same permission as the balance, because that is what
+      // it is: the movements behind a balance. Read-only — returning a session is `sales`' return
+      // flow, not a button on the catalogue screen.
+      ...can3("services.view_package_balance") ? [{ id: "movements", label: t5("ui.actionMovements"), icon: "time-outline" }] : [],
       ...can3("services.delete_package") ? [{ id: "delete", label: t5("ui.actionDelete"), icon: "trash-outline", color: "danger" }] : []
     ];
   }
@@ -4657,8 +4830,24 @@ var ErpServicesPackages = class extends i3 {
         maxUses: full.max_uses == null ? "" : String(full.max_uses)
       };
       this.dataTable()?.open("create");
+    } else if (actionId === "movements" && can3("services.view_package_balance")) {
+      await this.openMovements(p4);
     } else if (actionId === "delete" && can3("services.delete_package")) {
       this.deleteTarget = p4;
+    }
+  }
+  /** Open the voucher's ledger and load it. The three states are painted, not only the happy one. */
+  async openMovements(p4) {
+    this.movementsOf = { id: p4.id, name: p4.name };
+    this.movements = [];
+    this.movementsError = "";
+    this.movementsLoading = true;
+    try {
+      this.movements = await erplora3().queryAll("services.packages.redemption_history", { package_id: p4.id }) ?? [];
+    } catch (e5) {
+      this.movementsError = domainMessage(e5, erplora3().locale, erplora3().t(CATALOG3, "ui.errorMovements"));
+    } finally {
+      this.movementsLoading = false;
     }
   }
   /** Back to a clean CREATE form. */
@@ -4748,6 +4937,49 @@ var ErpServicesPackages = class extends i3 {
       </ion-content>
     </ion-modal>`;
   }
+  /** A movement's date, in the hub's locale. An unparseable or absent stamp prints as «—». */
+  stamp(value) {
+    if (!value) return "\u2014";
+    const d3 = new Date(value);
+    return Number.isNaN(d3.getTime()) ? value : d3.toLocaleString(erplora3().locale, { dateStyle: "short", timeStyle: "short" });
+  }
+  renderMovement(m4) {
+    const t5 = (k2, p4) => erplora3().t(CATALOG3, k2, p4);
+    const refunded = m4.movement === "refunded";
+    return b2`<ion-item class="movement">
+      <ion-label class="ion-text-wrap">
+        <h3>
+          <ok-status-pill size="sm" tone=${refunded ? "warning" : m4.movement === "released" ? "neutral" : m4.movement === "held" ? "info" : "success"}>${t5(`ui.movement.${m4.movement}`)}</ok-status-pill>
+          ${m4.service_name ?? t5("ui.movementNoService")}
+        </h3>
+        <p>${this.stamp(m4.redeemed_at)} · ${t5("ui.movementCustomer")}: ${m4.customer_id}${m4.sale_id ? b2` · ${t5("ui.movementSale")}: ${m4.sale_id}` : A}</p>
+        ${refunded ? b2`<p class="refund">
+              ${t5("ui.movementRefundedBy", { who: m4.refunded_by ?? "\u2014", when: this.stamp(m4.refunded_at) })}
+              · ${t5("ui.movementRefundDoc")}: ${m4.refund_ref ?? "\u2014"}
+              ${m4.refund_note ? b2` · ${m4.refund_note}` : A}
+            </p>
+            ${Number(m4.refund_expired) ? b2`<ok-inline-feedback tone="warning" icon="alert-circle-outline">${t5("ui.movementRefundedExpired")}</ok-inline-feedback>` : A}` : A}
+      </ion-label>
+    </ion-item>`;
+  }
+  renderMovements() {
+    const t5 = (k2, p4) => erplora3().t(CATALOG3, k2, p4);
+    return b2`<ion-modal .isOpen=${!!this.movementsOf} @ionModalDidDismiss=${() => this.movementsOf = null}>
+      <ion-header class="ion-no-border">
+        <ion-toolbar>
+          <ion-title>${t5("ui.movementsTitle")}</ion-title>
+          <ion-buttons slot="end">
+            <ion-button @click=${() => this.movementsOf = null}>${t5("ui.btnClose")}</ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="ion-padding">
+        <!-- Self-styled: ion-modal is reparented to <body>, this component's CSS does not reach it. -->
+        <p><b>${this.movementsOf?.name ?? ""}</b> — ${t5("ui.movementsHint")}</p>
+        ${this.movementsError ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.movementsError}</ok-inline-feedback>` : this.movementsLoading ? b2`<ok-inline-feedback tone="neutral" icon="time-outline">${t5("ui.loading")}</ok-inline-feedback>` : this.movements.length === 0 ? b2`<ok-inline-feedback tone="neutral" icon="information-circle-outline">${t5("ui.emptyMovements")}</ok-inline-feedback>` : b2`<ion-list lines="full">${this.movements.map((m4) => this.renderMovement(m4))}</ion-list>`}
+      </ion-content>
+    </ion-modal>`;
+  }
   renderLines() {
     const t5 = (k2) => erplora3().t(CATALOG3, k2);
     return b2`<p class="lines-title">${t5("ui.packageLinesTitle")}</p>
@@ -4787,6 +5019,7 @@ var ErpServicesPackages = class extends i3 {
         </form>
       </ok-data-table>
       ${this.renderDeleteConfirm()}
+      ${this.renderMovements()}
     </div>`;
   }
 };
@@ -4811,9 +5044,21 @@ __decorateClass([
 __decorateClass([
   r5()
 ], ErpServicesPackages.prototype, "deleteTarget", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "movementsOf", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "movements", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "movementsLoading", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "movementsError", 2);
 define("erp-services-packages", ErpServicesPackages);
 
-// ui/components/erp-services-voucher-tender/erp-services-voucher-tender.ts
+// modules/services/ui/components/erp-services-voucher-tender/erp-services-voucher-tender.ts
 var CATALOG4 = { es: es_default, en: en_default };
 var REASONS = [
   "only_option",

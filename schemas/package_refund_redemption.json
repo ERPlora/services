@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "services.packages.refund_redemption params",
+  "description": "Devuelve al bono una sesión YA COBRADA porque la venta se devolvió (ADR-0386, services#71). La sesión vuelve a estar disponible y el canje sobrevive como rastro auditable (quién, cuándo y contra qué documento). Es idempotente por refund_ref: el mismo documento dos veces no devuelve dos sesiones, y otro documento distinto sobre el mismo canje se rechaza con services.redemption_already_refunded. 🔴 NO emite ningún documento fiscal: el bono de N sesiones es univalente y su registro salió al VENDERLO (art. 30 ter.1 de la Directiva 2006/112/CE). Si el bono ya estaba caducado la devolución se hace igual — la caducidad se avisa (voucher_expired de services.packages.refund_check), nunca bloquea.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["redemption_id", "refund_ref"],
+  "properties": {
+    "redemption_id": { "type": "string", "minLength": 1, "description": "Id del canje liquidado que se devuelve (el que devolvió services.packages.hold_for_line y liquidó settle_hold)." },
+    "refund_ref": { "type": "string", "minLength": 1, "description": "Referencia del documento de devolución de sales, opaca para este módulo. Es la clave de idempotencia: reintentar con la MISMA referencia no escribe nada; otra referencia sobre el mismo canje se rechaza." },
+    "refund_note": { "type": "string", "maxLength": 500, "description": "Motivo de la devolución, en palabras del operador. Opcional." }
+  }
+}
