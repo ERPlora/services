@@ -5138,6 +5138,12 @@ var ErpServicesVoucherTender = class extends i3 {
     this.loading = true;
     this.loadFailed = false;
     try {
+      const mine = await this.recoverHold();
+      if (mine) {
+        this.held = mine;
+        this.options = [];
+        return;
+      }
       const rows = await erplora4().query("services.packages.tender_options", {
         customer_id: this.customerId,
         service_id: this.serviceId
@@ -5154,6 +5160,30 @@ var ErpServicesVoucherTender = class extends i3 {
     } finally {
       this.loading = false;
     }
+  }
+  /**
+   * The hold this checkout already has for THIS line, or `null`.
+   *
+   * A checkout covers several lines and each one hosts its own slot, so the read is filtered by
+   * `line_ref` here rather than server-side: one query answers the whole ticket and every slot
+   * picks its own row out of it, instead of N round trips that would each say the same thing.
+   *
+   * The read only ever returns what can still be UNDONE — live, held, unsettled, not past its
+   * deadline — so a settled session (the sale was paid; giving it back is a refund, with its own
+   * audited door) never arrives here to be offered an «undo» the runtime would then refuse.
+   */
+  async recoverHold() {
+    if (!this.checkoutRef || !this.lineRef) return null;
+    const rows = await erplora4().query("services.packages.holds_for_checkout", {
+      checkout_ref: this.checkoutRef
+    });
+    const mine = (Array.isArray(rows) ? rows : []).find((r6) => r6.line_ref === this.lineRef);
+    if (!mine) return null;
+    return {
+      redemption_id: String(mine.redemption_id ?? ""),
+      package_name: String(mine.package_name ?? ""),
+      remaining_after: Number(mine.is_unlimited) === 1 ? null : mine.remaining_after ?? null
+    };
   }
   select(grantId) {
     this.selectedId = grantId;

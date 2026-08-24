@@ -5,6 +5,7 @@
     "queries": [
       "services.categories.list",
       "services.packages.get",
+      "services.packages.holds_for_checkout",
       "services.packages.list",
       "services.packages.redemption_history",
       "services.packages.tender_options",

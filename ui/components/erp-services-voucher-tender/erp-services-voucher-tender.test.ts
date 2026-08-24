@@ -319,10 +319,21 @@ describe('services#77 · a taken session survives the screen reloading', () => {
     expect(el.shadowRoot.querySelector('[data-test="confirm"]')).toBeNull();
   });
 
-  it('the recovered id is what the undo releases — the whole point', async () => {
+  it('the recovered id is what the undo releases, and the chooser comes back', async () => {
+    // The stub RELEASES for real: once `release_hold` succeeds the server no longer lists that
+    // hold. A mock that kept answering «still held» would have the component re-recover its own
+    // undo and would hide the round trip this test exists to prove — the id came from the server,
+    // went back to the server, and the screen re-read the answer rather than trusting itself.
+    let stillHeld = true;
     sdk.query = async (name: string) =>
-      name === 'services.packages.holds_for_checkout' ? [HELD_ROW] : options;
+      name === 'services.packages.holds_for_checkout' ? (stillHeld ? [HELD_ROW] : []) : options;
+    sdk.command = async (name: string, payload: Record<string, unknown>) => {
+      commands.push({ name, payload });
+      if (name === 'services.packages.release_hold') stillHeld = false;
+      return {};
+    };
     const el = await mount();
+    expect(el.held?.redemption_id).toBe('red-9');
     await el.undo();
     await settle(el);
     expect(commands).toContainEqual({
@@ -330,6 +341,8 @@ describe('services#77 · a taken session survives the screen reloading', () => {
       payload: { redemption_id: 'red-9' },
     });
     expect(el.held).toBeNull();
+    // …and the cashier can spend a voucher on this line again, which is the point of undoing.
+    expect(el.shadowRoot.querySelector('[data-test="confirm"]')).not.toBeNull();
   });
 
   it('only the hold of THIS line comes back — a checkout covers several', async () => {
