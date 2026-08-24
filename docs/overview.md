@@ -18,8 +18,9 @@ with no stock.
 - **It does not compute tax.** A service stores which **tax category** it belongs to; the rate lives
   in `taxes`.
 - **It does not track stock.** A service has no units in the back room.
-- **It does not grant a package to a customer when they buy it.** It can **redeem** a use; creating
-  the entitlement in the first place is the checkout's job.
+- **It does not move a voucher between customers.** A grant belongs to ONE person, and that is the
+  market's default (Mindbody, Vagaro and Boulevard all keep sharing behind an explicit opt-in;
+  Boulevard forbids it for packages outright). Transferring or sharing one is its own feature.
 - **It has no variants or add-ons.** Both schemas were retired — add-ons in services#67 (the priced
   option belongs to `modifiers`, ADR-0376) and variants in services#69 — because neither ever had a
   query, a command or a screen.
@@ -40,6 +41,7 @@ with no stock.
 |---|---|
 | `services.service.created` / `.updated` / `.deleted` | a service changes |
 | `services.package.created` / `.updated` / `.deleted` | a package changes |
+| `services.package.granted` | a customer BUYS a voucher: the entitlement now exists |
 | `services.package.redeemed` | one use of a customer's package is consumed (at the chair) |
 | `services.package.held` | one session is reserved to cover a checkout line |
 | `services.package.hold_released` | a reserved session is given back because the redemption was undone |
@@ -50,14 +52,20 @@ with no stock.
 
 | Event | What it does |
 |---|---|
-| `sale.completed` (from `sales`) | settles every voucher session held against that checkout, so a session already delivered can no longer be undone. A quick sale with no `order_id` settles nothing here and goes through `services.packages.settle_hold` instead. |
+| `sale.completed` (from `sales`) | two things, in one transaction. **Settles** every voucher session held against that checkout, so a session already delivered can no longer be undone (a quick sale with no `order_id` settles nothing here and goes through `services.packages.settle_hold` instead). And **grants** every voucher the ticket SOLD: a line whose `product_id` is one of this hub's packages is a voucher sale, so the customer walks out owning it. One grant per unit, idempotent by `<sale_id>#<line>#<unit>`, so a redelivered event cannot mint it twice. A ticket that sold a voucher with **no customer** grants nothing and says so — an entitlement needs an owner. |
 
 ## Packages, in one paragraph
 
 A package bundles several services with a discount, an optional maximum number of uses and an
-optional validity in days. When a customer uses one, a **redemption** is written to an append-only
-ledger. Remaining uses are the maximum minus what has been used, and the expiry clock starts at the
-**first** redemption, not at purchase.
+optional validity in days — that is the **catalogue**. When a customer **buys** one, a **grant** is
+written: who owns it, when they bought it, in which sale and for how much, with the sessions and the
+validity **snapshotted** so a later edit of the catalogue cannot shorten what they paid for. When
+they use it, a **redemption** is written to an append-only ledger against that grant. Remaining uses
+are the grant's maximum minus what has been spent **on that grant**, and the expiry clock starts at
+the **purchase**.
+
+Buying the same voucher twice gives two grants, each with its own balance and its own deadline, and
+the till spends the one that expires first — saying so before it does (services#70).
 
 ## The voucher as a tender (ADR-0386)
 

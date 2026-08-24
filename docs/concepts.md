@@ -31,26 +31,66 @@ Three separate ideas people mix up:
 
 - **The package** — the definition: which services, in what quantity, with what discount, how many
   uses and for how long.
-- **The entitlement** — that a given customer has one. It comes into existence when they buy it.
+- **The grant (the entitlement)** — that a given customer has one. It is a ROW
+  (`services_package_grant`) and it comes into existence when they **buy** it: who, which voucher,
+  when, in which sale, for how much, with the sessions and the validity frozen as sold.
 - **The redemption** — one use being consumed. It is a row in an **append-only ledger**.
 
-Remaining uses = maximum uses − redemptions recorded. Nothing is decremented in place; the count is
-derived from the ledger, which is why the history of who used what and when is always intact.
+Remaining uses = **the grant's** maximum uses − redemptions recorded **against that grant**. Nothing
+is decremented in place; the count is derived from the ledger, which is why the history of who used
+what and when is always intact.
 
-## The validity clock starts at the first use, not at purchase
+Buy the same voucher twice and you own two grants. They do not pool: each has its own five sessions
+and its own deadline, and the till spends the one that expires first.
 
-A package with 30 days validity expires 30 days after its **first redemption**. A voucher bought in
-January and first used in June expires in July.
+## The validity clock starts at the PURCHASE
 
-This is a deliberate choice and worth stating to a customer up front, because they will assume
-otherwise.
+A package with 30 days validity expires 30 days after it was **bought**. A voucher bought in January
+and never touched is expired in February.
 
-## Selling a package does not create the entitlement — redeeming is all this module does
+It used to start at the first redemption, and that was wrong twice over: an unstarted voucher had no
+clock at all, so one bought a year ago and never used had not expired and never would — and
+refunding the session that started the clock **un-started it**, handing out an extension nobody
+bought. It is also what the market does: Vagaro, Square (with a hard one-year ceiling), Boulevard,
+Zenoti and Acuity all anchor on the purchase; only Mindbody and WellnessLiving offer first-use at
+all, and Mindbody's own knowledge base documents the two failures above.
 
-`services.packages.redeem` consumes one use. **Granting** the package to a customer when they buy it
-is the checkout's job, not this module's. Services offers the contract; it never edits `sales`.
+⚠️ **In Spain, an expiry on a prepaid voucher is legally contested.** Consumer authorities hold that
+*«los vales o bonos emitidos… no pueden tener una fecha de caducidad, ya que eso es una práctica
+ilegal»*, and there are live complaints over expired prepaid session packs. `validity_days` is
+**optional and empty by default**: leave it empty unless you have taken advice.
 
-So if a customer "has a voucher" that this module does not know about, the grant step is missing.
+## Selling a package DOES create the entitlement (services#73)
+
+It did not use to, and that was the bug: the relationship customer↔voucher was materialised by the
+**first redemption**, so every customer of the hub owned N free sessions of every voucher without
+anyone having sold them one, and the customer who *had* bought it got another N next month.
+
+Now there are two doors and both write the same row:
+
+- **the till** — `services` listens to `sale.completed` and grants every voucher the ticket sold. A
+  line whose `product_id` is one of this hub's packages IS a voucher sale, so `sales` needs to know
+  nothing about vouchers. One grant per unit, and a redelivered event cannot mint it twice;
+- **by hand** — `services.packages.grant`, for a voucher handed over outside the till.
+
+Without a grant nothing can be spent: the chair, the till and even raw SQL are refused, and the
+refusal has its own name (`services.package_no_grant`).
+
+**A voucher sold with no customer on the ticket grants nothing**, and the till is told so rather
+than left to discover it at the customer's next visit. An entitlement needs an owner — the same
+answer Mindbody gives (*«when a service is sold, the item needs to be associated with an existing
+client profile»*), Square, Vagaro, Phorest, Fresha, Boulevard and WellnessLiving included.
+
+## Selling a voucher issues the fiscal record; redeeming it issues nothing
+
+A voucher of N sessions is **univalent**: art. 30 ter.1 of Directive 2006/112/CE says the supply made
+in exchange for it *«shall not be regarded as an independent transaction»*. So the record comes out
+when the voucher is **SOLD**, with the service's VAT, and the redemption is a movement of balance —
+a second document at the chair would be double taxation. That is why the grant carries the amount,
+the base and the VAT: it is the row an inspection reconciles the redemptions against.
+
+(Vouchers are **not** in the Spanish LIVA — Directive 2016/1065 was never transposed — so what
+governs is the Directive plus the **DGT Resolution of 28/12/2018**.)
 
 ## A voucher cannot be spent twice, and that is enforced by the database
 
