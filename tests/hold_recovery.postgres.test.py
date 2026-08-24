@@ -205,6 +205,13 @@ def options(
     )
 
 
+def redeem_check(db: ScratchDb, grant_id: str, hub: str = HUB, now: str = NOW) -> dict:
+    """The pre-check the two spending commands preload. It has to answer what they will decide."""
+    return rows_of(
+        db, query_sql("services.packages.redeem_check", {"grant_id": grant_id, "now": now}, hub=hub)
+    )[0]
+
+
 def balance(db: ScratchDb, customer: str, hub: str = HUB, now: str = NOW):
     return rows_of(
         db,
@@ -449,6 +456,21 @@ def main() -> int:
             "and the till offers the voucher again on the clock alone",
             [abandoned_grant],
             [r["grant_id"] for r in options(db, "cus-3", cut, now=MUCH_LATER)],
+        )
+        # The FOURTH reader, and the one that decides the refusal MESSAGE. `redeem_check` is
+        # preloaded by the handlers of `hold_for_line` and `redeem`, so if it still counted the
+        # stale hold the cashier would be told «no sessions left» about a voucher the very next
+        # statement is about to spend happily — a refusal reason that is not true is worse than no
+        # reason. This voucher has ONE session, so the answer flips on that predicate alone.
+        check(
+            "before the deadline the pre-check says the voucher is spent",
+            [0, "no_uses_left"],
+            [redeem_check(db, abandoned_grant)[k] for k in ("redeemable", "reason")],
+        )
+        check(
+            "past it the pre-check says it is spendable again",
+            [1, ""],
+            [redeem_check(db, abandoned_grant, now=MUCH_LATER)[k] for k in ("redeemable", "reason")],
         )
         check(
             "…while the row is still LIVE: this is the clock, not a soft-delete",
