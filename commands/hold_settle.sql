@@ -12,9 +12,18 @@
 --
 -- Same conditional-UPDATE guard as the release, and deliberately the same shape: settle and
 -- release race over one row and only one of them can take it. Settling twice touches nothing.
+--
+-- 🔴 THE SETTLE DOES NOT CONSULT THE DEADLINE, and that is deliberate (services#77). A settle IS
+-- somebody coming back, so refusing a hold whose day had turned would charge the SALON a whole
+-- service — the till stopped billing that line the moment the voucher was applied. It clears
+-- `expires_at` instead, because a delivered session is final and `ck_services_redemption_deadline`
+-- says so in the schema. There is no window for a double spend either: a reclaimed session can only
+-- be TAKEN through `services._hold` or `services._redeem`, and both soft-delete the stale row in
+-- their own transaction before counting, so by then this UPDATE no longer matches anything.
 UPDATE services_package_redemption
    SET status = 'consumed',
        settled_at = :now,
+       expires_at = NULL,
        sale_id = :sale_id,
        updated_by = :current_user_id,
        updated_at = :now

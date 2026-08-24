@@ -1,7 +1,7 @@
 {
   "id": "services",
   "name": "Services",
-  "version": "1.5.36",
+  "version": "1.5.37",
   "description": "Service catalogue with categories and packages, and their availability.",
   "agent": {
     "description": "Manages the service catalogue: create, update and delete services, categories, and service packages; list available services and packages; configure module settings.",
@@ -147,7 +147,8 @@
       },
       "migrations/postgres/011_voucher_tender.sql",
       "migrations/postgres/012_voucher_refund.sql",
-      "migrations/postgres/013_package_grant.sql"
+      "migrations/postgres/013_package_grant.sql",
+      "migrations/postgres/014_hold_deadline.sql"
     ]
   },
   "queries": {
@@ -433,6 +434,15 @@
         "description": "Lists the vouchers (bonos) this customer can spend on a given service line, already ordered by the tie-break rule, with the preview the till shows before anything is reserved: sessions left now, sessions left AFTER redeeming, the expiry date, how many valid vouchers there were, which one will be spent (is_default) and WHY (default_reason). A voucher covers the line whole or not at all."
       },
       "expose_api": true
+    },
+    "services.packages.holds_for_checkout": {
+      "permission": "services.view_package_balance",
+      "sql": "queries/package_holds_for_checkout.sql",
+      "schema": "schemas/package_holds_for_checkout.json",
+      "ai": {
+        "description": "Lists the voucher sessions ALREADY HELD on an open checkout, so a till that reloaded can come back to exactly the state it was in — which voucher covers which line, the counter it was showing, and the redemption_id that undoes it. It returns only what can still be undone: live, held, unsettled holds whose deadline has not passed. A SETTLED session is not listed (the sale was paid and giving it back is a refund, which has its own audited door), and neither is a released or expired one (the session is already back on the voucher). A checkout with no holds answers an empty list, never an error."
+      },
+      "expose_api": true
     }
   },
   "commands": {
@@ -682,6 +692,7 @@
     "services._redeem": {
       "permission": "services.redeem_package",
       "sql": [
+        "commands/hold_expire.sql",
         "commands/_redeem_insert.sql",
         "commands/_redeem_assert.sql",
         "commands/_gate_clear.sql"
@@ -788,6 +799,7 @@
     "services._hold": {
       "permission": "services.hold_package",
       "sql": [
+        "commands/hold_expire.sql",
         "commands/_hold_insert.sql",
         "commands/_redeem_assert.sql",
         "commands/_gate_clear.sql"
@@ -878,6 +890,20 @@
           "required": true
         }
       ]
+    },
+    "services.packages.expire_holds": {
+      "permission": "services.hold_package",
+      "transaction": true,
+      "sql": [
+        "commands/hold_expire.sql"
+      ],
+      "schema": "schemas/package_expire_holds.json",
+      "emit": [
+        "services.package.hold_released"
+      ],
+      "ai": {
+        "description": "Gives back the voucher sessions of checkouts nobody ever came back to: soft-deletes every held session past its deadline and stamps it as expired, so the ledger tells a timeout apart from a cashier's undo. It is the janitor, not the guard — the reads stop counting a hold the moment its deadline passes, and the hold command reclaims stale sessions in its own transaction, so a session comes back even if this task never runs."
+      }
     }
   },
   "records": {
@@ -927,6 +953,14 @@
       "services.service.updated"
     ]
   },
+  "scheduled_tasks": [
+    {
+      "name": "expire_package_holds",
+      "command": "services.packages.expire_holds",
+      "cron": "0 * * * *",
+      "catch_up": "collapse"
+    }
+  ],
   "ui": {
     "entry": "dist/services.esm.js"
   },

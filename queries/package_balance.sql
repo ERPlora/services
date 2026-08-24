@@ -10,7 +10,10 @@
 --
 -- Param `:customer_id`; the runtime injects `:hub_id` and `:now`.
 --   used        = live sessions spent against THIS grant (held ones included — a hold is spent
---                 until it is released)
+--                 until it is released), EXCEPT a hold whose deadline has passed: an abandoned
+--                 checkout gives the session back on its own (services#77, migration 014), and the
+--                 balance a customer is shown must be the same number the till is about to charge
+--                 against, not the one a cron will agree with later
 --   remaining   = max_uses - used  (NULL when the grant was sold as unlimited)
 --   granted_at  = when it was bought: the expiry anchor and the date an auditor matches against the
 --                 fiscal record of the sale
@@ -30,14 +33,18 @@ SELECT
   g.amount_cents                                         AS amount_cents,
   g.max_uses                                             AS max_uses,
   (SELECT COUNT(*) FROM services_package_redemption r
-    WHERE r.hub_id = g.hub_id AND r.grant_id = g.id AND r.is_deleted = 0) AS used,
+    WHERE r.hub_id = g.hub_id AND r.grant_id = g.id AND r.is_deleted = 0
+      AND (r.expires_at IS NULL OR erp_dt(:now) < erp_dt(r.expires_at))) AS used,
   CASE WHEN g.max_uses IS NULL THEN NULL
        ELSE g.max_uses - (SELECT COUNT(*) FROM services_package_redemption r
                            WHERE r.hub_id = g.hub_id AND r.grant_id = g.id
-                             AND r.is_deleted = 0) END   AS remaining,
+                             AND r.is_deleted = 0
+                             AND (r.expires_at IS NULL
+                                  OR erp_dt(:now) < erp_dt(r.expires_at))) END   AS remaining,
   g.validity_days                                        AS validity_days,
   (SELECT MIN(r.redeemed_at) FROM services_package_redemption r
-    WHERE r.hub_id = g.hub_id AND r.grant_id = g.id AND r.is_deleted = 0) AS first_redeemed_at,
+    WHERE r.hub_id = g.hub_id AND r.grant_id = g.id AND r.is_deleted = 0
+      AND (r.expires_at IS NULL OR erp_dt(:now) < erp_dt(r.expires_at))) AS first_redeemed_at,
   CASE WHEN g.validity_days IS NULL THEN NULL
        ELSE erp_dateadd(g.granted_at, g.validity_days, 'days') END        AS expires_at,
   CASE WHEN g.validity_days IS NOT NULL

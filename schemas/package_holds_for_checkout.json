@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "services.packages.holds_for_checkout params",
+  "description": "Solo lectura: las sesiones de bono YA TOMADAS en un cobro abierto (services#77, ADR-0386). Es la lectura con la que la pantalla de cobro se REHIDRATA tras recargarse: el `redemption_id` —la única llave que deshace un canje— vivía en la memoria del componente, así que una recarga dejaba la sesión gastada y a nadie con qué devolverla. Devuelve únicamente lo que todavía se puede deshacer: filas vivas, `held`, sin liquidar y no vencidas. Una sesión liquidada NO vuelve por aquí (la venta se cobró y devolverla es una devolución, con su propia puerta auditada), y una soltada o vencida tampoco (la sesión ya está de vuelta en el bono). Un cobro sin canjes responde lista vacía, nunca un error.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "checkout_ref"
+  ],
+  "properties": {
+    "checkout_ref": {
+      "type": "string",
+      "minLength": 1,
+      "description": "El cobro abierto, opaco para este módulo: es el `order_id` cuando el TPV trabaja un pedido — el mismo valor que lleva `sale.completed`, que es lo que permite liquidar estos canjes por evento. El componente lo recibe por el contrato del slot y el host se lo reemite en cada montaje, que es justo lo que sobrevive a la recarga."
+    }
+  }
+}

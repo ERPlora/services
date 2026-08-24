@@ -24,6 +24,15 @@
 -- customer was sold, and editing the catalogue afterwards must not shorten what somebody paid for.
 -- The name is still read live, because a name is presentation and not a term.
 --
+-- 🔴 AN ABANDONED HOLD STOPS COUNTING THE SECOND ITS DEADLINE PASSES (services#77), which is why
+-- `used` carries the `expires_at` predicate. THE READ IS WHAT FREES THE SESSION HERE — not the
+-- sweep. It has to be this way round and not the other: this query is the one that decides whether
+-- the voucher is OFFERED at all, so if a stale hold still counted, the till would not show the
+-- voucher, the cashier could never tap «pay with voucher», and the reclaim that lives inside
+-- `services._hold` would never get the chance to run. The session would stay parked until a cron
+-- fired — which is exactly the WooCommerce failure (held stock freed only by a scheduled job, and
+-- blocked forever when that job does not run) that migration 014 refuses to inherit.
+--
 -- ── THE TIE-BREAK ───────────────────────────────────────────────────────────────────────────────
 --
 -- Decided by the market, not by us (12 references; the full table is in the PR of services#70).
@@ -70,9 +79,11 @@ WITH candidate AS (
         g.validity_days AS validity_days,
         g.granted_at    AS granted_at,
         (SELECT COUNT(*) FROM services_package_redemption r
-          WHERE r.hub_id = :hub_id AND r.grant_id = g.id AND r.is_deleted = 0)   AS used,
+          WHERE r.hub_id = :hub_id AND r.grant_id = g.id AND r.is_deleted = 0
+            AND (r.expires_at IS NULL OR erp_dt(:now) < erp_dt(r.expires_at)))   AS used,
         (SELECT MIN(r.redeemed_at) FROM services_package_redemption r
-          WHERE r.hub_id = :hub_id AND r.grant_id = g.id AND r.is_deleted = 0)   AS first_redeemed_at
+          WHERE r.hub_id = :hub_id AND r.grant_id = g.id AND r.is_deleted = 0
+            AND (r.expires_at IS NULL OR erp_dt(:now) < erp_dt(r.expires_at)))   AS first_redeemed_at
     FROM services_package_grant g
     JOIN services_package p ON p.id = g.package_id AND p.hub_id = g.hub_id
     WHERE g.hub_id = :hub_id AND g.is_deleted = 0 AND g.customer_id = :customer_id

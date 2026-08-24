@@ -49,6 +49,26 @@ const GIFT = {
   default_reason: '',
 };
 
+/** A row of `services.packages.holds_for_checkout` — what the reload finds already spent. */
+const HELD_ROW = {
+  redemption_id: 'red-9',
+  grant_id: 'g-cuts',
+  package_id: 'p-cuts',
+  package_name: 'Bono 5 cortes',
+  customer_id: 'cus-1',
+  service_id: 'svc-1',
+  service_name: 'Corte',
+  checkout_ref: 'order-7',
+  line_ref: 'line-1',
+  redeemed_at: '2026-08-18T10:00:00Z',
+  hold_expires_at: '2026-08-19T10:00:00Z',
+  note: '',
+  max_uses: 5,
+  is_unlimited: 0,
+  remaining_after: 2,
+  expires_at: '2026-08-30T10:00:00Z',
+};
+
 const commands: { name: string; payload: Record<string, unknown> }[] = [];
 let options: unknown[] = [];
 let sdk: Record<string, unknown>;
@@ -61,6 +81,8 @@ beforeEach(() => {
   sdk = {
     query: async (name: string) =>
       name === 'services.packages.tender_options' ? options : [],
+    // `services.packages.holds_for_checkout` falls through to `[]` above: nothing held yet, which
+    // is the state every test written before services#77 assumes.
     queryAll: async () => [],
     command: async (name: string, payload: Record<string, unknown>) => {
       commands.push({ name, payload });
@@ -258,5 +280,119 @@ describe('permissions and the loading state', () => {
     const el = await mount();
     expect(text(el)).toContain('ui.tender.loadFailed');
     expect(text(el)).not.toContain('ui.tender.none');
+  });
+});
+
+// ── services#77 · the reload ────────────────────────────────────────────────
+//
+// The bug this closes, in the cashier's words: she taps «pay with voucher», the session is spent
+// there and then, and the tablet reloads before she can charge. The component came back from zero
+// — `held` is component state — so it offered the voucher again, and there was NO WAY OUT: charging
+// billed the full price (the host does not know the line is covered), redeeming again hit
+// `uq_services_redemption_line`, and undoing needed a `redemption_id` the reload had taken with it.
+//
+// The fix is a READ, not a memory: `services.packages.holds_for_checkout` enumerates what this
+// checkout already holds, and the four props the host re-emits on every mount are enough to ask.
+describe('services#77 · a taken session survives the screen reloading', () => {
+  it('asks what this checkout already holds, with the ref the host re-emits', async () => {
+    const asked: Record<string, unknown>[] = [];
+    sdk.query = async (name: string, params: Record<string, unknown>) => {
+      asked.push({ name, ...params });
+      return name === 'services.packages.holds_for_checkout' ? [] : options;
+    };
+    await mount();
+    expect(asked).toContainEqual({
+      name: 'services.packages.holds_for_checkout',
+      checkout_ref: 'order-7',
+    });
+  });
+
+  it('comes back as HELD — with the voucher, the counter and its undo', async () => {
+    sdk.query = async (name: string) =>
+      name === 'services.packages.holds_for_checkout' ? [HELD_ROW] : options;
+    const el = await mount();
+    // Not the chooser: the session is already spent, and offering it again is what charged the
+    // customer twice.
+    expect(el.held).toMatchObject({ redemption_id: 'red-9', package_name: 'Bono 5 cortes' });
+    expect(text(el)).toContain('ui.tender.held:{"name":"Bono 5 cortes","after":2}');
+    expect(el.shadowRoot.querySelector('[data-test="undo"]')).not.toBeNull();
+    expect(el.shadowRoot.querySelector('[data-test="confirm"]')).toBeNull();
+  });
+
+  it('the recovered id is what the undo releases, and the chooser comes back', async () => {
+    // The stub RELEASES for real: once `release_hold` succeeds the server no longer lists that
+    // hold. A mock that kept answering «still held» would have the component re-recover its own
+    // undo and would hide the round trip this test exists to prove — the id came from the server,
+    // went back to the server, and the screen re-read the answer rather than trusting itself.
+    let stillHeld = true;
+    sdk.query = async (name: string) =>
+      name === 'services.packages.holds_for_checkout' ? (stillHeld ? [HELD_ROW] : []) : options;
+    sdk.command = async (name: string, payload: Record<string, unknown>) => {
+      commands.push({ name, payload });
+      if (name === 'services.packages.release_hold') stillHeld = false;
+      return {};
+    };
+    const el = await mount();
+    expect(el.held?.redemption_id).toBe('red-9');
+    await el.undo();
+    await settle(el);
+    expect(commands).toContainEqual({
+      name: 'services.packages.release_hold',
+      payload: { redemption_id: 'red-9' },
+    });
+    expect(el.held).toBeNull();
+    // …and the cashier can spend a voucher on this line again, which is the point of undoing.
+    expect(el.shadowRoot.querySelector('[data-test="confirm"]')).not.toBeNull();
+  });
+
+  it('only the hold of THIS line comes back — a checkout covers several', async () => {
+    sdk.query = async (name: string) =>
+      name === 'services.packages.holds_for_checkout'
+        ? [{ ...HELD_ROW, redemption_id: 'red-other', line_ref: 'line-9' }, HELD_ROW]
+        : options;
+    const el = await mount();
+    expect(el.held?.redemption_id).toBe('red-9');
+  });
+
+  it('a hold on another line does NOT hijack this slot', async () => {
+    sdk.query = async (name: string) =>
+      name === 'services.packages.holds_for_checkout'
+        ? [{ ...HELD_ROW, redemption_id: 'red-other', line_ref: 'line-9' }]
+        : options;
+    const el = await mount();
+    expect(el.held).toBeNull();
+    expect(el.shadowRoot.querySelector('[data-test="confirm"]')).not.toBeNull();
+  });
+
+  it('nothing held: the chooser, exactly as before', async () => {
+    sdk.query = async (name: string) =>
+      name === 'services.packages.holds_for_checkout' ? [] : options;
+    const el = await mount();
+    expect(el.held).toBeNull();
+    expect(text(el)).toContain('ui.tender.remainingAfter:{"before":4,"after":3}');
+  });
+
+  it('🔴 a FAILED recovery never renders the chooser — it would spend a second session', async () => {
+    // The dangerous direction is not «no vouchers», it is «offer it again». If this read is the
+    // one that failed, the component cannot know whether a session is already spent on this line,
+    // and confirming would hit the line's unique index at best and double-spend at worst. So it
+    // refuses to guess and says so, with a retry.
+    sdk.query = async (name: string) => {
+      if (name === 'services.packages.holds_for_checkout') throw new Error('boom');
+      return options;
+    };
+    const el = await mount();
+    expect(el.shadowRoot.querySelector('[data-test="confirm"]')).toBeNull();
+    expect(text(el)).toContain('ui.tender.loadFailed');
+    expect(el.shadowRoot.querySelector('[data-test="retry"]')).not.toBeNull();
+  });
+
+  it('an unlimited voucher recovered does not invent a countdown', async () => {
+    sdk.query = async (name: string) =>
+      name === 'services.packages.holds_for_checkout'
+        ? [{ ...HELD_ROW, is_unlimited: 1, remaining_after: null }]
+        : options;
+    const el = await mount();
+    expect(text(el)).toContain('ui.tender.heldUnlimited:{"name":"Bono 5 cortes"}');
   });
 });

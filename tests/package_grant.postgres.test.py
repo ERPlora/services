@@ -589,6 +589,11 @@ def the_backfill_keeps_every_balance(db_name_prefix: str) -> None:
                 db=db.name,
             )
         db.apply("migrations/postgres/013_package_grant.sql")
+        # The subject of this section is 013's backfill, but the checks below ask
+        # `services.packages.balance` — a query of the CURRENT module, which since services#77
+        # reads `expires_at`. A hub never runs a query against a half-migrated schema (the runtime
+        # applies every declared migration before serving), so the mirror must not either.
+        db.apply("migrations/postgres/014_hold_deadline.sql")
         check(
             "one legacy grant was minted for the pair (voucher, customer)",
             1,

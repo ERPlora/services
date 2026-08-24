@@ -67,6 +67,25 @@ interface HeldSession {
 }
 
 /**
+ * A row of `services.packages.holds_for_checkout` — a session this checkout ALREADY spent
+ * (services#77).
+ *
+ * This is what makes the screen survive a reload. `held` is component state, so a remount used to
+ * start from zero and paint the chooser over a session that was already gone: charging then billed
+ * the FULL price (the host does not know the line is covered), redeeming again hit
+ * `uq_services_redemption_line`, and undoing was impossible because the `redemption_id` had left
+ * with the component's memory. The read gives it back, and the four props the host re-emits on
+ * every mount are enough to ask for it.
+ */
+interface CheckoutHold {
+  redemption_id: string;
+  package_name: string;
+  line_ref: string;
+  remaining_after: number | null;
+  is_unlimited: number;
+}
+
+/**
  * The tie-break reasons the query can name. Listing them here is deliberate: an unknown reason
  * must NOT render a raw key on a salon's screen, so anything outside this set falls back to the
  * generic sentence.
@@ -159,6 +178,16 @@ export class ErpServicesVoucherTender extends LitElement {
     this.loading = true;
     this.loadFailed = false;
     try {
+      // 🔴 THE RECOVERY COMES FIRST, and it decides whether there is anything to choose at all
+      // (services#77). If this checkout already holds a session for THIS line, the screen must come
+      // back as «held, with undo» — not as the chooser. Painting the chooser over a spent session
+      // is what charged the customer for a haircut they had already paid for.
+      const mine = await this.recoverHold();
+      if (mine) {
+        this.held = mine;
+        this.options = [];
+        return;
+      }
       const rows = await erplora().query<TenderOption[]>('services.packages.tender_options', {
         customer_id: this.customerId,
         service_id: this.serviceId,
@@ -181,6 +210,36 @@ export class ErpServicesVoucherTender extends LitElement {
     } finally {
       this.loading = false;
     }
+  }
+
+  /**
+   * The hold this checkout already has for THIS line, or `null`.
+   *
+   * A checkout covers several lines and each one hosts its own slot, so the read is filtered by
+   * `line_ref` here rather than server-side: one query answers the whole ticket and every slot
+   * picks its own row out of it, instead of N round trips that would each say the same thing.
+   *
+   * The read only ever returns what can still be UNDONE — live, held, unsettled, not past its
+   * deadline — so a settled session (the sale was paid; giving it back is a refund, with its own
+   * audited door) never arrives here to be offered an «undo» the runtime would then refuse.
+   */
+  private async recoverHold(): Promise<HeldSession | null> {
+    if (!this.checkoutRef || !this.lineRef) return null;
+    const rows = await erplora().query<CheckoutHold[]>('services.packages.holds_for_checkout', {
+      checkout_ref: this.checkoutRef,
+    });
+    const mine = (Array.isArray(rows) ? rows : []).find((r) => r.line_ref === this.lineRef);
+    if (!mine) return null;
+    return {
+      redemption_id: String(mine.redemption_id ?? ''),
+      package_name: String(mine.package_name ?? ''),
+      // `remaining_after` is NULL exactly when the voucher was sold as unlimited — the query
+      // derives both from the same `max_uses IS NULL`, so re-deriving it from `is_unlimited` here
+      // would be a second opinion on a question that already has one answer, and a branch no test
+      // could tell apart. The SQL is the authority; `tests/hold_recovery.postgres.test.py` §K is
+      // what holds it to that.
+      remaining_after: mine.remaining_after ?? null,
+    };
   }
 
   select(grantId: string): void {

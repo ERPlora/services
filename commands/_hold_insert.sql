@@ -25,11 +25,17 @@
 -- exactly the width it had.
 INSERT INTO services_package_redemption
   (id, hub_id, grant_id, package_id, customer_id, service_id, checkout_ref, line_ref,
-   appointment_id, sale_id, note, redeemed_at, status, settled_at, use_index,
+   appointment_id, sale_id, note, redeemed_at, status, settled_at, expires_at, use_index,
    is_deleted, created_by, updated_by, created_at, updated_at)
 SELECT
   :redemption_id, :hub_id, g.id, g.package_id, g.customer_id, :service_id, :checkout_ref, :line_ref,
   NULL, NULL, COALESCE(:note, ''), :now, 'held', NULL,
+  -- 🔴 THE DEADLINE IS THE SERVER'S, AND IT IS THE ONLY PLACE THE WINDOW IS WRITTEN (services#77).
+  -- One day from now: long enough that it cannot fire under a live sale, short enough that an
+  -- abandoned checkout does not park a customer's session forever. The payload has no way to
+  -- propose it — a caller choosing its own deadline could hold a voucher for a month. Why a day
+  -- and not minutes, with the 13 references behind it: migration 014.
+  erp_dateadd(:now, 1, 'days'),
   (SELECT COALESCE(MAX(u.use_index), 0) + 1
      FROM services_package_redemption u
     WHERE u.hub_id = :hub_id AND u.package_id = g.package_id
