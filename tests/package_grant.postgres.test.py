@@ -339,6 +339,25 @@ def two_grants_coexist(db: ScratchDb, svc: str, pkg: str) -> None:
     )
     check("only the newer grant is left", [newer], [r["grant_id"] for r in still])
     check("with its five sessions intact", 5, still[0]["remaining_before"])
+    # 🔴 And it can actually be SPENT. Reading `tender_options` is not enough: that query counts per
+    # grant already, so a guard that had gone back to counting over (package, customer) would still
+    # offer this voucher and refuse it at the till — measured, that mutant SURVIVED until the line
+    # below existed. What proves the pool is per-purchase is a session landing on the second grant
+    # after the first one is exhausted.
+    hold(db, newer, svc, "order-c2", str(uuid.uuid4()))
+    check(
+        "a session lands on the SECOND purchase, with the first one exhausted",
+        1,
+        int(db.scalar(f"SELECT count(*) FROM services_package_redemption WHERE grant_id = '{newer}' AND is_deleted = 0")),
+    )
+    check(
+        "and the two ledgers stay apart: 5 on one purchase, 1 on the other",
+        [5, 1],
+        [
+            int(db.scalar(f"SELECT count(*) FROM services_package_redemption WHERE grant_id = '{g}' AND is_deleted = 0"))
+            for g in (older, newer)
+        ],
+    )
 
 
 # ── 4 · expiry runs from the PURCHASE ────────────────────────────────────────
