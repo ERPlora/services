@@ -9,7 +9,19 @@
   shows the count before you confirm; the appointments keep their booking, price and duration. If
   `appointments` is not installed the dialog simply has no such line. Nothing stops an API caller
   from archiving a booked service — by design (Fresha, Square and Vagaro archive and warn too).
-- **This module cannot grant a package to a customer.** It can only redeem one.
+- **A voucher cannot be transferred or shared.** A grant belongs to ONE customer. Sharing it with a
+  family member, or moving it to the daughter it was bought for, has no door yet — the market keeps
+  both behind an explicit opt-in and they are their own feature (services#79 transfer /
+  services#80 sharing).
+- **A voucher sold with no customer on the ticket is not granted.** The sale goes through and the
+  listener reports how many ownerless vouchers it saw, but nothing is written: an entitlement needs
+  an owner. Grant it afterwards with `services.packages.grant`.
+- **Deleting a customer leaves their grants behind.** `customer_id` is an opaque reference with no
+  cross-module foreign key (the module contract), so a deleted or merged customer leaves grants that
+  no balance screen will show. Of 17 products surveyed **not one** documents an answer to this, so
+  there is no prior art to copy and ours has to be designed (services#81).
+- **A grant cannot be corrected or revoked.** No door adjusts the sessions, extends the deadline or
+  voids a voucher sold by mistake (services#82).
 
 ## Errors you will actually see
 
@@ -21,9 +33,11 @@
 | `services.parent_category_unavailable` | The parent category you attached belongs to another hub or is deleted | Pick a live parent of this hub, or leave it empty (root) |
 | `services.category_update_rejected` | The category update matched nothing: the category is not in this hub, or the parent is foreign/deleted/the category itself | Check both |
 | `InvalidPayload` (validation error) | The payload broke the command's contract: unknown key, pricing type outside the enum, negative price, duration 0, capacity 0, percentage above 100, empty batch… | Fix the named field; every public command has a JSON Schema |
-| `package_not_found` | The package does not exist or is inactive | Reactivate it, or check the id |
-| `no_uses_left` | The maximum uses are already consumed | Sell another package |
-| `expired` | The validity window has passed since the **first** redemption | The package is spent; a new one is needed |
+| `services.package_no_grant` | **Nobody sold that voucher to this customer.** The grant does not exist in this hub | Sell it — or grant it with `services.packages.grant`. It is not a matter of reactivating anything |
+| `services.grant_customer_required` | A grant was attempted with no customer | Pick the customer: a voucher with no owner cannot be redeemed by anyone |
+| `package_not_found` | The grant is real but its voucher template is archived or inactive | Reactivate the package, or check the id |
+| `no_uses_left` | The sessions **of that grant** are already consumed | Sell another one — a second grant of the same voucher is a normal, supported case |
+| `expired` | The validity window has passed since the **purchase** | The voucher is spent; a new one is needed |
 
 A refused redemption rolls the whole transaction back — no ledger row, no event.
 
@@ -71,16 +85,22 @@ A refused redemption rolls the whole transaction back — no ledger row, no even
 | Delete a category | `services.delete_category` |
 | Create or change a package | `services.add_package` / `services.change_package` |
 | Delete a package | `services.delete_package` |
+| Grant a voucher to a customer (and what the till's `sale.completed` listener needs) | `services.grant_package` |
 | Redeem one use of a package | `services.redeem_package` |
 | See a customer's package balance | `services.view_package_balance` |
 | Change the module settings | `services.manage_settings` |
 
 By role: **admin** has everything. **manager** has everything except the three deletes and
-`manage_settings`. **employee** can **see** everything, **create a service**, **redeem a package**
-and **see a balance** — but cannot edit or delete anything, and cannot manage categories or
-packages.
+`manage_settings`. **cashier** can see the catalogue, **grant**, **redeem**, hold and settle.
+**employee** can **see** everything, **create a service**, **redeem a package** and **see a
+balance** — but cannot edit or delete anything, and cannot manage categories or packages.
 
 Redeeming is deliberately available to an employee: it happens at the counter.
+
+🔴 **`services.grant_package` is what the till's own listener runs under.** The relay delivers
+`sale.completed` with the permissions of whoever completed the sale, so a role that can take money
+and cannot grant would leave a customer paying for a voucher that never lands. Cashier, manager and
+admin have it; if you build a custom role that closes a sale, give it this too.
 
 ## Dependencies — what breaks if something is missing
 
@@ -92,8 +112,14 @@ pointer on every save.
 price and above all the **duration** of a service. Without a service catalogue, `appointments` cannot
 book anything — which is why installing the diary installs this module.
 
-**`customers` is referenced but not depended on.** Package redemptions store a customer id by
-convention, with no cross-module foreign key.
+**`customers` is referenced but not depended on.** Grants and redemptions store a customer id by
+convention, with no cross-module foreign key. That is what makes a deleted customer's grants
+invisible rather than refused — see the known gaps above.
+
+**`sales` is not depended on either, and does not know vouchers exist.** The grant listener reads one
+field of `sale.completed` — a line's `product_id`, matched against this module's own catalogue — the
+same way the settle already reads `order_id`. Nothing was added to `sales` for it, and a hub without
+`sales` simply grants by hand.
 
 ## When something looks wrong
 
@@ -114,13 +140,20 @@ service of **this** business that is still in the catalogue. It used to be worse
 dropped and the package was created without it, so the voucher was short of sessions and nobody was
 told. Now the whole package is refused and nothing is saved — fix the line and save again.
 
-**"A customer's voucher is not recognised."** Either they were never granted it — this module cannot
-grant, only redeem — or it is out of uses, expired or inactive. The redemption itself says which:
-it refuses with `services.package_no_uses_left`, `services.package_expired` or
-`services.package_not_found` (the check command answers the same trio without consuming).
+**"A customer's voucher is not recognised."** The first thing to check is whether they were ever
+**granted** it: the voucher being in the catalogue does not mean this customer owns one. The
+redemption says which of the four it is — `services.package_no_grant` (nobody sold it to them),
+`services.package_no_uses_left`, `services.package_expired` or `services.package_not_found` (the
+template is archived). The check command answers the same four without consuming.
 
-**"The voucher expired sooner than expected."** The clock starts at the **first redemption**, not at
-purchase. That surprises everyone once.
+**"They paid for the voucher on the ticket but it is not on their account."** Look at whether the
+sale had a **customer**. A voucher line on an anonymous ticket grants nothing — there is nobody to
+grant it to. Grant it by hand with `services.packages.grant` and the sessions are theirs.
+
+**"The voucher expired sooner than expected."** The clock starts at the **purchase**, not at the
+first use, so a voucher bought and never touched does expire. ⚠️ And in Spain an expiry on a prepaid
+voucher is legally contested (consumer authorities call it *«una práctica ilegal»*): `validity_days`
+is optional and empty by default — leave it empty unless you have taken advice.
 
 **"The balance says uses remain but redeeming is refused."** Check the expiry and whether the package
 is still active — remaining uses is only one of the three conditions.

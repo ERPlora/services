@@ -7,8 +7,11 @@ The runtime halves of the fix live elsewhere: the reason→code mapping is the W
 the issue's acceptance criteria:
 
   1. `services.packages.redeem_check` — the read the handler now refuses with — answers the
-     RIGHT reason for each scenario: exhausted, expired, unknown package (and an other-hub
-     package is unknown, not "yours").
+     RIGHT reason for each scenario: no grant at all, exhausted, expired, archived voucher (and
+     an other-hub grant is unknown, not "yours"). Since services#73 the question is asked about a
+     GRANT — the customer's purchase — so `no_grant` is the first and most common refusal: it is
+     what a customer who never bought the voucher gets, where the old model handed them five free
+     sessions.
   2. The gated statements (`services._redeem`: conditional INSERT + assert + clear) still refuse
      and ROLL BACK in every one of those scenarios — the read is advisory, the gate stays the
      transactional authority, so a race between the read and the write still aborts.
@@ -29,8 +32,9 @@ failures: list[str] = []
 
 # `pg_harness.NOW` — the harness binds every :now to this instant.
 NOW = "2026-08-18T10:00:00Z"
-# 48 days before NOW: with validity_days = 30, a first use anchored here is long expired.
-FIRST_USE_LONG_AGO = "2026-07-01T10:00:00Z"
+# 48 days before NOW: with validity_days = 30, a voucher BOUGHT here is long expired — and it is
+# expired with zero uses, which is the whole point of moving the anchor to the purchase.
+BOUGHT_LONG_AGO = "2026-07-01T10:00:00Z"
 
 # The hub's db layer lowers the `erp_*` SQL bridges (ADR-0007) to native Postgres before PREPARE;
 # this miniature does the same for the ONLY two this module uses (`erp_dt`, `erp_dateadd`), the
@@ -135,7 +139,42 @@ def seed_package(db: ScratchDb, hub: str, name: str, max_uses, validity_days) ->
     return package_id
 
 
-def redeem(db: ScratchDb, package_id: str, customer: str = "cus-1") -> None:
+def seed_grant(
+    db: ScratchDb,
+    package_id: str,
+    customer: str = "cus-1",
+    hub: str = HUB,
+    granted_at: str = NOW,
+) -> str:
+    """The PURCHASE row (services#73): without one there is nothing to redeem."""
+    from pg_harness import USER, bind
+
+    grant_id = str(uuid.uuid4())
+    params = {
+        "grant_id": grant_id,
+        "package_id": package_id,
+        "customer_id": customer,
+        "granted_at": granted_at,
+        "source": "manual",
+        "sale_id": None,
+        "sale_ref": "",
+        "amount_cents": 0,
+        "net_amount_cents": 0,
+        "tax_amount_cents": 0,
+        "note": "",
+        "hub_id": hub,
+        "current_user_id": USER,
+        "now": NOW,
+    }
+    script = ["BEGIN;"]
+    for rel in ("commands/_grant_insert.sql", "commands/_grant_assert.sql", "commands/_gate_clear.sql"):
+        script.append(lower_bridges(bind((MODULE_DIR / rel).read_text(), params)))
+    script.append("COMMIT;")
+    db.psql([], db=db.name, stdin="\n".join(script))
+    return grant_id
+
+
+def redeem(db: ScratchDb, grant_id: str, hub: str = HUB) -> None:
     """One use consumed through the gated statements, the way the handler's intention runs.
 
     `pg_harness.run_command` does not lower the `erp_*` bridges (no other services statement
@@ -145,9 +184,8 @@ def redeem(db: ScratchDb, package_id: str, customer: str = "cus-1") -> None:
 
     params = {
         "redemption_id": str(uuid.uuid4()),
-        "package_id": package_id,
-        "customer_id": customer,
-        "hub_id": HUB,
+        "grant_id": grant_id,
+        "hub_id": hub,
         "current_user_id": USER,
         "now": NOW,
     }
@@ -158,23 +196,27 @@ def redeem(db: ScratchDb, package_id: str, customer: str = "cus-1") -> None:
     db.psql([], db=db.name, stdin="\n".join(script))
 
 
-def check_reason(db: ScratchDb, label: str, expected_reason: str, package_id: str, customer: str = "cus-1") -> None:
+def reason_of(db: ScratchDb, grant_id: str) -> dict:
     from pg_harness import bind
 
     sql = (MODULE_DIR / "queries/package_redeem_check.sql").read_text().rstrip().rstrip(";")
-    lowered = lower_bridges(bind(sql, {"hub_id": HUB, "now": NOW, "package_id": package_id, "customer_id": customer}))
+    lowered = lower_bridges(bind(sql, {"hub_id": HUB, "now": NOW, "grant_id": grant_id}))
     out = db.psql(["-tAc", f"SELECT COALESCE(json_agg(t), '[]'::json) FROM ({lowered}) t"], db=db.name)
     rows = json.loads(out.strip() or "[]")
-    reason = rows[0].get("reason") if rows else None
-    check(f"redeem_check reason · {label}", expected_reason, reason)
-    check(f"redeem_check redeemable · {label}", 0, rows[0].get("redeemable"))
+    return rows[0] if rows else {}
 
 
-def residue(db: ScratchDb, package_id: str) -> tuple[int, int]:
+def check_reason(db: ScratchDb, label: str, expected_reason: str, grant_id: str) -> None:
+    row = reason_of(db, grant_id)
+    check(f"redeem_check reason · {label}", expected_reason, row.get("reason"))
+    check(f"redeem_check redeemable · {label}", 0, row.get("redeemable"))
+
+
+def residue(db: ScratchDb, grant_id: str) -> tuple[int, int]:
     redemptions = int(
         db.scalar(
             "SELECT count(*) FROM services_package_redemption "
-            f"WHERE package_id = '{package_id}' AND is_deleted = 0"
+            f"WHERE grant_id = '{grant_id}' AND is_deleted = 0"
         )
     )
     gate = int(db.scalar("SELECT count(*) FROM services__gate"))
@@ -190,60 +232,51 @@ def main() -> int:
     db.create()
     try:
         seed_service(db, HUB, "Cut")
-        print("A. exhausted — the 3rd use of a 2-use package")
+        print("A. exhausted — the 3rd use of a 2-use voucher")
         capped = seed_package(db, HUB, "Bono 2 usos", max_uses=2, validity_days=None)
-        redeem(db, capped)
-        redeem(db, capped)
-        check("two uses consumed", 2, residue(db, capped)[0])
-        check_reason(db, "exhausted", "no_uses_left", capped)
-        refused(db, "the 3rd use", lambda: redeem(db, capped))
-        check("no redemption row was left behind", (2, 0), residue(db, capped))
+        capped_grant = seed_grant(db, capped)
+        redeem(db, capped_grant)
+        redeem(db, capped_grant)
+        check("two uses consumed", 2, residue(db, capped_grant)[0])
+        check_reason(db, "exhausted", "no_uses_left", capped_grant)
+        refused(db, "the 3rd use", lambda: redeem(db, capped_grant))
+        check("no redemption row was left behind", (2, 0), residue(db, capped_grant))
 
-        print("\nB. expired — validity_days ran out since the first use")
+        print("\nB. expired — validity_days ran out since the PURCHASE, with zero uses")
         expiring = seed_package(db, HUB, "Bono caduca", max_uses=None, validity_days=30)
-        # A first use anchored 48 days ago: the anchor starts the clock, not the purchase.
-        db.psql(
-            [],
-            db=db.name,
-            stdin=(
-                # `use_index` is not optional since migration 011: the ordinal IS the
-                # anti-double-spend guard, and `ck_services_redemption_use_index` refuses a row
-                # without one — including this one, written by raw SQL. That refusal is the guard
-                # working, so the seed supplies the ordinal the command would have computed.
-                "INSERT INTO services_package_redemption "
-                "(id, hub_id, package_id, customer_id, note, redeemed_at, is_deleted, "
-                "status, use_index) VALUES "
-                f"('{uuid.uuid4()}', '{HUB}', '{expiring}', 'cus-1', 'first use', "
-                f"'{FIRST_USE_LONG_AGO}', 0, 'consumed', 1);"
-            ),
-        )
-        check_reason(db, "expired", "expired", expiring)
-        refused(db, "a use past the deadline", lambda: redeem(db, expiring))
-        check("no redemption row was left behind", (1, 0), residue(db, expiring))
+        stale = seed_grant(db, expiring, granted_at=BOUGHT_LONG_AGO)
+        check_reason(db, "expired", "expired", stale)
+        refused(db, "a use past the deadline", lambda: redeem(db, stale))
+        check("nothing was written", (0, 0), residue(db, stale))
 
-        print("\nC. unknown package — no bono by that id in this hub")
+        print("\nC. NO GRANT — the customer never bought that voucher (services#73)")
         ghost = str(uuid.uuid4())
-        check_reason(db, "unknown package", "package_not_found", ghost)
-        refused(db, "a ghost package", lambda: redeem(db, ghost))
+        check_reason(db, "a grant that does not exist", "no_grant", ghost)
+        refused(db, "a redemption with no purchase behind it", lambda: redeem(db, ghost))
         check("no residue at all", (0, 0), residue(db, ghost))
 
-        print("\nD. another hub's package is UNKNOWN here, not shared")
+        print("\nD. archived voucher — the grant is real, the template is gone")
+        archived = seed_package(db, HUB, "Bono retirado", max_uses=2, validity_days=None)
+        archived_grant = seed_grant(db, archived)
+        db.psql(["-c", f"UPDATE services_package SET is_active = 0 WHERE id = '{archived}'"], db=db.name)
+        check_reason(db, "archived voucher", "package_not_found", archived_grant)
+        refused(db, "a use of an archived voucher", lambda: redeem(db, archived_grant))
+        check("nothing was written", (0, 0), residue(db, archived_grant))
+
+        print("\nE. another hub's GRANT is UNKNOWN here, not shared")
         seed_service(db, OTHER_HUB, "Cut")
-        foreign = seed_package(db, OTHER_HUB, "Bono 2 usos", max_uses=2, validity_days=None)
-        check_reason(db, "other hub's package", "package_not_found", foreign)
+        foreign_pkg = seed_package(db, OTHER_HUB, "Bono 2 usos", max_uses=2, validity_days=None)
+        foreign = seed_grant(db, foreign_pkg, customer="cus-next-door", hub=OTHER_HUB)
+        check_reason(db, "other hub's grant", "no_grant", foreign)
         refused(db, "a cross-hub redemption", lambda: redeem(db, foreign))
         check("the other hub's ledger is untouched", (0, 0), residue(db, foreign))
 
-        print("\nE. the happy path still writes the ledger and empties the guard")
+        print("\nF. the happy path still writes the ledger and empties the guard")
         fresh = seed_package(db, HUB, "Bono abierto", max_uses=None, validity_days=None)
-        from pg_harness import bind
-
-        sql = (MODULE_DIR / "queries/package_redeem_check.sql").read_text().rstrip().rstrip(";")
-        lowered = lower_bridges(bind(sql, {"hub_id": HUB, "now": NOW, "package_id": fresh, "customer_id": "cus-1"}))
-        out = db.psql(["-tAc", f"SELECT COALESCE(json_agg(t), '[]'::json) FROM ({lowered}) t"], db=db.name)
-        check("redeem_check redeemable", 1, json.loads(out.strip() or "[{}]")[0].get("redeemable"))
-        redeem(db, fresh)
-        check("one use consumed, gate empty in repose", (1, 0), residue(db, fresh))
+        fresh_grant = seed_grant(db, fresh)
+        check("redeem_check redeemable", 1, reason_of(db, fresh_grant).get("redeemable"))
+        redeem(db, fresh_grant)
+        check("one use consumed, gate empty in repose", (1, 0), residue(db, fresh_grant))
     finally:
         db.drop()
 

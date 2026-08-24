@@ -7,6 +7,10 @@
 -- a refund for one that was. A history filtered on `is_deleted = 0`, which is the reflex everywhere
 -- else in the hub, would show exactly the movements it exists to show and hide the two that matter.
 --
+-- `grant_id` travels in the row (services#73): the movements of a voucher a customer bought TWICE
+-- are two ledgers under one template, and without the grant on the row nobody could tell which
+-- session came out of which purchase — which is exactly what an audit of the accrual has to do.
+--
 -- Binds: :package_id. The runtime injects :hub_id. There is no `:customer_id` filter on purpose:
 -- the screen this feeds is the VOUCHER's sheet, not a customer's, and `customer_id` travels in the
 -- row so the caller can group or filter without a second round trip. A customer's balance across
@@ -25,6 +29,7 @@
 -- line and therefore no `service_id`, and a movement with no service still has to be listed.
 SELECT
     r.id                                    AS redemption_id,
+    r.grant_id                              AS grant_id,
     r.package_id                            AS package_id,
     r.customer_id                           AS customer_id,
     r.service_id                            AS service_id,

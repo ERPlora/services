@@ -30,29 +30,36 @@
 --
 -- `remaining_after` is `remaining_before + 1` — the mirror image of `package_tender_options`, where
 -- spending a session previews one less. NULL on an unlimited voucher, where counting means nothing.
+--
+-- Since services#73 the counting and the expiry are read off the GRANT the session was spent
+-- against — the customer's PURCHASE — rather than recomputed over the pair (package, customer).
+-- That is what makes the answer right when a customer bought the same voucher twice: the session
+-- goes back to the grant it came out of, and the preview counts that grant's sessions and no one
+-- else's. The expiry it reports is the one that grant was sold with, which no later edit of the
+-- catalogue can move.
 WITH target AS (
-    SELECT id, package_id, customer_id, service_id, sale_id, checkout_ref, line_ref,
+    SELECT id, grant_id, package_id, customer_id, service_id, sale_id, checkout_ref, line_ref,
            status, settled_at, is_deleted, refunded_at, refund_ref
       FROM services_package_redemption
      WHERE id = :redemption_id AND hub_id = :hub_id
 ),
-pkg AS (
-    SELECT p.max_uses, p.validity_days
-      FROM services_package p
-     WHERE p.hub_id = :hub_id
-       AND p.id = (SELECT package_id FROM target)
+grant_row AS (
+    SELECT g.id, g.max_uses, g.validity_days, g.granted_at
+      FROM services_package_grant g
+     WHERE g.hub_id = :hub_id
+       AND g.id = (SELECT grant_id FROM target)
 ),
 used AS (
-    SELECT COUNT(*) AS n, MIN(u.redeemed_at) AS first_at
+    SELECT COUNT(*) AS n
       FROM services_package_redemption u
      WHERE u.hub_id = :hub_id
-       AND u.package_id = (SELECT package_id FROM target)
-       AND u.customer_id = (SELECT customer_id FROM target)
+       AND u.grant_id = (SELECT grant_id FROM target)
        AND u.is_deleted = 0
 ),
 facts AS (
     SELECT
         (SELECT id FROM target)                    AS rid,
+        COALESCE((SELECT grant_id FROM target), '')     AS grant_id,
         COALESCE((SELECT package_id FROM target), '')   AS package_id,
         COALESCE((SELECT customer_id FROM target), '')  AS customer_id,
         COALESCE((SELECT service_id FROM target), '')   AS service_id,
@@ -64,14 +71,15 @@ facts AS (
         (SELECT settled_at FROM target)            AS settled_at,
         (SELECT is_deleted FROM target)            AS is_deleted,
         (SELECT refunded_at FROM target)           AS refunded_at,
-        (SELECT max_uses FROM pkg)                 AS max_uses,
+        (SELECT max_uses FROM grant_row)           AS max_uses,
         (SELECT n FROM used)                       AS live_uses,
-        CASE WHEN (SELECT validity_days FROM pkg) IS NULL THEN NULL
-             ELSE erp_dateadd((SELECT first_at FROM used),
-                              (SELECT validity_days FROM pkg), 'days') END AS expires_at
+        CASE WHEN (SELECT validity_days FROM grant_row) IS NULL THEN NULL
+             ELSE erp_dateadd((SELECT granted_at FROM grant_row),
+                              (SELECT validity_days FROM grant_row), 'days') END AS expires_at
 )
 SELECT
     :redemption_id                                  AS redemption_id,
+    grant_id,
     package_id,
     customer_id,
     service_id,

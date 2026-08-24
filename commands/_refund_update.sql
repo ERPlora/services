@@ -20,19 +20,16 @@
 -- SOLD. Giving a session back moves a balance inside that already-taxed voucher; it emits nothing
 -- and rectifies nothing. The money side of the return is `sales`' rectificativa, not this.
 --
--- `refund_expired` is computed here, in the same statement, because one statement later it is no
--- longer computable: expiry is anchored on `MIN(redeemed_at)` over the LIVE uses and this very
--- UPDATE can move that anchor. The subquery reads the statement's snapshot, so the row being
--- returned still counts — the flag answers «was the voucher expired at the moment the session came
--- back?», which is the question an auditor asks. A voucher with no validity, or whose clock never
--- started, is not expired: the date bridge over a NULL anchor yields NULL, the comparison is NULL,
--- and the CASE falls to 0 rather than to a guess. (The anchor is written as a subquery and never as
--- a bridge call inside this prose: the runtime lowers every `erp_*` call it finds in the statement
--- TEXT, comments included, so a bridge named in a comment is a bridge it tries to lower.)
+-- `refund_expired` answers «was the voucher expired at the moment the session came back?», which is
+-- the question an auditor asks. Since services#73 it is read off the GRANT — the customer's
+-- purchase — so it is a plain comparison and no longer a subquery racing itself: the anchor used to
+-- be `MIN(redeemed_at)` over the LIVE uses, which this very UPDATE could move, and the flag had to
+-- be computed here or never. A grant with no validity is not expired: the date bridge over a NULL
+-- yields NULL, the comparison is NULL, and the CASE falls to 0 rather than to a guess.
 --
--- `services_package` is joined but NOT filtered on `is_deleted`/`is_active` on purpose: archiving
--- or deleting the voucher template must not trap a customer's refund. The row is only there for
--- `validity_days`.
+-- `services_package_grant` is joined but NOT filtered on `is_deleted` on purpose: revoking or
+-- archiving the entitlement must not trap a refund of a session that was already delivered and
+-- paid. The row is only there for the terms (`granted_at`, `validity_days`).
 UPDATE services_package_redemption AS r
    SET is_deleted = 1,
        deleted_at = :now,
@@ -41,23 +38,16 @@ UPDATE services_package_redemption AS r
        refund_ref = :refund_ref,
        refund_note = COALESCE(:refund_note, ''),
        refund_expired = CASE
-           WHEN p.validity_days IS NOT NULL
-                AND erp_dt(:now) > erp_dateadd(
-                      (SELECT MIN(a.redeemed_at)
-                         FROM services_package_redemption a
-                        WHERE a.hub_id = r.hub_id
-                          AND a.package_id = r.package_id
-                          AND a.customer_id = r.customer_id
-                          AND a.is_deleted = 0),
-                      p.validity_days, 'days')
+           WHEN g.validity_days IS NOT NULL
+                AND erp_dt(:now) > erp_dateadd(g.granted_at, g.validity_days, 'days')
            THEN 1 ELSE 0 END,
        updated_by = :current_user_id,
        updated_at = :now
-  FROM services_package p
+  FROM services_package_grant g
  WHERE r.id = :redemption_id
    AND r.hub_id = :hub_id
-   AND p.id = r.package_id
-   AND p.hub_id = r.hub_id
+   AND g.id = r.grant_id
+   AND g.hub_id = r.hub_id
    AND r.is_deleted = 0
    AND r.status = 'consumed'
    AND r.settled_at IS NOT NULL;

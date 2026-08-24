@@ -163,6 +163,45 @@ def _updates(out: str) -> int:
     )
 
 
+# Which grant a (voucher, customer, hub) triple is spending, minted on first use.
+#
+# services#73 put a PURCHASE row between the catalogue and the ledger: a session is now spent
+# against a grant, not against a package plus a customer id. This test is about REFUNDS, so the
+# purchase is scenery — it is created on demand and memoised, and every `hold` below reads exactly
+# as it did before. A test that had to spell out the purchase in twenty places would be testing
+# the seeding, not the refund.
+GRANTS: dict[tuple[str, str, str], str] = {}
+
+
+def grant_for(db: ScratchDb, package_id: str, customer: str, hub: str) -> str:
+    key = (hub, package_id, customer)
+    if key not in GRANTS:
+        grant_id = str(uuid.uuid4())
+        db.psql(
+            [],
+            db=db.name,
+            stdin=script_for(
+                "services._grant",
+                {
+                    "grant_id": grant_id,
+                    "package_id": package_id,
+                    "customer_id": customer,
+                    "granted_at": NOW,
+                    "source": "manual",
+                    "sale_id": None,
+                    "sale_ref": "",
+                    "amount_cents": 0,
+                    "net_amount_cents": 0,
+                    "tax_amount_cents": 0,
+                    "note": "",
+                },
+                hub=hub,
+            ),
+        )
+        GRANTS[key] = grant_id
+    return GRANTS[key]
+
+
 def hold(
     db: ScratchDb,
     package_id: str,
@@ -180,8 +219,7 @@ def hold(
             "services._hold",
             {
                 "redemption_id": rid,
-                "package_id": package_id,
-                "customer_id": customer,
+                "grant_id": grant_for(db, package_id, customer, hub),
                 "service_id": service_id,
                 "checkout_ref": checkout_ref,
                 "line_ref": line_ref,
@@ -275,6 +313,22 @@ def options(
         ["-tAc", f"SELECT COALESCE(json_agg(t), '[]'::json) FROM ({sql}) t"], db=db.name
     )
     return json.loads(out.strip() or "[]")
+
+
+def balance_of(db: ScratchDb, package_id: str, customer: str, hub: str = HUB) -> dict:
+    """The customer's balance ON THAT VOUCHER, through the module's own door.
+
+    `services.packages.balance` answers one row per GRANT (services#73). The tests here never buy
+    the same voucher twice, so «the grant of this voucher» is unambiguous — and asking through the
+    query rather than counting rows is what makes an expired voucher's balance readable at all: it
+    is absent from `tender_options` precisely because it is expired.
+    """
+    sql = query_sql("services.packages.balance", {"customer_id": customer}, hub=hub)
+    out = db.psql(
+        ["-tAc", f"SELECT COALESCE(json_agg(t), '[]'::json) FROM ({sql}) t"], db=db.name
+    )
+    rows = [r for r in json.loads(out.strip() or "[]") if r["package_id"] == package_id]
+    return rows[0] if rows else {}
 
 
 def live(db: ScratchDb, package_id: str, customer: str = "cus-1") -> int:
@@ -532,8 +586,7 @@ def main() -> int:
                 "services._redeem",
                 {
                     "redemption_id": chair,
-                    "package_id": five,
-                    "customer_id": "cus-chair",
+                    "grant_id": grant_for(db, five, "cus-chair", HUB),
                     "appointment_id": None,
                     "sale_id": None,
                     "note": "",
@@ -582,8 +635,9 @@ def main() -> int:
         print("\nH. 🔴 EXPIRY does not block a refund — it is RECORDED and announced")
         expiring = seed_package(db, HUB, "Bono caducado", max_uses=5, validity_days=30)
         seed_item(db, HUB, expiring, cut)
-        # Two uses, both long before NOW: the first anchors the clock, so at NOW the voucher is
-        # 18 days past its expiry. Rectifying yesterday's ticket must still work.
+        # Bought 48 days before NOW with 30 days of validity, so at NOW the voucher is 18 days
+        # past its expiry. Rectifying yesterday's ticket must still work. Since services#73 the
+        # clock hangs off the PURCHASE, so this is the grant's date and not the sessions'.
         first = sold_session(
             db, expiring, cut, "chk-e1", "line-1", "sale-e1", customer="cus-e"
         )
@@ -594,8 +648,8 @@ def main() -> int:
             [],
             db=db.name,
             stdin=(
-                "UPDATE services_package_redemption SET redeemed_at = "
-                f"'{LONG_AGO}' WHERE id IN ('{first}', '{second}');"
+                "UPDATE services_package_grant SET granted_at = "
+                f"'{LONG_AGO}' WHERE id = '{grant_for(db, expiring, "cus-e", HUB)}';"
             ),
         )
         warned = refund_check(db, second)
@@ -618,18 +672,26 @@ def main() -> int:
             [r for r in options(db, "cus-e", cut) if r["package_id"] == expiring],
         )
 
-        print("\nI. …and refunding the use that STARTED the clock un-starts it")
-        check("the anchor use goes back too", 1, refund(db, first, "return-e2"))
+        # 🔴 services#73 CLOSED a loophole here, and this is where it used to be. While the clock
+        # was anchored on the FIRST LIVE USE, refunding that use un-started it: spend a session on
+        # day one, return it, and the 30 days began again — an extension nobody bought, handed out
+        # by the undo button. The anchor is now the PURCHASE, which no refund can move, so the
+        # sessions come back and the deadline stays exactly where it was.
+        print("\nI. …and refunding a use does NOT restart the clock — a refund is not an extension")
+        check("the second use goes back too", 1, refund(db, first, "return-e2"))
         check("no live use is left", 0, live(db, expiring, "cus-e"))
-        restored = [r for r in options(db, "cus-e", cut) if r["package_id"] == expiring]
-        check("so the voucher is unstarted, not expired", 1, len(restored))
         check(
-            "with every session on it",
+            "every session is back on the voucher",
             5,
-            restored[0]["remaining_before"] if restored else None,
+            int(balance_of(db, expiring, "cus-e")["remaining"]),
         )
         check(
-            "and the second refund knew the voucher was expired AT THAT MOMENT",
+            "…and it is STILL expired: the refund gave sessions back, not time",
+            [],
+            [r for r in options(db, "cus-e", cut) if r["package_id"] == expiring],
+        )
+        check(
+            "and this refund knew the voucher was expired AT THAT MOMENT too",
             1,
             int(row(db, first, "refund_expired")[0]),
         )

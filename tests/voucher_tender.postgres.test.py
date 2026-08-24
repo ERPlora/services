@@ -131,6 +131,39 @@ def seed_item(db: ScratchDb, hub: str, package_id: str, service_id: str) -> None
     )
 
 
+def seed_grant(
+    db: ScratchDb,
+    package_id: str,
+    customer: str = "cus-1",
+    hub: str = HUB,
+    granted_at: str = NOW,
+) -> str:
+    """The PURCHASE row (services#73): a voucher nobody sold is a voucher nobody can spend."""
+    grant_id = str(uuid.uuid4())
+    db.psql(
+        [],
+        db=db.name,
+        stdin=script_for(
+            "services._grant",
+            {
+                "grant_id": grant_id,
+                "package_id": package_id,
+                "customer_id": customer,
+                "granted_at": granted_at,
+                "source": "manual",
+                "sale_id": None,
+                "sale_ref": "",
+                "amount_cents": 0,
+                "net_amount_cents": 0,
+                "tax_amount_cents": 0,
+                "note": "",
+            },
+            hub=hub,
+        ),
+    )
+    return grant_id
+
+
 # ── the doors under test ─────────────────────────────────────────────────────
 
 
@@ -150,11 +183,10 @@ def options(
 
 def hold(
     db: ScratchDb,
-    package_id: str,
+    grant_id: str,
     service_id: str,
     checkout_ref: str,
     line_ref: str,
-    customer: str = "cus-1",
     redemption_id: str | None = None,
     hub: str = HUB,
 ) -> str:
@@ -167,8 +199,7 @@ def hold(
             "services._hold",
             {
                 "redemption_id": rid,
-                "package_id": package_id,
-                "customer_id": customer,
+                "grant_id": grant_id,
                 "service_id": service_id,
                 "checkout_ref": checkout_ref,
                 "line_ref": line_ref,
@@ -223,7 +254,7 @@ def residue(db: ScratchDb, package_id: str, customer: str = "cus-1") -> tuple[in
 
 
 def raw_insert(
-    db: ScratchDb, package_id: str, customer: str, use_index: int, **cols
+    db: ScratchDb, package_id: str, customer: str, use_index: int, grant_id: str, **cols
 ) -> None:
     """A redemption written by RAW SQL, skipping the command entirely.
 
@@ -233,6 +264,7 @@ def raw_insert(
     values = {
         "id": str(uuid.uuid4()),
         "hub_id": HUB,
+        "grant_id": grant_id,
         "package_id": package_id,
         "customer_id": customer,
         "note": "raw",
@@ -260,7 +292,7 @@ def raw_insert(
 
 
 def concurrent_holds(
-    db: ScratchDb, package_id: str, service_id: str, customer: str
+    db: ScratchDb, package_id: str, service_id: str, customer: str, grant_id: str
 ) -> tuple[int, str]:
     """Two tills spend the LAST session at the same time. How many rows survive?
 
@@ -299,8 +331,7 @@ def concurrent_holds(
                 "services._hold",
                 {
                     "redemption_id": str(uuid.uuid4()),
-                    "package_id": package_id,
-                    "customer_id": customer,
+                    "grant_id": grant_id,
                     "service_id": service_id,
                     "checkout_ref": checkout,
                     "line_ref": "l1",
@@ -362,6 +393,10 @@ def main() -> int:
             db, HUB, "Bono 5 cortes", max_uses=5, validity_days=None
         )
         seed_item(db, HUB, five_cuts, cut)
+        # services#73: the offer exists because the customer BOUGHT it, not because the hub
+        # publishes it. Without this row `options` is empty and every check below fails — which is
+        # exactly what the old model got wrong.
+        five_cuts_grant = seed_grant(db, five_cuts, "cus-1")
         rows = options(db, "cus-1", cut)
         check("one voucher covers a cut", 1, len(rows))
         check(
@@ -389,6 +424,7 @@ def main() -> int:
             db, OTHER_HUB, "Bono vecino", max_uses=5, validity_days=None
         )
         seed_item(db, OTHER_HUB, foreign, foreign_cut)
+        seed_grant(db, foreign, "cus-1", hub=OTHER_HUB)
         check(
             "the neighbour's voucher is invisible",
             [],
@@ -409,6 +445,9 @@ def main() -> int:
             db, HUB, "Bono archivado", max_uses=5, validity_days=None
         )
         seed_item(db, HUB, archived, colour)
+        # Sold FIRST and archived afterwards: the interesting case is a customer who paid for a
+        # voucher the salon has since stopped offering, not one that was never on sale.
+        seed_grant(db, archived, "cus-2")
         db.psql(
             [],
             db=db.name,
@@ -418,7 +457,9 @@ def main() -> int:
 
         expiring = seed_package(db, HUB, "Bono caduca", max_uses=None, validity_days=30)
         seed_item(db, HUB, expiring, colour)
-        raw_insert(db, expiring, "cus-3", 1, status="consumed", redeemed_at=LONG_AGO)
+        # Bought 48 days ago with 30 days of validity: expired with ZERO uses, which is the anchor
+        # services#73 moved from the first use to the purchase.
+        seed_grant(db, expiring, "cus-3", granted_at=LONG_AGO)
         check("an expired voucher is not offered", [], options(db, "cus-3", colour))
 
         print("\nD. 🔴 the voucher cannot be spent twice — through the COMMAND")
@@ -426,7 +467,8 @@ def main() -> int:
             db, HUB, "Bono 1 sesion", max_uses=1, validity_days=None
         )
         seed_item(db, HUB, one_shot, cut)
-        first = hold(db, one_shot, cut, "chk-1", "line-1")
+        one_shot_grant = seed_grant(db, one_shot, "cus-1")
+        first = hold(db, one_shot_grant, cut, "chk-1", "line-1")
         check("the session is held", (1, 0), residue(db, one_shot))
         check(
             "the exhausted voucher is no longer offered",
@@ -436,7 +478,7 @@ def main() -> int:
         )
         refused(
             "a second line covered by the same 1-session voucher",
-            lambda: hold(db, one_shot, cut, "chk-1", "line-2"),
+            lambda: hold(db, one_shot_grant, cut, "chk-1", "line-2"),
         )
         check("still exactly one row, guard empty", (1, 0), residue(db, one_shot))
 
@@ -444,13 +486,13 @@ def main() -> int:
         refused(
             "a raw INSERT reusing use_index 1",
             lambda: raw_insert(
-                db, one_shot, "cus-1", 1, checkout_ref="chk-x", line_ref="line-x"
+                db, one_shot, "cus-1", 1, one_shot_grant, checkout_ref="chk-x", line_ref="line-x"
             ),
         )
         refused(
             "a raw INSERT covering an already covered line",
             lambda: raw_insert(
-                db, one_shot, "cus-1", 2, checkout_ref="chk-1", line_ref="line-1"
+                db, one_shot, "cus-1", 2, one_shot_grant, checkout_ref="chk-1", line_ref="line-1"
             ),
         )
         check("nothing got in", (1, 0), residue(db, one_shot))
@@ -458,7 +500,8 @@ def main() -> int:
         print("\nF. 🔴 …and under TWO REAL CONCURRENT TRANSACTIONS")
         racy = seed_package(db, HUB, "Bono carrera", max_uses=1, validity_days=None)
         seed_item(db, HUB, racy, cut)
-        live, err = concurrent_holds(db, racy, cut, "cus-race")
+        racy_grant = seed_grant(db, racy, "cus-race")
+        live, err = concurrent_holds(db, racy, cut, "cus-race", racy_grant)
         check("only ONE till got the last session", 1, live)
         check(
             "the loser was refused by the database",
@@ -480,7 +523,7 @@ def main() -> int:
         )
 
         print("\nH. …but NOT after it is settled")
-        again = hold(db, one_shot, cut, "chk-2", "line-1")
+        again = hold(db, one_shot_grant, cut, "chk-2", "line-1")
         check("settle marks it consumed", 1, settle(db, again, "sale-42"))
         check(
             "status and stamp",
@@ -510,9 +553,10 @@ def main() -> int:
         )
         by_event = seed_package(db, HUB, "Bono evento", max_uses=3, validity_days=None)
         seed_item(db, HUB, by_event, cut)
-        h1 = hold(db, by_event, cut, "order-7", "line-1", customer="cus-ev")
-        h2 = hold(db, by_event, cut, "order-7", "line-2", customer="cus-ev")
-        hold(db, by_event, cut, "order-8", "line-1", customer="cus-ev")
+        by_event_grant = seed_grant(db, by_event, "cus-ev")
+        h1 = hold(db, by_event_grant, cut, "order-7", "line-1")
+        h2 = hold(db, by_event_grant, cut, "order-7", "line-2")
+        hold(db, by_event_grant, cut, "order-8", "line-1")
         touched = _rows_touched(
             db,
             "services._settle_holds_for_sale",
@@ -555,8 +599,10 @@ def main() -> int:
         seed_item(db, HUB, soon, highlights)
         never = seed_package(db, HUB, "Bono sin caducidad", max_uses=5, validity_days=None)
         seed_item(db, HUB, never, highlights)
-        raw_insert(db, soon, "cus-9", 1, status="consumed", redeemed_at=RECENT)
-        raw_insert(db, never, "cus-9", 1, status="consumed", redeemed_at=RECENT)
+        soon_grant = seed_grant(db, soon, "cus-9")
+        never_grant = seed_grant(db, never, "cus-9")
+        raw_insert(db, soon, "cus-9", 1, soon_grant, status="consumed", redeemed_at=RECENT)
+        raw_insert(db, never, "cus-9", 2, never_grant, status="consumed", redeemed_at=RECENT)
         two = options(db, "cus-9", highlights)
         check("both are offered", 2, len(two))
         check("the one that EXPIRES is spent first", soon, two[0]["package_id"] if two else None)
@@ -574,6 +620,8 @@ def main() -> int:
         blowdry = seed_service(db, HUB, "Blowdry")
         seed_item(db, HUB, unlimited, blowdry)
         seed_item(db, HUB, finite, blowdry)
+        seed_grant(db, unlimited, "cus-12")
+        seed_grant(db, finite, "cus-12")
         vs = options(db, "cus-12", blowdry)
         check("both offered", 2, len(vs))
         check("the finite one goes first", finite, vs[0]["package_id"] if vs else None)
@@ -586,6 +634,8 @@ def main() -> int:
         trim = seed_service(db, HUB, "Trim")
         seed_item(db, HUB, big, trim)
         seed_item(db, HUB, small, trim)
+        seed_grant(db, big, "cus-10")
+        seed_grant(db, small, "cus-10")
         pair = options(db, "cus-10", trim)
         check("both offered", 2, len(pair))
         check("the shortest one first", small, pair[0]["package_id"] if pair else None)
@@ -597,18 +647,21 @@ def main() -> int:
         wash = seed_service(db, HUB, "Wash")
         seed_item(db, HUB, twin_a, wash)
         seed_item(db, HUB, twin_b, wash)
-        db.psql([], db=db.name, stdin=(
-            "UPDATE services_package SET created_at = '2026-08-19T10:00:00Z' "
-            f"WHERE id = '{twin_b}';"))
+        twin_a_grant = seed_grant(db, twin_a, "cus-11")
+        twin_b_grant = seed_grant(db, twin_b, "cus-11", granted_at="2026-08-19T10:00:00Z")
         older = options(db, "cus-11", wash)
         check("the older voucher wins", twin_a, older[0]["package_id"] if older else None)
         check("named reason", "oldest_voucher", older[0]["default_reason"] if older else None)
 
         print("\nM. …and when even the age is identical, the order is still not left to chance")
         db.psql([], db=db.name, stdin=(
-            f"UPDATE services_package SET created_at = '{NOW}' WHERE id = '{twin_b}';"))
-        runs = [[r["package_id"] for r in options(db, "cus-11", wash)] for _ in range(4)]
-        check("no tie is left to chance", sorted([twin_a, twin_b]), runs[0])
+            f"UPDATE services_package_grant SET granted_at = '{NOW}' WHERE id = '{twin_b_grant}';"))
+        # 🔴 The last-resort key is the GRANT id (services#73), not the package id, so that is what
+        # this asserts on. Comparing package ids here passed on a COIN FLIP — two random UUIDs sort
+        # the same way about half the time — and it was green locally and red in CI on the same
+        # commit. An assertion that is right 50 % of the time is not an assertion.
+        runs = [[r["grant_id"] for r in options(db, "cus-11", wash)] for _ in range(4)]
+        check("no tie is left to chance", sorted([twin_a_grant, twin_b_grant]), runs[0])
         check("and it is stable across four looks at the same screen", [runs[0]] * 4, runs)
         check("the last resort is named too", "stable_order",
               options(db, "cus-11", wash)[0]["default_reason"])

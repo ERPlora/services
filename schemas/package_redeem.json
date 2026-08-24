@@ -1,30 +1,38 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "services.packages.redeem params",
-  "description": "Parámetros del command services.packages.redeem: consume 1 uso de un paquete por un cliente. El scope hub_id y :now los inyecta el runtime (§2.5/§2.9); el id del consumo (:redemption_id, que el command devuelve al caller) lo toma el handler de context.new_ids. El consumo se RECHAZA con un código de dominio — services.package_not_found, services.package_no_uses_left o services.package_expired, según el motivo que calcula services.packages.redeem_check — y revierte entero (nada queda registrado).",
+  "description": "Parámetros del command services.packages.redeem: consume 1 uso de un bono que el cliente POSEE (una concesión, services#73). El scope hub_id y :now los inyecta el runtime (§2.5/§2.9); el id del consumo (:redemption_id, que el command devuelve al caller) lo toma el handler de context.new_ids. Se RECHAZA con un código de dominio — services.package_no_grant, services.package_not_found, services.package_no_uses_left o services.package_expired, según el motivo que calcula services.packages.redeem_check — y revierte entero (nada queda registrado).",
   "type": "object",
   "properties": {
-    "package_id": {
+    "grant_id": {
       "type": "string",
-      "description": "Id del paquete/bono a consumir."
-    },
-    "customer_id": {
-      "type": "string",
-      "description": "Id del cliente que consume el uso."
+      "minLength": 1,
+      "description": "Id de la CONCESIÓN (la compra del bono) contra la que se consume la sesión. El paquete y el cliente se leen de ella, nunca del payload: así un caller no puede emparejar el bono de otro con su propio cliente."
     },
     "appointment_id": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "description": "Id de la cita contra la que se consume (opcional)."
     },
     "sale_id": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "description": "Id de la venta/ticket contra el que se consume (opcional)."
     },
     "note": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "description": "Nota libre del consumo (opcional)."
     }
   },
-  "required": ["package_id", "customer_id"],
+  "required": [
+    "grant_id"
+  ],
   "additionalProperties": false
 }

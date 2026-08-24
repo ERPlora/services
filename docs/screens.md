@@ -106,24 +106,39 @@ de-duplicated. Requires `services.add_package`.
 `services.package_items.list` lists the services in a package with their quantity, sort order, and
 each service's name and price. Requires `services.view_package`.
 
-### Check a customer's package balance
+### Sell a voucher to a customer
 
-`services.packages.balance` gives, per package for that customer: uses consumed, uses remaining, when
-it was first redeemed, when it expires and whether it has expired. Requires
-`services.view_package_balance`.
+Usually nobody does this by hand: the voucher goes on the ticket like any other line, and when the
+sale is completed `services` grants it — one grant per unit, with the amount, the base and the VAT
+of that line on the row. The manual door is `services.packages.grant` (package + customer, plus the
+sale and the amounts when there are any), for a voucher handed over outside the till. It refuses
+with `services.grant_customer_required` if no customer is named, and `services.package_not_found` if
+the voucher is not in this hub's catalogue. Requires `services.grant_package`.
+
+⚠️ **A voucher line on an anonymous ticket grants nothing.** The sale goes through; the customer
+owns nothing. Add the customer and grant it by hand.
+
+### Check a customer's vouchers
+
+`services.packages.balance` gives **one row per voucher they bought**: sessions consumed, sessions
+remaining, when they bought it, what they paid, when it expires and whether it has. A customer who
+bought the same voucher twice has two rows, each with its own balance and its own deadline.
+Requires `services.view_package_balance`.
 
 ### Redeem one use
 
-1. Check first with `services.packages.redeem_check` — it tells you whether the redemption would work
-   and, if not, **why**: `package_not_found`, `no_uses_left` or `expired`.
-2. Redeem with `services.packages.redeem`, giving the package and the customer, and optionally the
-   appointment, the sale and a note.
+1. Check first with `services.packages.redeem_check`, naming the **grant** — it tells you whether the
+   redemption would work and, if not, **why**: `no_grant`, `package_not_found`, `no_uses_left` or
+   `expired`.
+2. Redeem with `services.packages.redeem`, giving the **grant** and, optionally, the appointment, the
+   sale and a note. The voucher and the owner are read off the grant, never off the payload.
 
-The redemption is appended to the ledger and `services.package.redeemed` is emitted. If the package
-is inactive, out of uses or expired, the whole thing is **refused and rolled back**, and the refusal
-carries a code the caller can translate: `services.package_not_found`,
-`services.package_no_uses_left` or `services.package_expired` — never the database's internals.
-Requires `services.redeem_package` — an employee has this.
+The redemption is appended to the ledger and `services.package.redeemed` is emitted. If the customer
+was never sold the voucher, or it is out of uses, expired, or its template archived, the whole thing
+is **refused and rolled back**, and the refusal carries a code the caller can translate:
+`services.package_no_grant`, `services.package_not_found`, `services.package_no_uses_left` or
+`services.package_expired` — never the database's internals. Requires `services.redeem_package` — an
+employee has this.
 
 ### The voucher's movements (`erp-services-packages` → «Movements»)
 
