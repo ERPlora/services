@@ -402,34 +402,55 @@ def main() -> int:
         print("\nF. a checkout with no holds answers an empty list, not an error")
         check("unknown checkout", [], recover_after_reload(db, "chk-never-existed"))
 
-        print("\nG. 🔴 the ABANDONED hold frees itself — the deadline is on the row")
+        print("\nG. 🔴 the ABANDONED hold frees itself — and the CLOCK is what frees it")
         many = seed_package(db, HUB, "Bono 3 sesiones", max_uses=3)
         seed_item(db, HUB, many, cut)
-        abandoned_grant = seed_grant(db, many, "cus-3")
+        # A ONE-session voucher, so «is it offered?» is a sharp question: the only thing that can
+        # put it back on the till is the stale hold ceasing to count. With a three-session voucher
+        # it would be offered either way and the assertion would pass without proving anything.
+        solo = seed_package(db, HUB, "Bono 1 sesion abandonada", max_uses=1)
+        seed_item(db, HUB, solo, cut)
+        abandoned_grant = seed_grant(db, solo, "cus-3")
         abandoned = hold(db, abandoned_grant, cut, "chk-abandoned", "l1")
         deadline = db.scalar(
             f"SELECT COALESCE(expires_at, '') FROM services_package_redemption WHERE id = '{abandoned}'"
         )
         check("the hold carries a deadline the caller never sent", True, deadline != "")
         check("and it is in the future at the moment it is taken", True, deadline > NOW)
+        check("before the deadline it is still recovered", 1, len(recover_after_reload(db, "chk-abandoned")))
+        check("it still counts against the voucher", 1, live_uses(db, abandoned_grant))
+        check("so the till does not offer it", [], options(db, "cus-3", cut))
+
+        # 🔴 THE READS DECIDE, NOT THE SWEEP. Everything below happens with NO sweep run and the row
+        # still LIVE in the table — which is the only way to prove the exclusion comes from the
+        # clock and not from the soft-delete that would later mask it. A first pass of this battery
+        # asserted all of this AFTER the sweep, and a mutant that deleted the deadline predicate
+        # from the read survived: the assertions were being carried by `is_deleted = 1`.
         check(
-            "before the deadline it is still recovered",
-            1,
-            len(recover_after_reload(db, "chk-abandoned")),
-        )
-        check(
-            "and it still counts against the voucher", 1, live_uses(db, abandoned_grant)
-        )
-        check("the sweep finds nothing yet", 0, expire_holds(db, LATER))
-        check(
-            "past the deadline the sweep reclaims it", 1, expire_holds(db, MUCH_LATER)
-        )
-        check("the session is back on the voucher", 0, live_uses(db, abandoned_grant))
-        check(
-            "and it is gone from the checkout",
+            "past the deadline the screen no longer sees the hold — no sweep has run",
             [],
-            recover_after_reload(db, "chk-abandoned"),
+            recover_after_reload(db, "chk-abandoned", now=MUCH_LATER),
         )
+        check(
+            "and the till offers the voucher again on the clock alone",
+            [abandoned_grant],
+            [r["grant_id"] for r in options(db, "cus-3", cut, now=MUCH_LATER)],
+        )
+        check(
+            "…while the row is still LIVE: this is the clock, not a soft-delete",
+            1,
+            int(
+                db.scalar(
+                    "SELECT count(*) FROM services_package_redemption "
+                    f"WHERE id = '{abandoned}' AND is_deleted = 0 AND status = 'held'"
+                )
+            ),
+        )
+
+        check("the sweep finds nothing before the deadline", 0, expire_holds(db, LATER))
+        check("past the deadline the sweep reclaims it", 1, expire_holds(db, MUCH_LATER))
+        check("the session is back on the voucher", 0, live_uses(db, abandoned_grant))
+        check("and it is gone from the checkout", [], recover_after_reload(db, "chk-abandoned"))
         check(
             "the ledger says the TIME ran out, not that somebody decided",
             ["expired", 1],
