@@ -58,7 +58,7 @@ docs/                         # documentación de usuario + corpus del asistente
 El estado vive en las **Issues de este repo**, no aquí. Huecos conocidos y documentados en
 `docs/limits.md`: variantes y addons existen en BD **sin query ni command**. Archivar un servicio
 con citas próximas **avisa** con el conteo (query pública de `appointments`), no bloquea (services#2).
-La **concesión** del bono se escribe aquí al comprarlo (services#73, ADR-0388): el listener de
+La **concesión** del bono se escribe aquí al comprarlo (services#73, ADR-0390): el listener de
 `sale.completed` concede cada bono que el ticket vendió, y `services.packages.grant` es la puerta
 manual. Sin concesión no se gasta una sesión.
 

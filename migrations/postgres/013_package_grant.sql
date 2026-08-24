@@ -98,7 +98,7 @@ ALTER TABLE services_package_redemption
   ADD CONSTRAINT fk_services_redemption_grant
   FOREIGN KEY (grant_id) REFERENCES services_package_grant (id) NOT VALID;
 
--- Services · migration 013 — the ENTITLEMENT becomes a ROW (services#73, ADR-0388). The prose is
+-- Services · migration 013 — the ENTITLEMENT becomes a ROW (services#73, ADR-0390). The prose is
 -- at the BOTTOM by house rule (hub#1137/ADR-0387): the migration guard matches a `DROP` at the
 -- START of the statement text and its splitter keeps a preceding comment inside the statement, so
 -- a header above SQL is the shape that silently defeats it. There is no `DROP` here — this is an

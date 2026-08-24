@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "services.packages.grant params",
-  "description": "Concede un bono a un cliente: escribe la fila de COMPRA (services_package_grant) sin la cual no se puede gastar ninguna sesión (services#73, ADR-0388). Congela los términos vendidos —sesiones y vigencia— para que una edición posterior del catálogo no acorte lo que el cliente ya pagó, y el reloj de caducidad arranca aquí, en la compra. El runtime inyecta hub_id y :now; el id de la concesión lo toma el handler de context.new_ids. 🔴 NO emite documento fiscal propio: un bono de N sesiones es univalente y el registro sale con la VENTA que lo pagó (art. 30 ter.1 de la Directiva 2006/112/CE). Un bono vendido en un ticket se concede solo al completarse la venta; esta puerta es para cuando se entrega fuera de la caja.",
+  "description": "Concede un bono a un cliente: escribe la fila de COMPRA (services_package_grant) sin la cual no se puede gastar ninguna sesión (services#73, ADR-0390). Congela los términos vendidos —sesiones y vigencia— para que una edición posterior del catálogo no acorte lo que el cliente ya pagó, y el reloj de caducidad arranca aquí, en la compra. El runtime inyecta hub_id y :now; el id de la concesión lo toma el handler de context.new_ids. 🔴 NO emite documento fiscal propio: un bono de N sesiones es univalente y el registro sale con la VENTA que lo pagó (art. 30 ter.1 de la Directiva 2006/112/CE). Un bono vendido en un ticket se concede solo al completarse la venta; esta puerta es para cuando se entrega fuera de la caja.",
   "type": "object",
   "additionalProperties": false,
   "required": ["package_id", "customer_id"],

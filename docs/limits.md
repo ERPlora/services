@@ -11,16 +11,17 @@
   from archiving a booked service — by design (Fresha, Square and Vagaro archive and warn too).
 - **A voucher cannot be transferred or shared.** A grant belongs to ONE customer. Sharing it with a
   family member, or moving it to the daughter it was bought for, has no door yet — the market keeps
-  both behind an explicit opt-in and they are their own feature (services#77 / services#78).
+  both behind an explicit opt-in and they are their own feature (services#79 transfer /
+  services#80 sharing).
 - **A voucher sold with no customer on the ticket is not granted.** The sale goes through and the
   listener reports how many ownerless vouchers it saw, but nothing is written: an entitlement needs
   an owner. Grant it afterwards with `services.packages.grant`.
 - **Deleting a customer leaves their grants behind.** `customer_id` is an opaque reference with no
   cross-module foreign key (the module contract), so a deleted or merged customer leaves grants that
-  no balance screen will show. No product surveyed documents an answer to this; ours is not designed
-  yet (services#79).
+  no balance screen will show. Of 17 products surveyed **not one** documents an answer to this, so
+  there is no prior art to copy and ours has to be designed (services#81).
 - **A grant cannot be corrected or revoked.** No door adjusts the sessions, extends the deadline or
-  voids a voucher sold by mistake (services#80).
+  voids a voucher sold by mistake (services#82).
 
 ## Errors you will actually see
 

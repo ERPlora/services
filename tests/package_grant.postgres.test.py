@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""services#73 — the ENTITLEMENT is a row, and nothing is spent without one (ADR-0386 / ADR-0388).
+"""services#73 — the ENTITLEMENT is a row, and nothing is spent without one (ADR-0386 / ADR-0390).
 
 Until this, `services_package` was a CATALOGUE row and the relationship customer<->voucher was
 materialised by the FIRST REDEMPTION. Two things followed, and both are money:

@@ -1,5 +1,5 @@
 -- The PURCHASE of a voucher: this customer now owns N uses of this package (statement 1 of 3 of
--- `services.packages.grant` and of the `sale.completed` listener, services#73 / ADR-0388).
+-- `services.packages.grant` and of the `sale.completed` listener, services#73 / ADR-0390).
 -- Conditional INSERT: it only writes when the template really exists in THIS hub and is being
 -- offered. If it does not, nothing is written and the assert (`_grant_assert.sql`) rolls the whole
 -- transaction back — no grant, no event, no entitlement out of thin air.

@@ -686,7 +686,7 @@ const READ_PACKAGE_GET: &str = "services.packages.get";
 /// The read that says which catalogue ids ARE vouchers, for the `sale.completed` listener.
 const READ_PACKAGES_LIST: &str = "services.packages.list";
 
-/// Logic of `services.packages.grant` — the PURCHASE of a voucher (services#73, ADR-0388).
+/// Logic of `services.packages.grant` — the PURCHASE of a voucher (services#73, ADR-0390).
 ///
 /// Until this existed the relationship customer<->voucher was materialised by the first
 /// redemption, so every customer of the hub owned N sessions of every voucher without anyone
