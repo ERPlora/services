@@ -32,9 +32,14 @@ pkg AS (
       AND p.is_deleted = 0 AND p.is_active = 1
 ),
 used AS (
+    -- A hold whose deadline has passed does NOT count: an abandoned checkout gives the session
+    -- back on its own (services#77, migration 014). Same predicate as `tender_options` and
+    -- `balance` on purpose — this query has to answer what the command is about to decide, and
+    -- `commands/hold_expire.sql` runs as the first statement of that command.
     SELECT COUNT(*) AS n
     FROM services_package_redemption
     WHERE hub_id = :hub_id AND grant_id = :grant_id AND is_deleted = 0
+      AND (expires_at IS NULL OR erp_dt(:now) < erp_dt(expires_at))
 ),
 checks AS (
     SELECT

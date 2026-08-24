@@ -12,9 +12,15 @@
 -- the statement touches zero rows and that is CORRECT, not a swallowed failure — that till settles
 -- through the explicit command, which is the authoritative path and the one under test. The
 -- `IS NOT NULL` is written out so the intent cannot be mistaken for an accident of SQL semantics.
+--
+-- It clears `expires_at` for the same reason the explicit command does (services#77): the session
+-- was delivered, so it is final and carries no deadline. And like that command it does NOT consult
+-- the deadline before settling — the sale completing is the strongest possible evidence that this
+-- checkout was not abandoned.
 UPDATE services_package_redemption
    SET status = 'consumed',
        settled_at = :now,
+       expires_at = NULL,
        sale_id = :sale_id,
        updated_by = :current_user_id,
        updated_at = :now

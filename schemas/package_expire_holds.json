@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "services.packages.expire_holds params",
+  "description": "Sin parámetros, y eso es la garantía, no una carencia (services#77). La barrida devuelve al bono las sesiones de los cobros a los que nadie volvió: suelta toda retención viva cuyo plazo haya pasado y la sella como vencida, para que el histórico distinga «se acabó el tiempo» de «la cajera lo deshizo». TODO lo que decide lo inyecta el runtime — el hub (`hub_id`), el reloj (`now`) y quién la ejecuta —, así que un llamante no puede dirigirla: no puede proponer otro `now` para vencer retenciones que aún viven, ni apuntarla al hub del vecino. El esquema es cerrado (`additionalProperties: false`) precisamente para que ese payload vacío sea obligatorio y no una convención. No es la guarda, sino la limpieza: las lecturas dejan de contar una retención en cuanto vence, y `services.packages.hold_for_line` recupera las caducadas en su propia transacción, así que la sesión vuelve aunque esta tarea no llegue a ejecutarse nunca.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {}
+}

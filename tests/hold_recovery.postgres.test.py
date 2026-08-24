@@ -271,7 +271,7 @@ SLOT_PROPS = ("customer_id", "service_id", "checkout_ref", "line_ref")
 
 
 def recover_after_reload(
-    db: ScratchDb, checkout_ref: str, hub: str = HUB
+    db: ScratchDb, checkout_ref: str, hub: str = HUB, now: str = NOW
 ) -> list[dict]:
     """Every live hold of an open checkout, through a DECLARED read and nothing else.
 
@@ -288,7 +288,7 @@ def recover_after_reload(
             f"the reloaded screen only has {', '.join(SLOT_PROPS)} and none of the "
             f"{len(MANIFEST['queries'])} queries takes checkout_ref"
         )
-    return rows_of(db, query_sql(name, {"checkout_ref": checkout_ref}, hub=hub))
+    return rows_of(db, query_sql(name, {"checkout_ref": checkout_ref, "now": now}, hub=hub))
 
 
 def live_uses(db: ScratchDb, grant_id: str) -> int:
@@ -479,30 +479,46 @@ def main() -> int:
         check("the guard table is left empty", 0, guard_residue(db))
 
         print("\nI. the same line can be held AGAIN once its hold expired")
-        # `uq_services_redemption_line` is partial on `is_deleted = 0`, so an expired hold that
-        # stayed live would refuse the retry — the cashier would be locked out of the very line
-        # they are standing in front of. The expiry soft-deletes, which is what frees the index.
-        retry = hold(db, stuck_grant, cut, "chk-stuck", "l1", now=MUCH_LATER)
+        # 🔴 `uq_services_redemption_line` is partial on `is_deleted = 0`, so an expired hold left
+        # LIVE would refuse the retry — the cashier would be locked out of the very line they are
+        # standing in front of, which is this bug wearing a different hat. The expiry soft-deletes,
+        # and that is what frees the index.
+        #
+        # The voucher here deliberately has THREE sessions. With a one-session one the retry would
+        # be refused for the honest reason «none left» and would never reach the index this section
+        # is about — an assertion that passes for the wrong reason proves nothing, and this one did
+        # exactly that on its first run.
+        line_grant = seed_grant(db, many, "cus-5")
+        first_try = hold(db, line_grant, cut, "chk-line", "l1")
+        check("held, and recoverable while it lives", 1, len(recover_after_reload(db, "chk-line")))
+        # Nobody comes back. A day later the cashier is in front of that same line again.
+        retry = hold(db, line_grant, cut, "chk-line", "l1", now=MUCH_LATER)
+        check("…and it is a NEW redemption, not the resurrected one", True, retry != first_try)
         check(
             "the abandoned line is holdable again",
-            1,
-            len(recover_after_reload(db, "chk-stuck")),
+            [retry],
+            [r["redemption_id"] for r in recover_after_reload(db, "chk-line", now=MUCH_LATER)],
         )
+        check("still exactly one live use — the retry, never both", 1, live_uses(db, line_grant))
         check(
-            "…and it is a NEW redemption, not the resurrected one", True, retry != stuck
+            "and the abandoned one is stamped as expired",
+            "expired",
+            db.scalar(
+                f"SELECT release_reason FROM services_package_redemption WHERE id = '{first_try}'"
+            ),
         )
-        check("still exactly one live use", 1, live_uses(db, stuck_grant))
         refused(
             "…but the SAME line twice while the hold is alive",
-            lambda: hold(db, stuck_grant, cut, "chk-stuck", "l1", now=MUCH_LATER),
+            lambda: hold(db, line_grant, cut, "chk-line", "l1", now=MUCH_LATER),
         )
+        check("the refusal left nothing behind", 1, live_uses(db, line_grant))
 
         print("\nJ. idempotence: nothing here can be applied twice")
         check("sweeping again touches nothing", 0, expire_holds(db, MUCH_LATER))
-        check("the counter did not move", 1, live_uses(db, stuck_grant))
+        check("the counter did not move", 1, live_uses(db, line_grant))
         check("releasing the retry", 1, release(db, retry))
         check("releasing it again touches nothing", 0, release(db, retry))
-        check("and the session stayed back exactly once", 0, live_uses(db, stuck_grant))
+        check("and the session stayed back exactly once", 0, live_uses(db, line_grant))
         check(
             "a released hold is not re-stamped by a later sweep",
             "released",
@@ -513,7 +529,7 @@ def main() -> int:
         check(
             "recovering twice is a read and moves nothing",
             [],
-            recover_after_reload(db, "chk-stuck"),
+            recover_after_reload(db, "chk-line", now=MUCH_LATER),
         )
         check("guard table still empty", 0, guard_residue(db))
     finally:

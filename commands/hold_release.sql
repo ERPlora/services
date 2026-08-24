@@ -12,11 +12,17 @@
 --
 -- Zero rows touched is the refusal: the manifest declares `expect_rows min 1`, so the dispatcher
 -- raises `services.hold_not_releasable` instead of reporting a silent success.
+--
+-- `release_reason = 'released'` is what separates a DECISION from a timeout (services#77). An
+-- abandoned hold is soft-deleted by exactly the same mechanism (`commands/hold_expire.sql`), so
+-- without this stamp a salon reading its voucher history would see «the cashier undid it» and
+-- «nobody ever came back» as the same row.
 UPDATE services_package_redemption
-   SET is_deleted = 1,
-       deleted_at = :now,
-       updated_by = :current_user_id,
-       updated_at = :now
+   SET is_deleted     = 1,
+       deleted_at     = :now,
+       release_reason = 'released',
+       updated_by     = :current_user_id,
+       updated_at     = :now
  WHERE id = :redemption_id
    AND hub_id = :hub_id
    AND is_deleted = 0

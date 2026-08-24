@@ -100,6 +100,12 @@ def main() -> int:
     check(
         "services._redeem statements",
         [
+            # 🔴 FIRST, and its position is the contract (services#77). It soft-deletes the holds
+            # of this hub whose deadline has passed, INSIDE this command's transaction, so the
+            # guard below counts a voucher's real balance instead of one an abandoned checkout is
+            # still sitting on. Put it after the INSERT and the session is reclaimed one statement
+            # too late — the redemption would already have been refused.
+            "commands/hold_expire.sql",
             "commands/_redeem_insert.sql",
             "commands/_redeem_assert.sql",
             "commands/_gate_clear.sql",
