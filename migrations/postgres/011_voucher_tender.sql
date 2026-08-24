@@ -7,14 +7,17 @@ ALTER TABLE services_package_redemption ADD COLUMN IF NOT EXISTS use_index    IN
 
 UPDATE services_package_redemption SET use_index = 0 WHERE use_index IS NULL;
 
-UPDATE services_package_redemption r
-   SET use_index = ordered.n
-  FROM (SELECT id,
-               ROW_NUMBER() OVER (PARTITION BY hub_id, package_id, customer_id
-                                  ORDER BY redeemed_at, id) AS n
-          FROM services_package_redemption
-         WHERE is_deleted = 0) AS ordered
- WHERE r.id = ordered.id AND r.is_deleted = 0;
+UPDATE services_package_redemption AS r
+   SET use_index = (
+        SELECT COUNT(*)
+          FROM services_package_redemption AS e
+         WHERE e.hub_id = r.hub_id
+           AND e.package_id = r.package_id
+           AND e.customer_id = r.customer_id
+           AND e.is_deleted = 0
+           AND (e.redeemed_at < r.redeemed_at
+                OR (e.redeemed_at = r.redeemed_at AND e.id <= r.id)))
+ WHERE r.is_deleted = 0;
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_services_redemption_use
     ON services_package_redemption (hub_id, package_id, customer_id, use_index)
@@ -97,3 +100,10 @@ ALTER TABLE services_package_redemption
 -- reason: `SET NOT NULL` scans the table and can abort a deploy, and the CHECK refuses new rows
 -- just as firmly. Soft-deleted rows keep the `0` of the first backfill; they are outside every
 -- unique index, so their ordinal means nothing and collides with nothing.
+--
+-- The backfill counts, rather than using `ROW_NUMBER() OVER … FROM (SELECT …)`, and that shape is
+-- not a style choice: `validate-migration-guard`'s table linter anchors on `FROM` in a non-SELECT
+-- statement and reads the `(SELECT` of a derived table as a table named `select`, which is not a
+-- `services_` table, so the migration is REJECTED before a hub ever sees it. A correlated count
+-- over the module's own table says the same thing — how many live uses of this voucher by this
+-- customer come at or before this row — with nothing for the linter to misread.

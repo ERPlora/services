@@ -59,6 +59,15 @@ pub fn redeem_package(input: Json<erplora_guest_sdk::Input>) -> FnResult<Json<Ou
     }
 }
 
+#[cfg(feature = "guest")]
+#[plugin_fn]
+pub fn hold_package_for_line(input: Json<erplora_guest_sdk::Input>) -> FnResult<Json<Output>> {
+    match hold_package_for_line_pure(input.into_inner().into_value()) {
+        Ok(out) => Ok(Json(out)),
+        Err(msg) => Err(WithReturnCode::new(Error::msg(msg), 1)),
+    }
+}
+
 // ── helpers de tipos (mismo criterio que el handler de sales) ───────────────
 
 // El DINERO lo redondea `erplora_guest_sdk::money` (ADR-0123): unidad mínima, HALF_UP, uno solo
@@ -635,6 +644,129 @@ pub fn redeem_package_pure(input: Value) -> Result<Output, String> {
         })))
 }
 
+/// The read the till shows and the handler verifies against (services#70).
+const READ_TENDER_OPTIONS: &str = "services.packages.tender_options";
+
+/// Logic of `services.packages.hold_for_line` — the voucher as a TENDER that covers a LINE
+/// (services#70, ADR-0386).
+///
+/// A voucher is N uses of CONCRETE services, not a wallet, so it covers the eligible line whole or
+/// not at all. The handler runs in a sandbox and cannot read the database, so the host preloads TWO
+/// reads of this module, both `required`:
+///
+///   * `services.packages.tender_options` — the vouchers that COVER THIS SERVICE and still have a
+///     session, already ordered by the tie-break. 🔴 This is the authority on eligibility. The
+///     payload says which voucher the cashier picked; whether that voucher may be spent on this
+///     line is decided HERE, against the hub's own rows. A handler that took the payload's word
+///     for it would let a caller spend a haircut voucher on a bottle of shampoo by asking nicely.
+///   * `services.packages.redeem_check` — WHY not, when not: it turns the raw `CHECK constraint
+///     failed` of `services__gate` into a stable, namespaced, translatable code before it reaches
+///     the API, the flows and the assistant.
+///
+/// Both are fail-closed: with no read there is nothing to verify against, so nothing is held.
+///
+/// An eligible voucher goes through the SAME gated statements as before (`services._hold`:
+/// conditional INSERT + assert + clear), so the database stays the transactional authority — the
+/// reads improve the message, they never replace the gate, and the race between two tills is
+/// settled by the unique index on the use ordinal (migration 011), not by this code.
+///
+/// 🔴 No fiscal document comes out of a redemption. A voucher of N sessions is UNIVALENT: the
+/// record was issued when the voucher was SOLD, with the service's VAT, and art. 30 ter.1 of
+/// Directive 2006/112/CE says the supply made in exchange for it «shall not be regarded as an
+/// independent transaction». A second document here would be double taxation.
+pub fn hold_package_for_line_pure(input: Value) -> Result<Output, String> {
+    let payload = input.get("payload").cloned().unwrap_or(Value::Null);
+    let context = input.get("context").cloned().unwrap_or(Value::Null);
+    let empty: Vec<Value> = Vec::new();
+    let new_ids = context.get("new_ids").and_then(|v| v.as_array()).unwrap_or(&empty);
+
+    let package_id = str_field(&payload, "package_id").trim().to_string();
+    let customer_id = str_field(&payload, "customer_id").trim().to_string();
+    let service_id = str_field(&payload, "service_id").trim().to_string();
+    let checkout_ref = str_field(&payload, "checkout_ref").trim().to_string();
+    let line_ref = str_field(&payload, "line_ref").trim().to_string();
+
+    // A hold that does not say which line it covers cannot be undone or audited later: it would
+    // sit in the ledger as a spent session nobody can trace back to a service.
+    if package_id.is_empty()
+        || customer_id.is_empty()
+        || service_id.is_empty()
+        || checkout_ref.is_empty()
+        || line_ref.is_empty()
+    {
+        return Ok(Output::new().with_error(refusal_for("")));
+    }
+
+    // The eligible vouchers for this line, from the host. `None` = the read was not preloaded
+    // (a runtime without `reads` support, or a degraded query): fail closed, do not hold blind.
+    let options = match input.pointer(format!("/context/reads/{READ_TENDER_OPTIONS}").as_str()) {
+        Some(Value::Array(rows)) => rows.clone(),
+        _ => return Ok(Output::new().with_error(refusal_for(""))),
+    };
+    let chosen = options
+        .iter()
+        .find(|row| str_field(row, "package_id").trim() == package_id);
+
+    // The pre-check's row. It is required even on the happy path: without it a refusal could not
+    // name its reason, and naming the reason is half of what this command is for.
+    let check_row = input
+        .pointer(format!("/context/reads/{READ_REDEEM_CHECK}/0").as_str())
+        .cloned()
+        .unwrap_or(Value::Null);
+    if check_row.is_null() {
+        return Ok(Output::new().with_error(refusal_for("")));
+    }
+
+    let chosen = match chosen {
+        Some(row) => row,
+        None => {
+            // Not among the eligible ones. If the pre-check can say why (exhausted, expired,
+            // unknown), that is the honest reason. If it says the voucher is perfectly redeemable,
+            // then the ONLY thing wrong is that it does not cover this service — which is its own
+            // code, because «no uses left» would be a lie the cashier cannot act on.
+            let reason = str_field(&check_row, "reason");
+            return Ok(Output::new().with_error(if redeemable_is(&check_row) {
+                redeem_refusal(
+                    "services.package_does_not_cover_service",
+                    "This voucher does not cover that service.",
+                )
+            } else {
+                refusal_for(&reason)
+            }));
+        }
+    };
+
+    let redemption_id = match new_ids.first().map(as_str) {
+        Some(id) if !id.is_empty() => id,
+        _ => return Err("context.new_ids is empty: the host did not hand out ids".to_string()),
+    };
+
+    let mut p = Map::new();
+    p.insert("redemption_id".into(), json!(redemption_id));
+    p.insert("package_id".into(), json!(package_id));
+    p.insert("customer_id".into(), json!(customer_id));
+    p.insert("service_id".into(), json!(service_id));
+    p.insert("checkout_ref".into(), json!(checkout_ref));
+    p.insert("line_ref".into(), json!(line_ref));
+    p.insert("note".into(), json!(str_field(&payload, "note")));
+
+    Ok(Output::new()
+        .with_operation(Operation::sql("services._hold", p.clone()))
+        .with_result(json!({
+            "held": true,
+            "redemption_id": redemption_id,
+            "package_id": p["package_id"],
+            "customer_id": p["customer_id"],
+            "service_id": p["service_id"],
+            "package_name": chosen.get("package_name").cloned().unwrap_or(Value::Null),
+            // The preview travels back with the confirmation: what the till SHOWED before the
+            // cashier confirmed and what it PRINTS afterwards are then the same number, taken
+            // from the same read, instead of two counts that can disagree.
+            "remaining_before": chosen.get("remaining_before").cloned().unwrap_or(Value::Null),
+            "remaining_after": chosen.get("remaining_after").cloned().unwrap_or(Value::Null),
+        })))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1118,5 +1250,161 @@ mod tests {
                 "a redeemable voucher in shape {shape} must go through, got {out:?}"
             );
         }
+    }
+
+    // ── services#70 · el bono como TENDER que cubre una LÍNEA ────────────────────────────────
+    //
+    // El handler no puede leer la BD, así que el host le precarga DOS lecturas del propio módulo:
+    // `services.packages.tender_options` (los bonos que cubren ESTA línea, ya ordenados) y
+    // `services.packages.redeem_check` (por qué NO, si no). El payload dice qué bono quiere gastar
+    // el cajero; quién decide si ese bono es elegible son las lecturas. Es la regla de la casa: un
+    // handler no se fía del payload para datos de negocio, y que el manifest declare la read no
+    // prueba que el handler la use — estos tests son lo que lo prueba.
+
+    fn tender_option(package_id: &str) -> Value {
+        json!({
+            "package_id": package_id,
+            "package_name": "Bono 5 cortes",
+            "remaining_before": 5,
+            "remaining_after": 4,
+            "is_default": 1,
+            "default_reason": "only_option",
+            "candidate_count": 1
+        })
+    }
+
+    fn hold_payload() -> Value {
+        json!({
+            "package_id": "pkg-1",
+            "customer_id": "cus-1",
+            "service_id": "svc-1",
+            "checkout_ref": "order-7",
+            "line_ref": "line-1",
+            "note": "cobro en caja"
+        })
+    }
+
+    fn hold_input(options: Option<Value>, check_row: Option<Value>, payload: Value) -> Value {
+        let mut reads = Map::new();
+        if let Some(rows) = options {
+            reads.insert("services.packages.tender_options".into(), rows);
+        }
+        if let Some(row) = check_row {
+            reads.insert(READ_REDEEM_CHECK.into(), json!([row]));
+        }
+        json!({
+            "payload": payload,
+            "context": { "new_ids": ["red-1"], "reads": Value::Object(reads) }
+        })
+    }
+
+    fn eligible_input(payload: Value) -> Value {
+        hold_input(
+            Some(json!([tender_option("pkg-1")])),
+            Some(json!({ "redeemable": 1, "reason": "" })),
+            payload,
+        )
+    }
+
+    #[test]
+    fn an_eligible_voucher_holds_the_session_for_that_line() {
+        let out = hold_package_for_line_pure(eligible_input(hold_payload())).unwrap();
+        assert!(out.error.is_none(), "an eligible voucher must go through, got {out:?}");
+        assert_eq!(out.operations.len(), 1);
+        let op = &out.operations[0];
+        assert_eq!(op.command, "services._hold");
+        assert_eq!(op.params["redemption_id"], json!("red-1"), "the host's id batch, front first");
+        assert_eq!(op.params["package_id"], json!("pkg-1"));
+        assert_eq!(op.params["customer_id"], json!("cus-1"));
+        assert_eq!(op.params["service_id"], json!("svc-1"), "which LINE the session covers");
+        assert_eq!(op.params["checkout_ref"], json!("order-7"));
+        assert_eq!(op.params["line_ref"], json!("line-1"));
+        assert_eq!(op.params["note"], json!("cobro en caja"));
+        let result = out.result.unwrap();
+        assert_eq!(result["redemption_id"], json!("red-1"));
+        // The preview travels back with the confirmation, so the till can print «quedan 4»
+        // without asking again — and so what was SHOWN and what was SPENT are the same number.
+        assert_eq!(result["remaining_after"], json!(4));
+    }
+
+    /// 🔴 El corazón de la regla: la elegibilidad la decide la LECTURA, no el payload. Un bono que
+    /// existe y tiene sesiones pero NO cubre este servicio no está en `tender_options`, y el
+    /// handler lo rechaza aunque el payload insista y aunque `redeem_check` diga que sí.
+    #[test]
+    fn a_voucher_that_does_not_cover_this_service_is_refused_however_the_payload_insists() {
+        let out = hold_package_for_line_pure(hold_input(
+            Some(json!([tender_option("pkg-otro")])),
+            Some(json!({ "redeemable": 1, "reason": "" })),
+            hold_payload(),
+        ))
+        .unwrap();
+        assert_eq!(
+            out.error.as_ref().map(|e| e.code.as_str()),
+            Some("services.package_does_not_cover_service")
+        );
+        assert!(out.operations.is_empty(), "nothing is written when the voucher is not eligible");
+    }
+
+    /// Sin ningún bono elegible para la línea, y con `redeem_check` explicando por qué, sale el
+    /// código de NEGOCIO — no el CHECK crudo del gate.
+    #[test]
+    fn the_business_reason_survives_all_the_way_to_the_caller() {
+        for (reason, code) in [
+            ("no_uses_left", "services.package_no_uses_left"),
+            ("expired", "services.package_expired"),
+            ("package_not_found", "services.package_not_found"),
+        ] {
+            let out = hold_package_for_line_pure(hold_input(
+                Some(json!([])),
+                Some(json!({ "redeemable": 0, "reason": reason })),
+                hold_payload(),
+            ))
+            .unwrap();
+            assert_eq!(
+                out.error.as_ref().map(|e| e.code.as_str()),
+                Some(code),
+                "reason {reason} must reach the caller as {code}"
+            );
+        }
+    }
+
+    /// Fail-closed, las dos patas: sin lectura no hay nada contra lo que verificar, así que NO se
+    /// reserva a ciegas. Es la mitad que un `required: true` en el manifest no demuestra.
+    #[test]
+    fn without_the_reads_nothing_is_held() {
+        for input in [
+            hold_input(None, Some(json!({ "redeemable": 1, "reason": "" })), hold_payload()),
+            hold_input(Some(json!([tender_option("pkg-1")])), None, hold_payload()),
+            hold_input(None, None, hold_payload()),
+        ] {
+            let out = hold_package_for_line_pure(input).unwrap();
+            assert!(out.error.is_some(), "a missing read must refuse, got {out:?}");
+            assert!(out.operations.is_empty());
+        }
+    }
+
+    /// El cobro necesita saber A QUÉ línea se pega la sesión. Sin esas referencias no hay canje
+    /// que deshacer ni línea que liberar, y la reserva quedaría huérfana en la tabla.
+    #[test]
+    fn a_hold_without_its_checkout_and_line_is_refused() {
+        for missing in ["service_id", "checkout_ref", "line_ref", "package_id", "customer_id"] {
+            let mut payload = hold_payload();
+            payload[missing] = json!("");
+            let out = hold_package_for_line_pure(eligible_input(payload)).unwrap();
+            assert_eq!(
+                out.error.as_ref().map(|e| e.code.as_str()),
+                Some("services.package_not_redeemable"),
+                "an empty {missing} must refuse"
+            );
+        }
+    }
+
+    /// El host es la autoridad de ids. Sin lote no hay id que devolver al caller ni fila que el
+    /// assert pueda verificar, así que el command se cae en vez de inventarse uno.
+    #[test]
+    fn without_an_id_batch_the_hold_cannot_be_written() {
+        let mut input = eligible_input(hold_payload());
+        input["context"]["new_ids"] = json!([]);
+        assert!(hold_package_for_line_pure(input).is_err());
     }
 }
