@@ -1861,6 +1861,240 @@ mod tests {
         assert!(hold_package_for_line_pure(input).is_err());
     }
 
+    // ── services#73 · la titularidad es una FILA ─────────────────────────────────────────────
+    //
+    // Antes de esto, la relación cliente<->bono se materializaba con el PRIMER CANJE, así que
+    // cualquier cliente del hub tenía sus N sesiones gratis de cualquier bono. Estas pruebas
+    // fijan las dos puertas por las que entra la compra: la manual (`services.packages.grant`) y
+    // la del ticket (el listener de `sale.completed`).
+
+    fn grant_input(package: Option<Value>, payload: Value) -> Value {
+        let mut ctx = json!({ "new_ids": ["grant-1", "grant-2", "grant-3"] });
+        if let Some(row) = package {
+            ctx["reads"] = json!({ READ_PACKAGE_GET: [row] });
+        }
+        json!({ "payload": payload, "context": ctx })
+    }
+
+    fn a_package() -> Value {
+        json!({ "id": "pkg-1", "name": "Bono 5 cortes", "max_uses": 5, "validity_days": 30 })
+    }
+
+    #[test]
+    fn a_grant_carries_the_purchase_and_its_money() {
+        let out = grant_package_pure(grant_input(
+            Some(a_package()),
+            json!({
+                "package_id": "pkg-1",
+                "customer_id": "cus-1",
+                "granted_at": "2026-08-18T09:00:00Z",
+                "sale_id": "sale-7",
+                "sale_ref": "sale-7#0#0",
+                "amount_cents": 12100,
+                "net_amount_cents": 10000,
+                "tax_amount_cents": 2100,
+                "source": "sale"
+            }),
+        ))
+        .unwrap();
+        assert!(out.error.is_none(), "a known voucher must be grantable, got {out:?}");
+        assert_eq!(out.operations.len(), 1);
+        let op = &out.operations[0];
+        assert_eq!(op.command, "services._grant");
+        assert_eq!(op.params["grant_id"], json!("grant-1"));
+        assert_eq!(op.params["package_id"], json!("pkg-1"));
+        assert_eq!(op.params["customer_id"], json!("cus-1"));
+        assert_eq!(op.params["granted_at"], json!("2026-08-18T09:00:00Z"));
+        assert_eq!(op.params["source"], json!("sale"));
+        assert_eq!(op.params["sale_ref"], json!("sale-7#0#0"));
+        // 🔴 The three amounts are what makes the accrual reconcilable: this grant says which sale
+        // paid for it and for how much, base and VAT apart (ADR-0386 decision 5).
+        assert_eq!(op.params["amount_cents"], json!(12100));
+        assert_eq!(op.params["net_amount_cents"], json!(10000));
+        assert_eq!(op.params["tax_amount_cents"], json!(2100));
+        assert_eq!(out.result.unwrap()["grant_id"], json!("grant-1"));
+    }
+
+    /// Un bono sin dueño no lo puede canjear nadie, así que no es una concesión: es una fila que
+    /// alguien reportará como bug la semana que viene. Código propio, porque el arreglo es «elige
+    /// el cliente», no «elige otro bono».
+    #[test]
+    fn a_grant_without_a_customer_is_refused_with_its_own_code() {
+        let out = grant_package_pure(grant_input(
+            Some(a_package()),
+            json!({ "package_id": "pkg-1", "customer_id": "  " }),
+        ))
+        .unwrap();
+        assert_eq!(
+            out.error.as_ref().map(|e| e.code.as_str()),
+            Some("services.grant_customer_required")
+        );
+        assert!(out.operations.is_empty(), "nothing is written when there is no owner");
+    }
+
+    /// Fail-closed: sin la lectura no hay contra qué verificar, así que no se concede nada.
+    #[test]
+    fn without_the_read_the_grant_fails_closed_not_blind() {
+        for input in [
+            grant_input(None, json!({ "package_id": "pkg-1", "customer_id": "cus-1" })),
+            grant_input(Some(a_package()), json!({ "package_id": "", "customer_id": "cus-1" })),
+        ] {
+            let out = grant_package_pure(input).unwrap();
+            assert_eq!(
+                out.error.as_ref().map(|e| e.code.as_str()),
+                Some("services.package_not_found")
+            );
+            assert!(out.operations.is_empty());
+        }
+    }
+
+    // ── el listener de `sale.completed` ──────────────────────────────────────────────────────
+
+    fn sale_input(items: Value, customer: &str) -> Value {
+        json!({
+            "payload": {
+                "sale_id": "sale-7",
+                "order_id": "order-7",
+                "customer_id": customer,
+                "items": items
+            },
+            "context": {
+                "new_ids": ["g1", "g2", "g3", "g4"],
+                "reads": { READ_PACKAGES_LIST: [{ "id": "pkg-1", "name": "Bono 5 cortes" }] }
+            }
+        })
+    }
+
+    /// El settle va SIEMPRE y va primero: una reserva que nadie liquida se queda liberable para
+    /// siempre, o sea una sesión que se puede devolver después de que la clienta se cortara el pelo.
+    #[test]
+    fn a_sale_always_settles_its_holds_even_when_it_sold_no_voucher() {
+        let out = on_sale_completed_pure(sale_input(
+            json!([{ "product_id": "prod-shampoo", "quantity": 1_000_000 }]),
+            "cus-1",
+        ))
+        .unwrap();
+        assert_eq!(out.operations.len(), 1, "only the settle");
+        assert_eq!(out.operations[0].command, "services._settle_holds_for_sale");
+        assert_eq!(out.operations[0].params["order_id"], json!("order-7"));
+        assert_eq!(out.result.unwrap()["granted"], json!(0));
+    }
+
+    /// 🔴 Lo que services#73 arregla: la línea que VENDE un bono concede la titularidad. La marca
+    /// es el propio id del paquete en `product_id`, comprobado contra el catálogo del módulo —
+    /// `sales` no aprende nada de bonos y no hubo contrato que negociar.
+    #[test]
+    fn a_line_selling_a_voucher_grants_it_to_the_customer() {
+        let out = on_sale_completed_pure(sale_input(
+            json!([
+                { "product_id": "prod-shampoo", "quantity": 1_000_000, "net_amount": 500, "tax_amount": 105 },
+                { "product_id": "pkg-1", "quantity": 1_000_000, "net_amount": 10000, "tax_amount": 2100 }
+            ]),
+            "cus-1",
+        ))
+        .unwrap();
+        assert_eq!(out.operations.len(), 2, "settle + one grant");
+        let g = &out.operations[1];
+        assert_eq!(g.command, "services._grant");
+        assert_eq!(g.params["package_id"], json!("pkg-1"));
+        assert_eq!(g.params["customer_id"], json!("cus-1"));
+        assert_eq!(g.params["source"], json!("sale"));
+        assert_eq!(g.params["sale_ref"], json!("sale-7#1#0"), "line 1, unit 0 — the idempotence key");
+        assert_eq!(g.params["net_amount_cents"], json!(10000));
+        assert_eq!(g.params["tax_amount_cents"], json!(2100));
+        assert_eq!(g.params["amount_cents"], json!(12100));
+    }
+
+    /// Dos bonos en una línea son DOS concesiones, no una de doble tamaño: el cliente puede
+    /// gastarlas por separado y cada una tiene su caducidad y su saldo.
+    #[test]
+    fn two_vouchers_on_one_line_are_two_grants_with_the_money_split_to_the_cent() {
+        let out = on_sale_completed_pure(sale_input(
+            json!([{ "product_id": "pkg-1", "quantity": 2_000_000, "net_amount": 2501, "tax_amount": 525 }]),
+            "cus-1",
+        ))
+        .unwrap();
+        assert_eq!(out.operations.len(), 3, "settle + two grants");
+        let nets: Vec<i64> = out.operations[1..]
+            .iter()
+            .map(|o| o.params["net_amount_cents"].as_i64().unwrap())
+            .collect();
+        let taxes: Vec<i64> = out.operations[1..]
+            .iter()
+            .map(|o| o.params["tax_amount_cents"].as_i64().unwrap())
+            .collect();
+        assert_eq!(nets, vec![1251, 1250], "the remainder goes to the first, never nowhere");
+        assert_eq!(taxes, vec![263, 262]);
+        assert_eq!(
+            nets.iter().sum::<i64>(),
+            2501,
+            "what the grants say was charged has to add back up to what WAS charged"
+        );
+        assert_eq!(taxes.iter().sum::<i64>(), 525);
+        let refs: Vec<&str> = out.operations[1..]
+            .iter()
+            .map(|o| o.params["sale_ref"].as_str().unwrap())
+            .collect();
+        assert_eq!(refs, vec!["sale-7#0#0", "sale-7#0#1"], "one ref per unit, or one blocks the other");
+    }
+
+    /// 🔴 Sin cliente no hay a quién concederle nada — y no se traga en silencio: viaja en el
+    /// resultado para que la caja pueda decirlo, en vez de que lo descubra la clienta en su
+    /// próxima visita.
+    #[test]
+    fn a_voucher_sold_without_a_customer_is_reported_not_swallowed() {
+        let out = on_sale_completed_pure(sale_input(
+            json!([{ "product_id": "pkg-1", "quantity": 2_000_000, "net_amount": 100, "tax_amount": 21 }]),
+            "",
+        ))
+        .unwrap();
+        assert_eq!(out.operations.len(), 1, "the settle, and no grant");
+        let result = out.result.unwrap();
+        assert_eq!(result["granted"], json!(0));
+        assert_eq!(result["ownerless_vouchers"], json!(2));
+    }
+
+    /// Sin el catálogo no hay forma de distinguir una línea de bono de una de champú. Adivinar
+    /// crearía titularidades sobre productos o se dejaría fuera las que sí se pagaron, así que el
+    /// listener falla y el relay lo reintenta (y acaba en dead-letter, que es un sitio donde se mira).
+    #[test]
+    fn without_the_catalogue_the_listener_refuses_instead_of_guessing() {
+        let mut input = sale_input(json!([{ "product_id": "pkg-1", "quantity": 1_000_000 }]), "cus-1");
+        input["context"]["reads"] = json!({});
+        assert!(on_sale_completed_pure(input).is_err());
+    }
+
+    /// El lote de ids del host es finito (256). Conceder los primeros y perder el resto sería una
+    /// entrega corta y SILENCIOSA de algo que el cliente pagó.
+    #[test]
+    fn more_vouchers_than_ids_refuses_instead_of_short_delivering() {
+        let mut input = sale_input(
+            json!([{ "product_id": "pkg-1", "quantity": 9_000_000, "net_amount": 900, "tax_amount": 0 }]),
+            "cus-1",
+        );
+        input["context"]["new_ids"] = json!(["g1", "g2"]);
+        let err = on_sale_completed_pure(input).unwrap_err();
+        assert!(err.contains("sale-7"), "the refusal must name the sale, got: {err}");
+    }
+
+    /// Una cantidad en escala 10⁶ son unidades enteras; media unidad de un derecho no existe.
+    #[test]
+    fn a_quantity_below_one_unit_still_grants_the_voucher_once() {
+        assert_eq!(vouchers_on_the_line(&json!({ "quantity": 1_000_000 })), 1);
+        assert_eq!(vouchers_on_the_line(&json!({ "quantity": 3_000_000 })), 3);
+        assert_eq!(vouchers_on_the_line(&json!({ "quantity": 500_000 })), 1);
+        assert_eq!(vouchers_on_the_line(&json!({})), 1, "no quantity = one voucher");
+    }
+
+    #[test]
+    fn splitting_cents_never_loses_one() {
+        for (total, units) in [(2501i64, 2i64), (100, 3), (0, 4), (7, 7), (5, 8)] {
+            let parts: i64 = (0..units).map(|i| split_cents(total, units, i)).sum();
+            assert_eq!(parts, total, "splitting {total} across {units} must add back up");
+        }
+        assert_eq!(split_cents(10, 0, 0), 0, "no units, no money attributed");
+    }
+
     // ── services#71 · devolver la sesión al bono ─────────────────────────────────────────────
     //
     // Same rule, one door further: the payload says WHICH redemption the operator wants back, and

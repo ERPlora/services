@@ -451,11 +451,76 @@ def raw_sql_cannot_skip_the_grant(db: ScratchDb) -> None:
     refused("a redemption inserted with no grant_id", raw)
 
 
-# ── 8 · the backfill of a hub that already had redemptions ───────────────────
+# ── 8 · the sale mints the grant, and only once ──────────────────────────────
+
+
+def the_sale_mints_the_grant_once(db: ScratchDb, svc: str, pkg: str) -> None:
+    """The idempotence of the `sale.completed` listener, in the STATEMENTS (services#73).
+
+    The relay is at-least-once. The handler composes one `services._grant` per unit sold, each
+    carrying a `sale_ref` — `<sale_id>#<line>#<unit>` — and this is the half only the database can
+    prove: the second delivery writes NOTHING and still passes the assert, so the event is marked
+    delivered instead of dead-lettering forever, and the customer gets one voucher rather than two.
+    """
+    print("\n8 · a redelivered `sale.completed` grants the voucher ONCE")
+    frank = "cus-frank"
+    ref = "sale-100#0#0"
+    first = grant(db, pkg, frank, sale_ref=ref, amount_cents=12100)
+    check(
+        "the sale granted it",
+        1,
+        int(db.scalar(f"SELECT count(*) FROM services_package_grant WHERE sale_ref = '{ref}'")),
+    )
+    # The redelivery: a DIFFERENT grant id, the SAME document. It must not write, and it must not
+    # blow up either — an assert that failed here would dead-letter work that is already done.
+    second = str(uuid.uuid4())
+    grant(db, pkg, frank, sale_ref=ref, amount_cents=12100, grant_id=second)
+    check(
+        "the redelivery wrote nothing",
+        1,
+        int(db.scalar(f"SELECT count(*) FROM services_package_grant WHERE sale_ref = '{ref}'")),
+    )
+    check(
+        "and the id of the retry names no row",
+        0,
+        int(db.scalar(f"SELECT count(*) FROM services_package_grant WHERE id = '{second}'")),
+    )
+    check(
+        "the customer has ONE voucher, not two",
+        1,
+        len(rows(db, "services.packages.tender_options", {"customer_id": frank, "service_id": svc})),
+    )
+    check(
+        "the money of the purchase is on the row, base and VAT apart",
+        [12100, 12100, 0],
+        json_of(db, f"SELECT json_build_array(amount_cents, net_amount_cents, tax_amount_cents) "
+                    f"FROM services_package_grant WHERE id = '{first}'"),
+    )
+    # 🔴 The schema is the other half: the index refuses a second live grant on the same document
+    # even through raw SQL, which is the door a support script or a future command comes through.
+    refused(
+        "a raw INSERT reusing the same sale line",
+        lambda: db.psql(
+            [
+                "-c",
+                "INSERT INTO services_package_grant "
+                "(id, hub_id, package_id, customer_id, granted_at, source, sale_ref, is_deleted) "
+                f"VALUES ('{uuid.uuid4()}', '{HUB}', '{pkg}', '{frank}', '{NOW}', 'sale', '{ref}', 0)",
+            ],
+            db=db.name,
+        ),
+    )
+
+
+def json_of(db: ScratchDb, sql: str):
+    return json.loads(db.scalar(sql))
+
+
+# ── 9 · the backfill of a hub that already had redemptions ───────────────────
 
 
 def the_backfill_keeps_every_balance(db_name_prefix: str) -> None:
-    print("\n8 · migration 013 does not change one balance of a hub that already redeemed")
+    print("\n9 · migration 013 does not change one balance of a hub that already redeemed")
     db = ScratchDb(db_name_prefix)
     db.create(through="migrations/postgres/012_voucher_refund.sql")
     try:
@@ -529,6 +594,7 @@ def main() -> int:
         the_grant_is_a_snapshot(db, svc)
         the_neighbour_is_invisible(db)
         raw_sql_cannot_skip_the_grant(db)
+        the_sale_mints_the_grant_once(db, svc, pkg)
     finally:
         db.drop()
     the_backfill_keeps_every_balance("services_grant_legacy")

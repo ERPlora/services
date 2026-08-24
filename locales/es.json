@@ -93,7 +93,7 @@
     "colDiscountPercent": "Descuento (%)",
     "fixedPriceHelp": "Déjalo vacío para que valga la suma de sus líneas menos el descuento.",
     "colValidityDays": "Vigencia (días)",
-    "validityHelp": "Días canjeable desde el primer uso; vacío = no caduca.",
+    "validityHelp": "Días canjeable desde la COMPRA; vacío = no caduca.",
     "colMaxUses": "Usos",
     "maxUsesHelp": "Usos que concede el bono; vacío = ilimitados.",
     "packageLinesTitle": "Servicios incluidos",
@@ -132,7 +132,7 @@
         "expires_first": "Se gasta primero porque es el que antes caduca.",
         "already_started": "Se gasta primero para terminar el bono que ya estaba empezado.",
         "fewest_sessions_left": "Se gasta primero porque es al que le quedan menos sesiones.",
-        "oldest_voucher": "Se gasta primero porque es el bono más antiguo.",
+        "oldest_voucher": "Se gasta primero porque se compró antes.",
         "stable_order": "Los dos bonos son equivalentes; este va siempre primero.",
         "generic": "Este es el bono que se va a gastar."
       }

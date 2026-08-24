@@ -92,7 +92,7 @@
     "colDiscountPercent": "Discount (%)",
     "fixedPriceHelp": "Leave empty to price it as the sum of its lines minus the discount.",
     "colValidityDays": "Validity (days)",
-    "validityHelp": "Days redeemable after the first use; empty = never expires.",
+    "validityHelp": "Days redeemable from the PURCHASE; empty = never expires.",
     "colMaxUses": "Uses",
     "maxUsesHelp": "Uses the voucher grants; empty = unlimited.",
     "packageLinesTitle": "Services included",
@@ -131,7 +131,7 @@
         "expires_first": "Used first because it expires soonest.",
         "already_started": "Used first to finish the voucher already started.",
         "fewest_sessions_left": "Used first because it has the fewest sessions left.",
-        "oldest_voucher": "Used first because it is the oldest voucher.",
+        "oldest_voucher": "Used first because it was bought first.",
         "stable_order": "Both vouchers are equivalent; this one always goes first.",
         "generic": "This is the voucher that will be used."
       }

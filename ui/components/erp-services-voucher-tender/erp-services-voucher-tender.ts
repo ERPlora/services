@@ -40,6 +40,10 @@ interface ErploraClientLike {
 
 /** A row of `services.packages.tender_options`. */
 interface TenderOption {
+  /** The customer's PURCHASE of this voucher (services#73). What is spent is a grant, never a
+   * catalogue row: two purchases of the same voucher are two rows here, with their own balance
+   * and their own expiry, and picking one of them is what this screen is for. */
+  grant_id: string;
   package_id: string;
   package_name: string;
   max_uses: number | null;
@@ -161,11 +165,11 @@ export class ErpServicesVoucherTender extends LitElement {
       });
       this.options = Array.isArray(rows) ? rows : [];
       // The tie-break picks the DEFAULT. The operator's own choice, once made, survives a reload.
-      const stillThere = this.options.some((o) => o.package_id === this.selectedId);
+      const stillThere = this.options.some((o) => o.grant_id === this.selectedId);
       if (!stillThere) {
         this.selectedId =
-          this.options.find((o) => Number(o.is_default) === 1)?.package_id ??
-          this.options[0]?.package_id ??
+          this.options.find((o) => Number(o.is_default) === 1)?.grant_id ??
+          this.options[0]?.grant_id ??
           '';
       }
     } catch (e) {
@@ -179,20 +183,20 @@ export class ErpServicesVoucherTender extends LitElement {
     }
   }
 
-  select(packageId: string): void {
-    this.selectedId = packageId;
+  select(grantId: string): void {
+    this.selectedId = grantId;
     this.feedback = '';
   }
 
   /** The explicit redemption: nothing is spent until this runs. */
   async confirm(): Promise<void> {
-    const option = this.options.find((o) => o.package_id === this.selectedId);
+    const option = this.options.find((o) => o.grant_id === this.selectedId);
     if (!option || this.busy) return;
     this.busy = true;
     this.feedback = '';
     try {
       const out = await erplora().command<HeldSession>('services.packages.hold_for_line', {
-        package_id: option.package_id,
+        grant_id: option.grant_id,
         customer_id: this.customerId,
         service_id: this.serviceId,
         checkout_ref: this.checkoutRef,
@@ -210,6 +214,7 @@ export class ErpServicesVoucherTender extends LitElement {
           composed: true,
           detail: {
             redemptionId: this.held.redemption_id,
+            grantId: option.grant_id,
             packageId: option.package_id,
             lineRef: this.lineRef,
             checkoutRef: this.checkoutRef,
@@ -274,7 +279,7 @@ export class ErpServicesVoucherTender extends LitElement {
   }
 
   private renderOption(o: TenderOption) {
-    const chosen = o.package_id === this.selectedId;
+    const chosen = o.grant_id === this.selectedId;
     return html`<label
       class="option"
       role="radio"
@@ -282,9 +287,9 @@ export class ErpServicesVoucherTender extends LitElement {
       data-test="option"
     >
       <ion-radio
-        .value=${o.package_id}
+        .value=${o.grant_id}
         ?checked=${chosen}
-        @click=${() => this.select(o.package_id)}
+        @click=${() => this.select(o.grant_id)}
       ></ion-radio>
       <div>
         <div class="name">${o.package_name}</div>

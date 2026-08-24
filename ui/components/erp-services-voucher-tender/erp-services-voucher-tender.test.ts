@@ -18,6 +18,10 @@ import esLocale from '../../../locales/es.json';
 const ERRORS = (esLocale as { errors: Record<string, string> }).errors;
 
 const CUTS = {
+  // services#73: what the till spends is a GRANT — the customer's purchase — and the row carries
+  // both ids. Two purchases of the same voucher differ only in `grant_id`, which is exactly why
+  // the selection and the command key on it.
+  grant_id: 'g-cuts',
   package_id: 'p-cuts',
   package_name: 'Bono 5 cortes',
   max_uses: 5,
@@ -34,6 +38,7 @@ const CUTS = {
 };
 const GIFT = {
   ...CUTS,
+  grant_id: 'g-gift',
   package_id: 'p-gift',
   package_name: 'Bono regalo',
   remaining_before: 2,
@@ -133,7 +138,7 @@ describe('the preview: which voucher, which line, and how many sessions are left
 
   it('the default is preselected and its reason is written out, not implied', async () => {
     const el = await mount();
-    expect(el.selectedId).toBe('p-cuts');
+    expect(el.selectedId).toBe('g-cuts');
     expect(text(el)).toContain('ui.tender.reason.expires_first');
   });
 
@@ -166,14 +171,14 @@ describe('the preview: which voucher, which line, and how many sessions are left
 describe('the operator can override the tie-break — the rule is a default, not a cage', () => {
   it('picking the other voucher is what gets held', async () => {
     const el = await mount();
-    el.select('p-gift');
+    el.select('g-gift');
     await settle(el);
     await el.confirm();
     expect(commands).toHaveLength(1);
     expect(commands[0]).toMatchObject({
       name: 'services.packages.hold_for_line',
       payload: {
-        package_id: 'p-gift',
+        grant_id: 'g-gift',
         customer_id: 'cus-1',
         service_id: 'svc-1',
         checkout_ref: 'order-7',

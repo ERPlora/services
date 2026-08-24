@@ -3531,7 +3531,7 @@ var es_default = {
     colDiscountPercent: "Descuento (%)",
     fixedPriceHelp: "D\xE9jalo vac\xEDo para que valga la suma de sus l\xEDneas menos el descuento.",
     colValidityDays: "Vigencia (d\xEDas)",
-    validityHelp: "D\xEDas canjeable desde el primer uso; vac\xEDo = no caduca.",
+    validityHelp: "D\xEDas canjeable desde la COMPRA; vac\xEDo = no caduca.",
     colMaxUses: "Usos",
     maxUsesHelp: "Usos que concede el bono; vac\xEDo = ilimitados.",
     packageLinesTitle: "Servicios incluidos",
@@ -3570,7 +3570,7 @@ var es_default = {
         expires_first: "Se gasta primero porque es el que antes caduca.",
         already_started: "Se gasta primero para terminar el bono que ya estaba empezado.",
         fewest_sessions_left: "Se gasta primero porque es al que le quedan menos sesiones.",
-        oldest_voucher: "Se gasta primero porque es el bono m\xE1s antiguo.",
+        oldest_voucher: "Se gasta primero porque se compr\xF3 antes.",
         stable_order: "Los dos bonos son equivalentes; este va siempre primero.",
         generic: "Este es el bono que se va a gastar."
       }
@@ -3603,6 +3603,8 @@ var es_default = {
     "services.category_update_rejected": "No se ha podido actualizar la categor\xEDa: no existe en este negocio, o la categor\xEDa padre elegida no existe (o es ella misma).",
     "services.category_not_found": "Esa categor\xEDa no existe en este negocio.",
     "services.package_not_found": "Ese paquete no existe en este negocio.",
+    "services.package_no_grant": "Este cliente no tiene ese bono: nadie se lo ha vendido.",
+    "services.grant_customer_required": "Elige el cliente al que pertenece el bono: un bono sin due\xF1o no lo puede canjear nadie.",
     "services.package_needs_lines": "Un paquete necesita al menos una l\xEDnea de servicio: un paquete sin l\xEDneas no se puede vender ni canjear.",
     "services.package_no_uses_left": "Este bono ya no tiene sesiones disponibles.",
     "services.package_expired": "Este bono ha caducado.",
@@ -3712,7 +3714,7 @@ var en_default = {
     colDiscountPercent: "Discount (%)",
     fixedPriceHelp: "Leave empty to price it as the sum of its lines minus the discount.",
     colValidityDays: "Validity (days)",
-    validityHelp: "Days redeemable after the first use; empty = never expires.",
+    validityHelp: "Days redeemable from the PURCHASE; empty = never expires.",
     colMaxUses: "Uses",
     maxUsesHelp: "Uses the voucher grants; empty = unlimited.",
     packageLinesTitle: "Services included",
@@ -3751,7 +3753,7 @@ var en_default = {
         expires_first: "Used first because it expires soonest.",
         already_started: "Used first to finish the voucher already started.",
         fewest_sessions_left: "Used first because it has the fewest sessions left.",
-        oldest_voucher: "Used first because it is the oldest voucher.",
+        oldest_voucher: "Used first because it was bought first.",
         stable_order: "Both vouchers are equivalent; this one always goes first.",
         generic: "This is the voucher that will be used."
       }
@@ -3784,6 +3786,8 @@ var en_default = {
     "services.category_update_rejected": "The category could not be updated: it does not exist in this business, or the parent you picked does not (or is the category itself).",
     "services.category_not_found": "That category does not exist in this business.",
     "services.package_not_found": "That package does not exist in this business.",
+    "services.package_no_grant": "This customer does not have that voucher: nobody has sold it to them.",
+    "services.grant_customer_required": "Pick the customer this voucher belongs to: a voucher with no owner cannot be redeemed.",
     "services.package_needs_lines": "A package needs at least one service line: a package with no lines cannot be sold or redeemed.",
     "services.package_no_uses_left": "This voucher has no sessions left.",
     "services.package_expired": "This voucher has expired.",
@@ -5139,9 +5143,9 @@ var ErpServicesVoucherTender = class extends i3 {
         service_id: this.serviceId
       });
       this.options = Array.isArray(rows) ? rows : [];
-      const stillThere = this.options.some((o7) => o7.package_id === this.selectedId);
+      const stillThere = this.options.some((o7) => o7.grant_id === this.selectedId);
       if (!stillThere) {
-        this.selectedId = this.options.find((o7) => Number(o7.is_default) === 1)?.package_id ?? this.options[0]?.package_id ?? "";
+        this.selectedId = this.options.find((o7) => Number(o7.is_default) === 1)?.grant_id ?? this.options[0]?.grant_id ?? "";
       }
     } catch (e5) {
       this.options = [];
@@ -5151,19 +5155,19 @@ var ErpServicesVoucherTender = class extends i3 {
       this.loading = false;
     }
   }
-  select(packageId) {
-    this.selectedId = packageId;
+  select(grantId) {
+    this.selectedId = grantId;
     this.feedback = "";
   }
   /** The explicit redemption: nothing is spent until this runs. */
   async confirm() {
-    const option = this.options.find((o7) => o7.package_id === this.selectedId);
+    const option = this.options.find((o7) => o7.grant_id === this.selectedId);
     if (!option || this.busy) return;
     this.busy = true;
     this.feedback = "";
     try {
       const out = await erplora4().command("services.packages.hold_for_line", {
-        package_id: option.package_id,
+        grant_id: option.grant_id,
         customer_id: this.customerId,
         service_id: this.serviceId,
         checkout_ref: this.checkoutRef,
@@ -5180,6 +5184,7 @@ var ErpServicesVoucherTender = class extends i3 {
           composed: true,
           detail: {
             redemptionId: this.held.redemption_id,
+            grantId: option.grant_id,
             packageId: option.package_id,
             lineRef: this.lineRef,
             checkoutRef: this.checkoutRef
@@ -5236,7 +5241,7 @@ var ErpServicesVoucherTender = class extends i3 {
     </div>`;
   }
   renderOption(o7) {
-    const chosen = o7.package_id === this.selectedId;
+    const chosen = o7.grant_id === this.selectedId;
     return b2`<label
       class="option"
       role="radio"
@@ -5244,9 +5249,9 @@ var ErpServicesVoucherTender = class extends i3 {
       data-test="option"
     >
       <ion-radio
-        .value=${o7.package_id}
+        .value=${o7.grant_id}
         ?checked=${chosen}
-        @click=${() => this.select(o7.package_id)}
+        @click=${() => this.select(o7.grant_id)}
       ></ion-radio>
       <div>
         <div class="name">${o7.package_name}</div>
