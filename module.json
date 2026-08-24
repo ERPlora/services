@@ -1,7 +1,7 @@
 {
   "id": "services",
   "name": "Services",
-  "version": "1.5.34",
+  "version": "1.5.35",
   "description": "Service catalogue with categories and packages, and their availability.",
   "agent": {
     "description": "Manages the service catalogue: create, update and delete services, categories, and service packages; list available services and packages; configure module settings.",
@@ -408,7 +408,7 @@
       "sql": "queries/package_refund_check.sql",
       "schema": "schemas/package_refund_check.json",
       "ai": {
-        "description": "Checks whether a PAID voucher session can be given back to its voucher and, if not, returns the business reason (redemption_not_found, already_refunded or not_settled) instead of the raw gate error. It also previews the sessions before and after the return, and WARNS with voucher_expired when the voucher has already expired \u2014 a warning, never a refusal: a return undoes a past act and expiry does not veto it."
+        "description": "Checks whether a PAID voucher session can be given back to its voucher and, if not, returns the business reason (redemption_not_found, already_refunded or not_settled) instead of the raw gate error. It also previews the sessions before and after the return, and WARNS with voucher_expired when the voucher has already expired — a warning, never a refusal: a return undoes a past act and expiry does not veto it."
       },
       "expose_api": true
     },
@@ -417,7 +417,7 @@
       "sql": "queries/package_redemption_history.sql",
       "schema": "schemas/package_redemption_history.json",
       "ai": {
-        "description": "Lists every movement of a voucher \u2014 held, consumed, released and refunded \u2014 with who did it, when, which sale it belonged to and, for a refund, the return document behind it. Soft-deleted rows are included on purpose: that is where the releases and the refunds live."
+        "description": "Lists every movement of a voucher — held, consumed, released and refunded — with who did it, when, which sale it belonged to and, for a refund, the return document behind it. Soft-deleted rows are included on purpose: that is where the releases and the refunds live."
       },
       "expose_api": true
     },
@@ -818,7 +818,7 @@
         "services.package.refunded"
       ],
       "ai": {
-        "description": "Gives a PAID voucher session back to its voucher because the sale was returned, keeping the redemption as an audit trail (who, when, and against which return document). Idempotent by refund_ref: the same document twice returns one session, and a different document over the same redemption is refused with services.redemption_already_refunded. Refuses with a domain code (services.redemption_not_found, services.redemption_not_settled, services.redemption_already_refunded) instead of the raw gate error. An EXPIRED voucher does not block the return \u2014 it is recorded and announced. It issues NO fiscal document: the voucher is univalent and its record came out when the voucher was SOLD (art. 30 ter.1 of Directive 2006/112/CE)."
+        "description": "Gives a PAID voucher session back to its voucher because the sale was returned, keeping the redemption as an audit trail (who, when, and against which return document). Idempotent by refund_ref: the same document twice returns one session, and a different document over the same redemption is refused with services.redemption_already_refunded. Refuses with a domain code (services.redemption_not_found, services.redemption_not_settled, services.redemption_already_refunded) instead of the raw gate error. An EXPIRED voucher does not block the return — it is recorded and announced. It issues NO fiscal document: the voucher is univalent and its record came out when the voucher was SOLD (art. 30 ter.1 of Directive 2006/112/CE)."
       },
       "expose_api": true
     },
