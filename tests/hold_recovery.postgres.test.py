@@ -67,6 +67,11 @@ failures: list[str] = []
 # The checkout that gets abandoned. `NOW` is 2026-08-18T10:00:00Z.
 LATER = "2026-08-18T10:20:00Z"
 MUCH_LATER = "2026-08-19T10:00:00Z"
+# A day past MUCH_LATER, and half an hour after it. Section L needs a grant holding a STALE session
+# and a FRESH one at the same instant, which only exists when the two were taken at different
+# moments — so it needs two clocks that are one day apart and one that sits between their deadlines.
+HALF_HOUR_ON = "2026-08-19T10:30:00Z"
+EVEN_LATER = "2026-08-20T10:00:00Z"
 
 
 def check(label: str, expected, actual) -> None:
@@ -553,6 +558,80 @@ def main() -> int:
             recover_after_reload(db, "chk-line", now=MUCH_LATER),
         )
         check("guard table still empty", 0, guard_residue(db))
+
+        print("\nK. an UNLIMITED voucher recovers without inventing a countdown")
+        # The screen renders a counter or the word «unlimited» depending on whether
+        # `remaining_after` is NULL, and it takes that straight from here rather than re-deriving
+        # it from `is_unlimited`. So this is where the two have to agree: both come from the same
+        # `max_uses IS NULL`, and a component branch second-guessing it would be a branch no test
+        # could tell apart (a mutant that removed it survived, which is how this section exists).
+        endless = seed_package(db, HUB, "Bono ilimitado", max_uses=None)
+        seed_item(db, HUB, endless, cut)
+        endless_grant = seed_grant(db, endless, "cus-6")
+        hold(db, endless_grant, cut, "chk-endless", "l1")
+        row = recover_after_reload(db, "chk-endless")[0]
+        check("it is flagged unlimited", 1, row["is_unlimited"])
+        check("and it previews NO count, rather than a wrong one", None, row["remaining_after"])
+        check("max_uses travels as NULL too", None, row["max_uses"])
+        # …and the two really are one question: a FINITE voucher answers both the other way. Held
+        # fresh here rather than reusing an earlier checkout — section J released those, and
+        # asserting over an empty list would have passed for the wrong reason.
+        hold(db, line_grant, cut, "chk-finite", "l1", now=MUCH_LATER)
+        finite_row = recover_after_reload(db, "chk-finite", now=MUCH_LATER)
+        check("a finite voucher is not flagged unlimited", [0], [r["is_unlimited"] for r in finite_row])
+        check("and it does carry a count: 3 sold, 1 held, 2 left", [2], [r["remaining_after"] for r in finite_row])
+
+        print("\nL. the recovered counter ignores the grant's OWN stale holds")
+        # 🔴 The number the cashier reads off this screen has to be the number the till is about to
+        # charge against — the same one `tender_options` and `balance` give. So `remaining_after`
+        # counts the grant's live uses EXCLUDING the ones whose deadline has passed, exactly like
+        # they do. Without that predicate the screen would quietly under-count a voucher by however
+        # many abandoned checkouts it is still carrying, and the cashier would refuse a session the
+        # customer actually has.
+        #
+        # Building the case needs two clocks a day apart: a session held on Tuesday is stale by
+        # Thursday while one held on Wednesday is not, and NEITHER has been swept, because nothing
+        # has tried to spend from this voucher in between. A mutant that dropped this predicate
+        # survived every other section — they all had at most one hold per grant.
+        mixed_grant = seed_grant(db, many, "cus-7")
+        stale = hold(db, mixed_grant, cut, "chk-stale", "l1", now=MUCH_LATER)
+        fresh = hold(db, mixed_grant, cut, "chk-still-open", "l2", now=HALF_HOUR_ON)
+        check(
+            "both are live in the table",
+            2,
+            int(
+                db.scalar(
+                    "SELECT count(*) FROM services_package_redemption "
+                    f"WHERE id IN ('{stale}', '{fresh}') AND is_deleted = 0 AND status = 'held'"
+                )
+            ),
+        )
+        open_now = recover_after_reload(db, "chk-still-open", now=EVEN_LATER)
+        check("only the fresh checkout is recovered", [fresh], [r["redemption_id"] for r in open_now])
+        check(
+            "and its counter ignores the stale sibling: 3 sold, 1 live, 2 left",
+            [2],
+            [r["remaining_after"] for r in open_now],
+        )
+        check(
+            "the till agrees, which is the whole point of them sharing the predicate",
+            [2],
+            [
+                r["remaining_before"]
+                for r in options(db, "cus-7", cut, now=EVEN_LATER)
+                if r["grant_id"] == mixed_grant
+            ],
+        )
+        check(
+            "…and the stale one is STILL live: no sweep has run, this is the clock",
+            1,
+            int(
+                db.scalar(
+                    "SELECT count(*) FROM services_package_redemption "
+                    f"WHERE id = '{stale}' AND is_deleted = 0"
+                )
+            ),
+        )
     finally:
         db.drop()
 

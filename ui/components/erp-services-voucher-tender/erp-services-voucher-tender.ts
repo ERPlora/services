@@ -233,7 +233,12 @@ export class ErpServicesVoucherTender extends LitElement {
     return {
       redemption_id: String(mine.redemption_id ?? ''),
       package_name: String(mine.package_name ?? ''),
-      remaining_after: Number(mine.is_unlimited) === 1 ? null : (mine.remaining_after ?? null),
+      // `remaining_after` is NULL exactly when the voucher was sold as unlimited — the query
+      // derives both from the same `max_uses IS NULL`, so re-deriving it from `is_unlimited` here
+      // would be a second opinion on a question that already has one answer, and a branch no test
+      // could tell apart. The SQL is the authority; `tests/hold_recovery.postgres.test.py` §K is
+      // what holds it to that.
+      remaining_after: mine.remaining_after ?? null,
     };
   }
 
