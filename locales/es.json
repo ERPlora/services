@@ -137,6 +137,22 @@
         "generic": "Este es el bono que se va a gastar."
       }
     },
+    "sessionRefund": {
+      "title": "Sesión de bono",
+      "giveBack": "Devolver la sesión a {name}",
+      "remainingAfter": "Quedan {before} sesiones · {after} tras esta devolución",
+      "unlimited": "Sesiones ilimitadas",
+      "expired": "{name} caducó el {date}. La sesión vuelve al bono igualmente.",
+      "done": "{name}: la sesión ha vuelto al bono.",
+      "loadFailed": "No se han podido leer las sesiones de bono de esta venta. Inténtalo otra vez antes de terminar la devolución.",
+      "refundFailed": "No se ha podido devolver esa sesión al bono.",
+      "btnRetry": "Reintentar",
+      "reason": {
+        "already_refunded": "Esta sesión ya se devolvió en otra devolución.",
+        "not_settled": "Esta sesión nunca se cobró, así que no hay nada que devolver.",
+        "generic": "Esta sesión no se puede devolver."
+      }
+    },
     "actionMovements": "Movimientos",
     "movementsTitle": "Movimientos del bono",
     "movementsHint": "todas las sesiones de este bono: reservadas, entregadas, liberadas y devueltas.",

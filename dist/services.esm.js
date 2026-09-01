@@ -9,7 +9,7 @@ var __decorateClass = (decorators, target, key, kind) => {
   return result;
 };
 
-// ../../../module-toolkit/node_modules/@lit-labs/ssr-dom-shim/lib/element-internals.js
+// @lit-labs/ssr-dom-shim/lib/element-internals.js
 var ElementInternalsShim = class ElementInternals {
   get shadowRoot() {
     return this.__host.__shadowRoot;
@@ -88,7 +88,7 @@ var ElementInternalsShim = class ElementInternals {
   }
 };
 
-// ../../../module-toolkit/node_modules/@lit-labs/ssr-dom-shim/lib/events.js
+// @lit-labs/ssr-dom-shim/lib/events.js
 var __classPrivateFieldSet = function(receiver, state, value, kind, f3) {
   if (kind === "m") throw new TypeError("Private method is not writable");
   if (kind === "a" && !f3) throw new TypeError("Private accessor was defined without a setter");
@@ -246,7 +246,7 @@ Object.defineProperties(CustomEventShim.prototype, {
 var EventShimWithRealType = EventShim;
 var CustomEventShimWithRealType = CustomEventShim;
 
-// ../../../module-toolkit/node_modules/@lit-labs/ssr-dom-shim/lib/css.js
+// @lit-labs/ssr-dom-shim/lib/css.js
 var _a2;
 var CSSRuleShim = (_a2 = class CSSRule {
   constructor() {
@@ -277,7 +277,7 @@ var CSSRuleShim = (_a2 = class CSSRule {
   }
 }, _a2.STYLE_RULE = 1, _a2.CHARSET_RULE = 2, _a2.IMPORT_RULE = 3, _a2.MEDIA_RULE = 4, _a2.FONT_FACE_RULE = 5, _a2.PAGE_RULE = 6, _a2.NAMESPACE_RULE = 10, _a2.KEYFRAMES_RULE = 7, _a2.KEYFRAME_RULE = 8, _a2.SUPPORTS_RULE = 12, _a2.COUNTER_STYLE_RULE = 11, _a2.FONT_FEATURE_VALUES_RULE = 14, _a2.MARGIN_RULE = 9, _a2);
 
-// ../../../module-toolkit/node_modules/@lit-labs/ssr-dom-shim/index.js
+// @lit-labs/ssr-dom-shim/index.js
 globalThis.Event ??= EventShimWithRealType;
 globalThis.CustomEvent ??= CustomEventShimWithRealType;
 var constructionToken = Symbol();
@@ -462,7 +462,7 @@ var attributesForElement = (element) => {
   }
   return attrs;
 };
-var NodeShim = class Node extends EventTarget {
+var NodeShim = class Node2 extends EventTarget {
   getRootNode(options) {
     if (options?.composed) {
       return document2;
@@ -674,7 +674,7 @@ var CustomElementRegistryShimWithRealType = CustomElementRegistry;
 var customElements2 = new CustomElementRegistryShimWithRealType();
 var windowShim = new WindowShim(constructionToken);
 
-// ../../../module-toolkit/node_modules/@lit/reactive-element/node/css-tag.js
+// @lit/reactive-element/node/css-tag.js
 var t = globalThis;
 var e = t.ShadowRoot && (void 0 === t.ShadyCSS || t.ShadyCSS.nativeShadow) && "adoptedStyleSheets" in Document.prototype && "replace" in CSSStyleSheet.prototype;
 var s = Symbol();
@@ -719,7 +719,7 @@ var c = e || void 0 === t.CSSStyleSheet ? (t5) => t5 : (t5) => t5 instanceof CSS
   return r(e5);
 })(t5) : t5;
 
-// ../../../module-toolkit/node_modules/@lit/reactive-element/node/reactive-element.js
+// @lit/reactive-element/node/reactive-element.js
 var { is: h, defineProperty: r2, getOwnPropertyDescriptor: o2, getOwnPropertyNames: n2, getOwnPropertySymbols: a, getPrototypeOf: c2 } = Object;
 var l = globalThis;
 l.customElements ??= customElements2;
@@ -942,7 +942,7 @@ var g = class extends (globalThis.HTMLElement ?? HTMLElementShimWithRealType) {
 };
 g.elementStyles = [], g.shadowRootOptions = { mode: "open" }, g[f("elementProperties")] = /* @__PURE__ */ new Map(), g[f("finalized")] = /* @__PURE__ */ new Map(), u?.({ ReactiveElement: g }), (l.reactiveElementVersions ??= []).push("2.1.2");
 
-// ../../node_modules/.pnpm/lit-html@3.3.3/node_modules/lit-html/lit-html.js
+// lit-html/lit-html.js
 var t2 = globalThis;
 var i2 = (t5) => t5;
 var s2 = t2.trustedTypes;
@@ -1197,7 +1197,7 @@ var D = (t5, i7, s5) => {
   return h4._$AI(t5), h4;
 };
 
-// ../../node_modules/.pnpm/lit-element@4.2.2/node_modules/lit-element/lit-element.js
+// lit-element/lit-element.js
 var s3 = globalThis;
 var i3 = class extends g {
   constructor() {
@@ -1226,7 +1226,7 @@ var o4 = s3.litElementPolyfillSupport;
 o4?.({ LitElement: i3 });
 (s3.litElementVersions ??= []).push("4.2.2");
 
-// ../../../module-toolkit/node_modules/@lit/reactive-element/node/decorators/property.js
+// @lit/reactive-element/node/decorators/property.js
 var o5 = { attribute: true, type: String, converter: b, reflect: false, hasChanged: m };
 var r4 = (t5 = o5, e5, r6) => {
   const { kind: n6, metadata: i7 } = r6;
@@ -1256,19 +1256,19 @@ function n4(t5) {
   })(t5, e5, o7);
 }
 
-// ../../../module-toolkit/node_modules/@lit/reactive-element/node/decorators/state.js
+// @lit/reactive-element/node/decorators/state.js
 function r5(r6) {
   return n4({ ...r6, state: true, attribute: false });
 }
 
-// ../../../outfitkit/dist/define.js
+// @erplora/outfitkit/dist/define.js
 function define(tag, ctor) {
   if (typeof customElements !== "undefined" && !customElements.get(tag)) {
     customElements.define(tag, ctor);
   }
 }
 
-// ../../../outfitkit/dist/shared/icons.js
+// @erplora/outfitkit/dist/shared/icons.js
 var rawAdd = '<svg viewBox="0 0 512 512" width="1.2em" height="1.2em" ><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M256 112v288m144-144H112"/></svg>';
 var rawAlertCircle = '<svg viewBox="0 0 512 512" width="1.2em" height="1.2em" ><path fill="currentColor" d="M256 48C141.31 48 48 141.31 48 256s93.31 208 208 208s208-93.31 208-208S370.69 48 256 48m0 319.91a20 20 0 1 1 20-20a20 20 0 0 1-20 20m21.72-201.15l-5.74 122a16 16 0 0 1-32 0l-5.74-121.94v-.05a21.74 21.74 0 1 1 43.44 0Z"/></svg>';
 var rawAlertCircleOutline = '<svg viewBox="0 0 512 512" width="1.2em" height="1.2em" ><path fill="none" stroke="currentColor" stroke-miterlimit="10" stroke-width="32" d="M448 256c0-106-86-192-192-192S64 150 64 256s86 192 192 192s192-86 192-192Z"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M250.26 166.05L256 288l5.73-121.95a5.74 5.74 0 0 0-5.79-6h0a5.74 5.74 0 0 0-5.68 6"/><path fill="currentColor" d="M256 367.91a20 20 0 1 1 20-20a20 20 0 0 1-20 20"/></svg>';
@@ -1416,7 +1416,7 @@ function okIcon(value) {
   return BY_NAME[value] ?? value;
 }
 
-// ../../../outfitkit/dist/ok-inline-feedback.js
+// @erplora/outfitkit/dist/ok-inline-feedback.js
 var __defProp2 = Object.defineProperty;
 var __decorateClass2 = (decorators, target, key, kind) => {
   var result = void 0;
@@ -1633,7 +1633,7 @@ __decorateClass2([
 ], OkInlineFeedback.prototype, "hasActions");
 define("ok-inline-feedback", OkInlineFeedback);
 
-// ../../node_modules/.pnpm/lit-html@3.3.3/node_modules/lit-html/directive.js
+// lit-html/directive.js
 var t3 = { ATTRIBUTE: 1, CHILD: 2, PROPERTY: 3, BOOLEAN_ATTRIBUTE: 4, EVENT: 5, ELEMENT: 6 };
 var e4 = (t5) => (...e5) => ({ _$litDirective$: t5, values: e5 });
 var i4 = class {
@@ -1653,7 +1653,7 @@ var i4 = class {
   }
 };
 
-// ../../node_modules/.pnpm/lit-html@3.3.3/node_modules/lit-html/directive-helpers.js
+// lit-html/directive-helpers.js
 var { I: t4 } = j;
 var i5 = (o7) => o7;
 var s4 = () => document.createComment("");
@@ -1686,7 +1686,7 @@ var h3 = (o7) => {
   o7._$AR(), o7._$AA.remove();
 };
 
-// ../../node_modules/.pnpm/lit-html@3.3.3/node_modules/lit-html/directives/repeat.js
+// lit-html/directives/repeat.js
 var u4 = (e5, s5, t5) => {
   const r6 = /* @__PURE__ */ new Map();
   for (let l3 = s5; l3 <= t5; l3++) r6.set(e5[l3], l3);
@@ -1739,7 +1739,7 @@ var c4 = e4(class extends i4 {
   }
 });
 
-// ../../node_modules/.pnpm/lit-html@3.3.3/node_modules/lit-html/directives/style-map.js
+// lit-html/directives/style-map.js
 var n5 = "important";
 var i6 = " !" + n5;
 var o6 = e4(class extends i4 {
@@ -1768,7 +1768,7 @@ var o6 = e4(class extends i4 {
   }
 });
 
-// ../../../outfitkit/dist/ok-data-table.js
+// @erplora/outfitkit/dist/ok-data-table.js
 var CSV_BOM = "\uFEFF";
 var WINDOWS_1252_C1 = [
   8364,
@@ -1863,7 +1863,8 @@ var DEFAULT_LABELS2 = {
   select: "Select",
   showing: "Showing {from}\u2013{to} of",
   recordSingular: "record",
-  recordPlural: "records"
+  recordPlural: "records",
+  loadMore: "Load more"
 };
 var ES_LABELS = {
   search: "Buscar\u2026",
@@ -1899,7 +1900,8 @@ var ES_LABELS = {
   select: "Seleccionar",
   showing: "Mostrando {from}\u2013{to} de",
   recordSingular: "registro",
-  recordPlural: "registros"
+  recordPlural: "registros",
+  loadMore: "Cargar m\xE1s"
 };
 var _OkDataTable = class _OkDataTable2 extends i3 {
   constructor() {
@@ -1934,6 +1936,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
     this.q = "";
     this.clientPage = 0;
     this.clientPageSize = 0;
+    this.mobileShown = 0;
     this.clientSort = "";
     this.clientSortDir = "asc";
     this.clientFilters = {};
@@ -1955,6 +1958,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
       } else {
         this.q = value;
         this.clientPage = 0;
+        this.mobileShown = 0;
       }
     };
   }
@@ -1995,13 +1999,37 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
       box-shadow: none;
     }
 
-    /* Panel lateral derecho (drawer) DENTRO de la tabla: filtros / alta-edición. No empuja contenido. */
+    /* Panel lateral derecho (drawer) DENTRO de la tabla: filtros / alta-edición. Base (sin media):
+       overlay absoluto — es lo que había hasta #75 y lo que ve un navegador sin media queries. */
     .tk-scrim { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.18); z-index: 19; }
     .drawer { position: absolute; top: 0; right: 0; height: 100%; width: 340px; max-width: 88%;
       background: var(--background); border-left: 1px solid var(--border-color);
       display: flex; flex-direction: column; z-index: 20;
       animation: tk-slide-in 0.18s ease; }
     @keyframes tk-slide-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
+    /* #75 — El panel EMPUJA en escritorio y es HOJA COMPLETA en móvil; nunca tapa a medias.
+       Medido en el hub (Servicios/Citas): a 1440 el overlay de 340px se pintaba ENCIMA de
+       «Duración», «Acciones» y el selector de columnas, con el 90% de la tabla vacío a la
+       izquierda; a 390 dejaba una tira de 45px de tabla (media lupa, medio «Co…») que hacía
+       parecer el formulario un pop-up mal puesto. Square Dashboard reduce la tabla con un panel
+       fijo; Fresha/Shopify/Odoo abren una hoja a pantalla completa en móvil.
+       ≥ 834px: mientras hay panel, .card pasa a rejilla de DOS columnas (tabla | panel 360px):
+       la tabla se estrecha (ya sabe hacer scroll-x, #67) y nada queda tapado. */
+    @media (min-width: 834px) {
+      .card.has-panel { display: grid; grid-template-columns: minmax(0, 1fr) 360px; grid-template-rows: auto minmax(0, 1fr) auto; }
+      .card.has-panel > .bar { grid-column: 1; grid-row: 1; }
+      .card.has-panel > .scroll, .card.has-panel > .cards-grid, .card.has-panel > .empty { grid-column: 1; grid-row: 2; min-height: 0; overflow: auto; }
+      .card.has-panel > .pager { grid-column: 1; grid-row: 3; }
+      .card.has-panel > .drawer { position: static; grid-column: 2; grid-row: 1 / -1; width: auto; max-width: none; height: auto; min-height: 0; animation: none; }
+      .card.has-panel > .tk-scrim { display: none; }
+    }
+    /* < 834px: hoja a pantalla completa con su cabecera (título + Cerrar); sin tira residual.
+       position:fixed dentro de ion-content se ancla al área de contenido (contain), que es justo el hueco
+       bajo la cabecera de la app: el usuario conserva el título de la página. */
+    @media (max-width: 833.98px) {
+      .drawer { position: fixed; inset: 0; top: var(--ok-sheet-top, 0px); width: 100%; max-width: none; height: auto; border-left: 0; z-index: 1000; }
+      .tk-scrim { display: none; }
+    }
     .drawer .dh { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
       padding: 0.6rem 0.5rem 0.6rem 1rem; border-bottom: 1px solid var(--border-color); font-size: 1rem; }
     .drawer .db { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 1rem; display: flex; flex-direction: column; gap: 0.85rem; }
@@ -2068,6 +2096,11 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
 
     /* Botón primario (primaryAction) */
     .primary-btn { --background: var(--primary); --color: var(--primary-contrast); }
+    /* #76 — El alta en MÓVIL: botón primario CON etiqueta y área táctil de 44px, en vez del «+»
+       icónico de 36px al final de la barra. Fresha/Square/Shopify POS ponen la acción primaria
+       de la lista como botón visible con texto (o FAB), nunca como icono anónimo. */
+    .add-btn { min-height: 44px; --border-radius: 10px; --padding-start: 0.9rem; --padding-end: 1rem; margin: 0; font-weight: 600; }
+    .add-btn ion-icon { margin-inline-end: 0.35rem; }
 
     /* Selects de la toolbar: fondo + borde visibles (como el buscador y la pastilla de fechas) para
      * que se distingan como controles en claro y oscuro (sin fondo eran invisibles en dark). */
@@ -2164,12 +2197,21 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
        que Ionic no trae (cabecera en fila, filas clave-valor, barra de acciones, resalte de selección). */
     ion-card.rcard { margin: 0; } /* la rejilla aporta el gap → sin esto el margin por defecto de ion-card lo duplica */
     ion-card.rcard.selected { outline: 2px solid var(--primary); outline-offset: -2px; }
+    /* #74 — Tarjeta clicable (opt-in row-clickable): la mitad de #67 que faltaba. La vista de
+       tarjetas es la que la tabla elige SOLA en móvil, así que sin esto el registro no se podía
+       abrir desde un teléfono (medido con combos 0.1.4: 0 rowClick a 390px). */
+    ion-card.rcard.clickable { cursor: pointer; }
+    ion-card.rcard.clickable:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
     @media (prefers-reduced-motion: reduce) {
       .gh.sortable:hover, .gh.sortable:active,
       .grow-data:hover, .grow-data:active { transform: none; }
     }
-    /* Cabecera: ion-card-header en fila (icono + título + checkbox); se conserva su padding Ionic. */
-    ion-card-header.rcard-head { display: flex; align-items: center; gap: 0.5rem; }
+    /* Header: ion-card-header as a single row (icon + title + checkbox), keeping Ionic's padding.
+       #79 — flex-direction/flex-wrap are SPELLED OUT on purpose: in ios mode (the mode the Hub
+       shell pins, ADR-0143) Ionic's own host CSS gives ion-card-header a column direction, so a
+       rule that only sets display:flex inherits it and the three children stack on three lines.
+       Under md the same rule looked right, which is why it shipped. */
+    ion-card-header.rcard-head { display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 0.5rem; }
     .rcard-head .rc-icon { display: inline-flex; color: var(--primary); }
     .rcard-head .rc-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
     /* Cuerpo: ion-card-content (padding Ionic por defecto) con las filas clave-valor apiladas. */
@@ -2203,9 +2245,16 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
     .pager .strong { font-weight: 600; color: var(--color); }
     .psize { font: inherit; font-size: 12.5px; padding: 0.2rem 0.35rem; border: 1px solid var(--border-color); border-radius: 6px; background: var(--background); color: var(--color); }
     .pager .nav { display: flex; align-items: center; gap: 0.2rem; }
+    /* #78 — Pie en MÓVIL: un solo control «Cargar más» en lugar del pager numerado (Shopify
+       IndexTable, Fresha, Square y Material hacen lo mismo: nadie pinta botones de página en un
+       teléfono). Sin atributo fill: el sólido por defecto de Ionic es el único que pinta caja en
+       modo ios (outfitkit#82 / ADR-0143). Los 44px son el área táctil mínima. */
+    .pager .load-more { min-height: 44px; margin: 0; --padding-start: 1rem; --padding-end: 1rem; font-size: 13px; }
     .pager .nav .pp { font-weight: 600; color: var(--color); padding: 0 0.25rem; }
     /* Pager numerado: botón por página + «…» en los saltos (look del Hub). */
-    .pnum { min-width: 1.75rem; height: 1.75rem; padding: 0 0.4rem; border: 1px solid transparent; border-radius: 8px; background: none; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--color); cursor: pointer; transition: background 0.12s, border-color 0.12s; }
+    /* #92 — min-width/height at 44px so a numbered page button matches the prev/next ion-button's
+       own 44px tap target (line above): before this they were visibly smaller than their neighbors. */
+    .pnum { min-width: var(--ok-tap-min, 44px); height: var(--ok-tap-min, 44px); padding: 0 0.4rem; border: 1px solid transparent; border-radius: 8px; background: none; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--color); cursor: pointer; transition: background 0.12s, border-color 0.12s; }
     .pnum:hover { background: var(--row-hover); }
     .pnum.on { background: color-mix(in srgb, var(--primary) 14%, transparent); color: var(--primary); border-color: color-mix(in srgb, var(--primary) 40%, transparent); }
     .pgap { padding: 0 0.15rem; color: var(--color-muted); }
@@ -2255,9 +2304,31 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
     const grid = scroll.querySelector(".grid");
     if (grid) this.xObserver.observe(grid);
   }
-  updated() {
+  updated(changed) {
     this.observeXOverflow();
     this.measureXOverflow();
+    if (changed.has("panel")) this.syncSheetTop();
+  }
+  /** #75 — Where the mobile sheet starts. `position: fixed; inset: 0` painted it from y=0 and the
+   *  app's `ion-header` (its own stacking context, above the content) covered the sheet's title and
+   *  its only Close button — measured at 390×844 in the Appointments parity page. CSS inside a
+   *  shadow root cannot know where the content area begins, so on open the table measures the
+   *  closest `ion-content` (walking through shadow hosts) and hands the offset over as a custom
+   *  property; on close it is removed. Without an `ion-content` around, the sheet keeps y=0. */
+  syncSheetTop() {
+    if (this.panel === "none") {
+      this.style.removeProperty("--ok-sheet-top");
+      return;
+    }
+    let node = this;
+    let content = null;
+    while (node && !content) {
+      const parent = node.parentNode ?? node.getRootNode?.()?.host ?? null;
+      if (parent && parent.nodeType === Node.ELEMENT_NODE && parent.tagName === "ION-CONTENT") content = parent;
+      node = parent === node ? null : parent;
+    }
+    const top = content ? Math.max(0, Math.round(content.getBoundingClientRect().top)) : 0;
+    this.style.setProperty("--ok-sheet-top", `${top}px`);
   }
   disconnectedCallback() {
     if (typeof window !== "undefined") {
@@ -2445,6 +2516,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
     }
     this.clientFilters = clean;
     this.clientPage = 0;
+    this.mobileShown = 0;
     this.panel = "none";
     this.emit("filterChange", { filters: this.serializeFilters(clean) });
   }
@@ -2565,6 +2637,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
       this.emit("sortChange", { sort: col.key, dir });
       return;
     }
+    this.mobileShown = 0;
     if (this.clientSort === col.key) {
       this.clientSortDir = this.clientSortDir === "asc" ? "desc" : "asc";
     } else {
@@ -2596,6 +2669,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
     else next[key] = merged;
     this.clientFilters = next;
     this.clientPage = 0;
+    this.mobileShown = 0;
   }
   // ion-select (select/multiselect) del panel de filtros (renderFilterControl). En servidor emite
   // `filterChange`; en cliente escribe `clientFilters` (multiselect ⇒ filtra por inclusión).
@@ -2643,8 +2717,9 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
    *   `views` antes de insertar  → tarjetas
    *   `views` después de insertar → tabla   ← lo que hace la página
    */
-  willUpdate() {
+  willUpdate(changed) {
     this.applyInitialView();
+    if (!this.serverSide && changed.has("rows") && this.mobileShown !== 0) this.mobileShown = 0;
   }
   applyInitialView() {
     if (this.viewChosenByUser) return;
@@ -2673,7 +2748,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
         <ion-select
           label=${col.header}
           label-placement="stacked"
-          fill="outline"
+          fill="outline" mode="md"
           ?multiple=${multi}
           interface="modal"
           .interfaceOptions=${{ cssClass: "ok-overlay" }}
@@ -2692,9 +2767,9 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
         <div class="fblock">
           <span class="flabel">${col.header}</span>
           <div class="frange">
-            <ion-input type=${t5} fill="outline" placeholder=${type === "daterange" ? this.t.from : this.t.gte}
+            <ion-input type=${t5} fill="outline" mode="md" placeholder=${type === "daterange" ? this.t.from : this.t.gte}
               @ionInput=${(e5) => onEdge(col, "from", e5)}></ion-input>
-            <ion-input type=${t5} fill="outline" placeholder=${type === "daterange" ? this.t.to : this.t.lte}
+            <ion-input type=${t5} fill="outline" mode="md" placeholder=${type === "daterange" ? this.t.to : this.t.lte}
               @ionInput=${(e5) => onEdge(col, "to", e5)}></ion-input>
           </div>
         </div>
@@ -2704,7 +2779,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
     return b2`
       <ion-input
         type=${inputType}
-        fill="outline"
+        fill="outline" mode="md"
         label=${col.header}
         label-placement="stacked"
         placeholder=${this.t.filterPlaceholder}
@@ -2865,8 +2940,14 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
       count = filtered.length;
       pages = Math.max(1, Math.ceil(filtered.length / ps));
       current = Math.min(this.clientPage, pages - 1);
-      visible = filtered.slice(current * ps, current * ps + ps);
+      visible = this.isMobile ? filtered.slice(0, Math.min(this.mobileShown || ps, count)) : filtered.slice(current * ps, current * ps + ps);
     }
+    const served = this.serverSide ? (current + 1) * ps : Math.min(this.mobileShown || ps, count);
+    const canLoadMore = this.isMobile && served < count;
+    const loadMore = () => {
+      if (this.serverSide) this.emit("pageChange", current + 1);
+      else this.mobileShown = Math.min((this.mobileShown || ps) + ps, count);
+    };
     const goTo = (p4) => {
       if (this.serverSide) this.emit("pageChange", p4);
       else this.clientPage = p4;
@@ -2876,13 +2957,14 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
       else {
         this.clientPageSize = n6;
         this.clientPage = 0;
+        this.mobileShown = 0;
       }
     };
     const searchbar = this.serverSide ? b2`<ion-searchbar class="ion-no-border" placeholder=${this.effSearchPlaceholder} debounce="250" @ionInput=${this.onSearch}></ion-searchbar>` : b2`<ion-searchbar class="ion-no-border" .value=${this.q} placeholder=${this.effSearchPlaceholder} debounce="250" @ionInput=${this.onSearch}></ion-searchbar>`;
     const selCount = this.selection.size;
     const showTopbar = !!this.title || this.hasSearch || this.viewToggle || this.effColumnPicker || this.effExport || this.effImport || this.hasFilterRow || this.addable || !!this.primaryAction;
     return b2`
-      <div class="card">
+      <div class=${`card${this.panel !== "none" ? " has-panel" : ""}`}>
         ${showTopbar ? b2`
               <div class="bar">
                 <div class="bar-main">
@@ -2890,7 +2972,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
                   ${this.hasSearch ? b2`<div class="search">${searchbar}</div>` : A}
                   ${this.inlineFilters ? this.renderInlineFilters() : A}
                   <span class="tk-spacer"></span>
-                    ${this.effColumnPicker ? b2`
+                    ${this.effColumnPicker && !this.isMobile ? b2`
                           <ion-select
                             class="tk-cols"
                             multiple
@@ -2903,7 +2985,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
                             ${this.columns.map((c5) => b2`<ion-select-option value=${c5.key}>${c5.header}</ion-select-option>`)}
                           </ion-select>
                         ` : A}
-                    ${this.effPageSizes.length ? b2`
+                    ${this.effPageSizes.length && !this.isMobile ? b2`
                           <ion-select
                             class="tk-psize"
                             interface="popover"
@@ -2926,9 +3008,17 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
                           <input class="tk-file" type="file" accept=".csv,text/csv" hidden @change=${(e5) => this.onImportFile(e5)} />
                         ` : A}
                     ${this.effExport ? this.toolButton("download-outline", false, () => this.exportCsv(), this.t.exportCsv) : A}
-                    ${this.addable ? this.toolButton("add", this.panel === "create", () => this.toggle("create"), this.t.add) : A}
+                    ${this.addable ? this.isMobile ? b2`
+                            <ion-button class="primary-btn add-btn" size="small" @click=${() => this.toggle("create")}>
+                              <ion-icon slot="start" .icon=${okIcon("add")}></ion-icon>${this.t.add}
+                            </ion-button>
+                          ` : this.toolButton("add", this.panel === "create", () => this.toggle("create"), this.t.add) : A}
                     ${this.renderOverflowMenu()}
-                    ${this.primaryAction ? b2`
+                    ${this.primaryAction ? this.isMobile ? b2`
+                            <ion-button class="primary-btn add-btn" size="small" @click=${() => this.emit("primaryAction", {})}>
+                              <ion-icon slot="start" .icon=${okIcon(this.primaryAction.icon ?? "add")}></ion-icon>${this.primaryAction.label}
+                            </ion-button>
+                          ` : b2`
                           <ion-button
                             class="primary-btn"
                             size="small"
@@ -2957,7 +3047,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
               <div class="pager">
                 <div class="left">
                   <span>
-                    ${pages > 1 ? b2`${this.t.showing.replace("{from}", String(current * ps + 1)).replace("{to}", String(Math.min((current + 1) * ps, count)))} ` : A}
+                    ${pages > 1 ? b2`${this.t.showing.replace("{from}", String(this.isMobile && !this.serverSide ? 1 : current * ps + 1)).replace("{to}", String(Math.min(served, count)))} ` : A}
                     <span class="strong">${count}</span> ${count === 1 ? this.t.recordSingular : this.t.recordPlural}
                   </span>
                   ${!showTopbar && this.effPageSizes.length ? b2`
@@ -2966,7 +3056,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
                         </select>
                       ` : A}
                 </div>
-                ${pages > 1 ? b2`
+                ${this.isMobile ? canLoadMore ? b2`<ion-button class="load-more" size="small" @click=${loadMore}>${this.t.loadMore}</ion-button>` : A : pages > 1 ? b2`
                       <div class="nav">
                         <ion-button size="small" fill="clear" ?disabled=${current === 0} @click=${() => goTo(current - 1)}><ion-icon slot="icon-only" .icon=${iconChevronBack}></ion-icon></ion-button>
                         ${this.pageList(current + 1, pages).map(
@@ -3014,8 +3104,8 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
         <div class="fblock">
           <span class="flabel">${label}</span>
           <div class="daterange">
-            <ion-input type="date" label=${this.t.from} label-placement="stacked" fill="outline" .value=${f3.from ?? ""} @ionChange=${(e5) => this.setFilterRange(col.key, "from", e5.detail.value ?? "")}></ion-input>
-            <ion-input type="date" label=${this.t.to} label-placement="stacked" fill="outline" .value=${f3.to ?? ""} @ionChange=${(e5) => this.setFilterRange(col.key, "to", e5.detail.value ?? "")}></ion-input>
+            <ion-input type="date" label=${this.t.from} label-placement="stacked" fill="outline" mode="md" .value=${f3.from ?? ""} @ionChange=${(e5) => this.setFilterRange(col.key, "from", e5.detail.value ?? "")}></ion-input>
+            <ion-input type="date" label=${this.t.to} label-placement="stacked" fill="outline" mode="md" .value=${f3.to ?? ""} @ionChange=${(e5) => this.setFilterRange(col.key, "to", e5.detail.value ?? "")}></ion-input>
           </div>
         </div>
       `;
@@ -3027,7 +3117,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
         <ion-select
           label=${label}
           label-placement="stacked"
-          fill="outline"
+          fill="outline" mode="md"
           multiple
           interface="modal"
           .interfaceOptions=${{ cssClass: "ok-overlay" }}
@@ -3040,8 +3130,8 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
       </div>
     `;
   }
-  /** #67 — Enter/Espacio activan la fila clicable: si se llega con el tabulador, el ratón no puede
-   *  ser el único camino. Espacio además NO debe desplazar la página. */
+  /** #67 — Enter/Espacio activan la fila clicable (y, desde #74, la tarjeta): si se llega con el
+   *  tabulador, el ratón no puede ser el único camino. Espacio además NO debe desplazar la página. */
   onRowKeydown(e5, row) {
     if (e5.key !== "Enter" && e5.key !== " " && e5.key !== "Spacebar") return;
     e5.preventDefault();
@@ -3075,7 +3165,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
       const caretIcon = !active ? iconSwapVerticalOutline : dir === "asc" ? iconChevronUpOutline : iconChevronDownOutline;
       return b2`
                 <div
-                  class=${`gcell gh ${alignCls(c5.align)}${sortable ? " sortable" : ""}`}
+                  class=${`gcell gh ${alignCls(c5.align)}${sortable ? " sortable" : ""}${c5.pinned === "end" ? " actions-col" : ""}`}
                   role="columnheader"
                   @click=${() => this.onHeaderClick(c5)}
                 >
@@ -3105,7 +3195,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
                 >
                   ${this.selectable ? b2`<span class="selcb" @click=${(e5) => e5.stopPropagation()}><ion-checkbox .checked=${selected} aria-label=${this.t.selectRow} @ionChange=${() => this.toggleRow(key)}></ion-checkbox></span>` : A}
                   ${cols.map(
-          (c5) => b2`<div class=${`gcell ${alignCls(c5.align)}`} role="cell">${c5.render ? c5.render(row) : b2`<span>${this.cell(c5, row)}</span>`}</div>`
+          (c5) => b2`<div class=${`gcell ${alignCls(c5.align)}${c5.pinned === "end" ? " actions-col" : ""}`} role="cell">${c5.render ? c5.render(row) : b2`<span>${this.cell(c5, row)}</span>`}</div>`
         )}
                   ${this.actions.length ? b2`<div class="gcell right actions-col" role="cell" @click=${(e5) => e5.stopPropagation()}>${this.actionButtons(row)}</div>` : A}
                 </div>
@@ -3129,12 +3219,18 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
         const selected = this.selectable && this.selection.has(key);
         const icon = this.cardIcon?.(row);
         return b2`
-              <ion-card class=${`rcard${selected ? " selected" : ""}`}>
+              <ion-card
+                class=${`rcard${selected ? " selected" : ""}${this.rowClickable ? " clickable" : ""}`}
+                role=${this.rowClickable ? "button" : A}
+                tabindex=${this.rowClickable ? "0" : A}
+                @click=${this.rowClickable ? () => this.emit("rowClick", { row }) : A}
+                @keydown=${this.rowClickable ? (e5) => this.onRowKeydown(e5, row) : A}
+              >
                 ${hasHead ? b2`
                       <ion-card-header class="rcard-head">
                         ${icon != null && icon !== "" ? b2`<span class="rc-icon">${typeof icon === "string" ? b2`<ion-icon .icon=${okIcon(icon)}></ion-icon>` : icon}</span>` : A}
                         <span class="rc-title">${this.cardTitle ? this.cardTitle(row) : A}</span>
-                        ${this.selectable ? b2`<ion-checkbox .checked=${selected} aria-label=${this.t.select} @ionChange=${() => this.toggleRow(key)}></ion-checkbox>` : A}
+                        ${this.selectable ? b2`<ion-checkbox .checked=${selected} aria-label=${this.t.select} @click=${(e5) => e5.stopPropagation()} @ionChange=${() => this.toggleRow(key)}></ion-checkbox>` : A}
                       </ion-card-header>
                     ` : A}
                 <ion-card-content class="rcard-body">
@@ -3142,7 +3238,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
           (c5) => b2`<div class="rrow"><span class="rk">${c5.header}</span><span class="rv">${c5.render ? c5.render(row) : this.cell(c5, row)}</span></div>`
         )}
                 </ion-card-content>
-                ${this.actions.length ? b2`<div class="ractions">${this.actionButtons(row)}</div>` : A}
+                ${this.actions.length ? b2`<div class="ractions" @click=${(e5) => e5.stopPropagation()}>${this.actionButtons(row)}</div>` : A}
               </ion-card>
             `;
       }
@@ -3276,6 +3372,9 @@ __decorateClass3([
 ], _OkDataTable.prototype, "clientPageSize");
 __decorateClass3([
   r5()
+], _OkDataTable.prototype, "mobileShown");
+__decorateClass3([
+  r5()
 ], _OkDataTable.prototype, "clientSort");
 __decorateClass3([
   r5()
@@ -3310,7 +3409,7 @@ __decorateClass3([
 var OkDataTable = _OkDataTable;
 define("ok-data-table", OkDataTable);
 
-// ../../../hub/packages/module-sdk/src/index.ts
+// @erplora/module-sdk/src/index.ts
 function isEmpty(v3) {
   return v3 === null || v3 === void 0 || v3 === "";
 }
@@ -3575,6 +3674,22 @@ var es_default = {
         generic: "Este es el bono que se va a gastar."
       }
     },
+    sessionRefund: {
+      title: "Sesi\xF3n de bono",
+      giveBack: "Devolver la sesi\xF3n a {name}",
+      remainingAfter: "Quedan {before} sesiones \xB7 {after} tras esta devoluci\xF3n",
+      unlimited: "Sesiones ilimitadas",
+      expired: "{name} caduc\xF3 el {date}. La sesi\xF3n vuelve al bono igualmente.",
+      done: "{name}: la sesi\xF3n ha vuelto al bono.",
+      loadFailed: "No se han podido leer las sesiones de bono de esta venta. Int\xE9ntalo otra vez antes de terminar la devoluci\xF3n.",
+      refundFailed: "No se ha podido devolver esa sesi\xF3n al bono.",
+      btnRetry: "Reintentar",
+      reason: {
+        already_refunded: "Esta sesi\xF3n ya se devolvi\xF3 en otra devoluci\xF3n.",
+        not_settled: "Esta sesi\xF3n nunca se cobr\xF3, as\xED que no hay nada que devolver.",
+        generic: "Esta sesi\xF3n no se puede devolver."
+      }
+    },
     actionMovements: "Movimientos",
     movementsTitle: "Movimientos del bono",
     movementsHint: "todas las sesiones de este bono: reservadas, entregadas, liberadas y devueltas.",
@@ -3756,6 +3871,22 @@ var en_default = {
         oldest_voucher: "Used first because it was bought first.",
         stable_order: "Both vouchers are equivalent; this one always goes first.",
         generic: "This is the voucher that will be used."
+      }
+    },
+    sessionRefund: {
+      title: "Voucher session",
+      giveBack: "Give the session back to {name}",
+      remainingAfter: "{before} sessions left \xB7 {after} after this return",
+      unlimited: "Unlimited sessions",
+      expired: "{name} expired on {date}. The session goes back to it anyway.",
+      done: "{name}: the session is back on the voucher.",
+      loadFailed: "The voucher sessions of this sale could not be read. Try again before finishing the return.",
+      refundFailed: "That voucher session could not be given back.",
+      btnRetry: "Try again",
+      reason: {
+        already_refunded: "This session was already given back on another return.",
+        not_settled: "This session was never paid, so there is nothing to give back.",
+        generic: "This session cannot be given back."
       }
     },
     actionMovements: "Movements",
@@ -4542,7 +4673,7 @@ __decorateClass([
 ], ErpServicesList.prototype, "archiveActive", 2);
 define("erp-services-list", ErpServicesList);
 
-// ../../../outfitkit/dist/ok-status-pill.js
+// @erplora/outfitkit/dist/ok-status-pill.js
 var __defProp4 = Object.defineProperty;
 var __decorateClass4 = (decorators, target, key, kind) => {
   var result = void 0;
@@ -5062,9 +5193,310 @@ __decorateClass([
 ], ErpServicesPackages.prototype, "movementsError", 2);
 define("erp-services-packages", ErpServicesPackages);
 
-// ui/components/erp-services-voucher-tender/erp-services-voucher-tender.ts
+// ui/components/erp-services-session-refund/erp-services-session-refund.ts
 var CATALOG4 = { es: es_default, en: en_default };
-var REASONS = [
+var REASONS = ["already_refunded", "not_settled"];
+function checkedOf(e5) {
+  const detail = e5.detail;
+  if (detail && typeof detail.checked === "boolean") return detail.checked;
+  return !!e5.target?.checked;
+}
+function erplora4() {
+  const c5 = globalThis.erplora;
+  if (!c5) throw new Error("erplora SDK no inicializado por el shell");
+  return c5;
+}
+var ErpServicesSessionRefund = class extends i3 {
+  constructor() {
+    super(...arguments);
+    this.saleId = "";
+    this.lineRef = "";
+    this.serviceId = "";
+    this.lineIndex = 0;
+    this.refundId = "";
+    this.refundRef = "";
+    this.session = null;
+    this.armed = false;
+    this.loading = true;
+    this.loadFailed = false;
+    this.feedback = "";
+    this.busy = false;
+    this.refunded = false;
+    /** One attempt per commit. The host dispatches once, but a screen is not a contract. */
+    this.committed = false;
+    /** The (sale, service, ordinal) the current answer belongs to — the guard against re-reading. */
+    this.loadedKey = "";
+    /**
+     * The host's document exists: give the session back, and make the screen WAIT for it.
+     *
+     * 🔴 `waitFor` is not optional politeness. Without it the screen closes as soon as the money is
+     * back and unmounts this element mid-command, leaving the session spent with nobody at the
+     * counter able to give it back — the exact failure this whole issue is about.
+     */
+    this.onCommit = (e5) => {
+      const detail = e5.detail ?? {};
+      const ref = String(detail.refundRef || this.refundRef || detail.refundId || this.refundId || "");
+      if (this.committed || !this.armed || !this.session || !ref) return;
+      this.committed = true;
+      const promise = this.giveBack(ref);
+      if (typeof detail.waitFor === "function") detail.waitFor(promise);
+      else void promise.catch(() => void 0);
+    };
+  }
+  static {
+    this.styles = i`
+    :host { display: block; font-family: system-ui, sans-serif; color: var(--ion-text-color, #1c1b18); }
+    .box { display: flex; flex-direction: column; gap: 0.45rem; }
+    .head { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+    .name { font-weight: 600; }
+    .counter { font-variant-numeric: tabular-nums; font-size: 0.85rem;
+               color: var(--ion-color-medium, #6b6b6b); }
+    .choice { display: grid; grid-template-columns: auto 1fr; gap: 0.5rem; align-items: center;
+              padding: 0.5rem 0.6rem; border: 1px solid var(--ion-color-step-200, #e2e0dc);
+              border-radius: 0.6rem; cursor: pointer; }
+    .choice[aria-checked='true'] { border-color: var(--ion-color-primary, #3b7d4f);
+                                   background: var(--ion-color-step-50, #f7f6f3); }
+    .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  `;
+  }
+  connectedCallback() {
+    super.connectedCallback();
+    this.addEventListener("erp:tender-refund-commit", this.onCommit);
+    void this.load();
+  }
+  disconnectedCallback() {
+    this.removeEventListener("erp:tender-refund-commit", this.onCommit);
+    super.disconnectedCallback();
+  }
+  updated(changed) {
+    if (changed.has("saleId") || changed.has("serviceId") || changed.has("lineIndex")) {
+      void this.load();
+    }
+  }
+  t(key, params) {
+    return erplora4().t(CATALOG4, key, params);
+  }
+  key() {
+    return `${this.saleId}|${this.serviceId}|${this.lineIndex}`;
+  }
+  async load(force = false) {
+    if (!this.saleId || !this.serviceId) {
+      this.session = null;
+      this.loading = false;
+      return;
+    }
+    const key = this.key();
+    if (!force && key === this.loadedKey) return;
+    this.loadedKey = key;
+    this.loading = true;
+    this.loadFailed = false;
+    this.feedback = "";
+    try {
+      const rows = await erplora4().query(
+        "services.packages.redemptions_for_sale",
+        { sale_id: this.saleId }
+      );
+      const mine = (Array.isArray(rows) ? rows : []).filter((r6) => r6.service_id === this.serviceId);
+      this.session = mine[this.lineIndex] ?? null;
+      this.settleArming();
+    } catch (e5) {
+      this.session = null;
+      this.loadFailed = true;
+      this.feedback = domainMessage(e5, erplora4().locale, this.t("ui.sessionRefund.loadFailed"));
+      this.setArmed(false);
+    } finally {
+      this.loading = false;
+    }
+  }
+  /** Arms by default when the session goes back — the operator un-ticks, never has to opt in. */
+  settleArming() {
+    const s5 = this.session;
+    if (!s5) {
+      this.armed = false;
+      return;
+    }
+    this.setArmed(Number(s5.refundable) === 1);
+  }
+  setArmed(on, silent = false) {
+    this.armed = on;
+    if (silent) return;
+    const warning = on ? this.expiryWarning() : "";
+    this.dispatchEvent(
+      new CustomEvent(on ? "erp:tender-refund-armed" : "erp:tender-refund-disarmed", {
+        bubbles: true,
+        composed: true,
+        detail: warning ? { lineRef: this.lineRef, warning } : { lineRef: this.lineRef }
+      })
+    );
+  }
+  /** The sentence the host paints next to **Devolver**, or '' when the voucher is live. */
+  expiryWarning() {
+    const s5 = this.session;
+    if (!s5 || Number(s5.voucher_expired) !== 1) return "";
+    return this.t("ui.sessionRefund.expired", {
+      name: s5.package_name,
+      date: s5.expires_at ? new Date(s5.expires_at).toLocaleDateString(erplora4().locale) : ""
+    });
+  }
+  /** The operator's choice. It changes what this hole promises; it never changes the money. */
+  toggle(on) {
+    if (!this.session || Number(this.session.refundable) !== 1) return;
+    if (on === this.armed) return;
+    this.feedback = "";
+    this.setArmed(on);
+  }
+  async giveBack(refundRef) {
+    const session = this.session;
+    if (!session) return;
+    this.busy = true;
+    this.feedback = "";
+    try {
+      await erplora4().command("services.packages.refund_redemption", {
+        redemption_id: session.redemption_id,
+        refund_ref: refundRef
+      });
+      this.refunded = true;
+    } catch (e5) {
+      this.feedback = domainMessage(e5, erplora4().locale, this.t("ui.sessionRefund.refundFailed"));
+      throw e5;
+    } finally {
+      this.busy = false;
+    }
+  }
+  renderCounter(s5) {
+    if (Number(s5.is_unlimited) === 1 || s5.remaining_after === null) {
+      return b2`<span class="counter">${this.t("ui.sessionRefund.unlimited")}</span>`;
+    }
+    return b2`<span class="counter"
+      >${this.t("ui.sessionRefund.remainingAfter", {
+      before: s5.remaining_before,
+      after: s5.remaining_after
+    })}</span
+    >`;
+  }
+  renderReason(s5) {
+    const known = REASONS.includes(s5.reason);
+    return b2`<ok-inline-feedback tone="neutral" icon="information-circle-outline"
+      >${known ? this.t(`ui.sessionRefund.reason.${s5.reason}`) : this.t("ui.sessionRefund.reason.generic")}</ok-inline-feedback
+    >`;
+  }
+  renderFeedback() {
+    if (!this.feedback) return A;
+    return b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline"
+      >${this.feedback}</ok-inline-feedback
+    >`;
+  }
+  render() {
+    if (this.loading) {
+      return b2`<div class="box">
+        <ion-skeleton-text animated style="height: 2.75rem"></ion-skeleton-text>
+      </div>`;
+    }
+    if (this.loadFailed) {
+      return b2`<div class="box">
+        <ok-inline-feedback tone="danger" icon="alert-circle-outline"
+          >${this.t("ui.sessionRefund.loadFailed")}</ok-inline-feedback
+        >
+        <div class="actions">
+          <ion-button fill="clear" data-test="retry" @click=${() => this.load(true)}
+            >${this.t("ui.sessionRefund.btnRetry")}</ion-button
+          >
+        </div>
+      </div>`;
+    }
+    const s5 = this.session;
+    if (!s5) return A;
+    if (this.refunded) {
+      return b2`<div class="box">
+        <ok-inline-feedback tone="success" icon="checkmark-circle-outline"
+          >${this.t("ui.sessionRefund.done", { name: s5.package_name })}</ok-inline-feedback
+        >
+      </div>`;
+    }
+    if (Number(s5.refundable) !== 1) {
+      return b2`<div class="box">
+        <div class="head"><span class="name">${s5.package_name}</span></div>
+        ${this.renderReason(s5)}${this.renderFeedback()}
+      </div>`;
+    }
+    const warning = this.expiryWarning();
+    return b2`<div class="box">
+      <div class="choice" aria-checked=${this.armed ? "true" : "false"}>
+        <!-- 🔴 ONE handler, and it is \`ionChange\`. Wiring \`@click\` as well looks harmless — and
+             is, in happy-dom, where \`ion-checkbox\` is an unknown element and only the click ever
+             fires — but a real Ionic checkbox emits BOTH: the change would set the state and the
+             click would immediately flip it back, so the tick would do nothing on a real till and
+             every test would still be green. The label goes INSIDE the control, which is Ionic's
+             own pattern and gives the whole row as a tap target. -->
+        <ion-checkbox
+          data-test="give-back"
+          label-placement="end"
+          justify="start"
+          ?checked=${this.armed}
+          ?disabled=${this.busy}
+          @ionChange=${(e5) => this.toggle(checkedOf(e5))}
+        >
+          <div>
+            <div class="head">
+              <span class="name"
+                >${this.t("ui.sessionRefund.giveBack", { name: s5.package_name })}</span
+              >
+            </div>
+            ${this.renderCounter(s5)}
+          </div>
+        </ion-checkbox>
+      </div>
+      ${warning ? b2`<ok-inline-feedback tone="warning" icon="alert-circle-outline"
+            >${warning}</ok-inline-feedback
+          >` : A}
+      ${this.renderFeedback()}
+    </div>`;
+  }
+};
+__decorateClass([
+  n4({ type: String, attribute: "sale-id" })
+], ErpServicesSessionRefund.prototype, "saleId", 2);
+__decorateClass([
+  n4({ type: String, attribute: "line-ref" })
+], ErpServicesSessionRefund.prototype, "lineRef", 2);
+__decorateClass([
+  n4({ type: String, attribute: "service-id" })
+], ErpServicesSessionRefund.prototype, "serviceId", 2);
+__decorateClass([
+  n4({ type: Number, attribute: "line-index" })
+], ErpServicesSessionRefund.prototype, "lineIndex", 2);
+__decorateClass([
+  n4({ type: String, attribute: "refund-id" })
+], ErpServicesSessionRefund.prototype, "refundId", 2);
+__decorateClass([
+  n4({ type: String, attribute: "refund-ref" })
+], ErpServicesSessionRefund.prototype, "refundRef", 2);
+__decorateClass([
+  r5()
+], ErpServicesSessionRefund.prototype, "session", 2);
+__decorateClass([
+  r5()
+], ErpServicesSessionRefund.prototype, "armed", 2);
+__decorateClass([
+  r5()
+], ErpServicesSessionRefund.prototype, "loading", 2);
+__decorateClass([
+  r5()
+], ErpServicesSessionRefund.prototype, "loadFailed", 2);
+__decorateClass([
+  r5()
+], ErpServicesSessionRefund.prototype, "feedback", 2);
+__decorateClass([
+  r5()
+], ErpServicesSessionRefund.prototype, "busy", 2);
+__decorateClass([
+  r5()
+], ErpServicesSessionRefund.prototype, "refunded", 2);
+define("erp-services-session-refund", ErpServicesSessionRefund);
+
+// ui/components/erp-services-voucher-tender/erp-services-voucher-tender.ts
+var CATALOG5 = { es: es_default, en: en_default };
+var REASONS2 = [
   "only_option",
   "finite_before_unlimited",
   "expires_first",
@@ -5073,13 +5505,13 @@ var REASONS = [
   "oldest_voucher",
   "stable_order"
 ];
-function erplora4() {
+function erplora5() {
   const c5 = globalThis.erplora;
   if (!c5) throw new Error("erplora SDK no inicializado por el shell");
   return c5;
 }
 function can4(permission) {
-  const client = erplora4();
+  const client = erplora5();
   return typeof client.hasPermission === "function" ? client.hasPermission(permission) : true;
 }
 var ErpServicesVoucherTender = class extends i3 {
@@ -5127,7 +5559,7 @@ var ErpServicesVoucherTender = class extends i3 {
     }
   }
   t(key, params) {
-    return erplora4().t(CATALOG4, key, params);
+    return erplora5().t(CATALOG5, key, params);
   }
   async load() {
     if (!this.customerId || !this.serviceId) {
@@ -5144,7 +5576,7 @@ var ErpServicesVoucherTender = class extends i3 {
         this.options = [];
         return;
       }
-      const rows = await erplora4().query("services.packages.tender_options", {
+      const rows = await erplora5().query("services.packages.tender_options", {
         customer_id: this.customerId,
         service_id: this.serviceId
       });
@@ -5156,7 +5588,7 @@ var ErpServicesVoucherTender = class extends i3 {
     } catch (e5) {
       this.options = [];
       this.loadFailed = true;
-      this.feedback = domainMessage(e5, erplora4().locale, this.t("ui.tender.loadFailed"));
+      this.feedback = domainMessage(e5, erplora5().locale, this.t("ui.tender.loadFailed"));
     } finally {
       this.loading = false;
     }
@@ -5174,7 +5606,7 @@ var ErpServicesVoucherTender = class extends i3 {
    */
   async recoverHold() {
     if (!this.checkoutRef || !this.lineRef) return null;
-    const rows = await erplora4().query("services.packages.holds_for_checkout", {
+    const rows = await erplora5().query("services.packages.holds_for_checkout", {
       checkout_ref: this.checkoutRef
     });
     const mine = (Array.isArray(rows) ? rows : []).find((r6) => r6.line_ref === this.lineRef);
@@ -5182,7 +5614,12 @@ var ErpServicesVoucherTender = class extends i3 {
     return {
       redemption_id: String(mine.redemption_id ?? ""),
       package_name: String(mine.package_name ?? ""),
-      remaining_after: Number(mine.is_unlimited) === 1 ? null : mine.remaining_after ?? null
+      // `remaining_after` is NULL exactly when the voucher was sold as unlimited — the query
+      // derives both from the same `max_uses IS NULL`, so re-deriving it from `is_unlimited` here
+      // would be a second opinion on a question that already has one answer, and a branch no test
+      // could tell apart. The SQL is the authority; `tests/hold_recovery.postgres.test.py` §K is
+      // what holds it to that.
+      remaining_after: mine.remaining_after ?? null
     };
   }
   select(grantId) {
@@ -5196,7 +5633,7 @@ var ErpServicesVoucherTender = class extends i3 {
     this.busy = true;
     this.feedback = "";
     try {
-      const out = await erplora4().command("services.packages.hold_for_line", {
+      const out = await erplora5().command("services.packages.hold_for_line", {
         grant_id: option.grant_id,
         customer_id: this.customerId,
         service_id: this.serviceId,
@@ -5222,7 +5659,7 @@ var ErpServicesVoucherTender = class extends i3 {
         })
       );
     } catch (e5) {
-      this.feedback = domainMessage(e5, erplora4().locale, this.t("ui.tender.holdFailed"));
+      this.feedback = domainMessage(e5, erplora5().locale, this.t("ui.tender.holdFailed"));
     } finally {
       this.busy = false;
     }
@@ -5234,7 +5671,7 @@ var ErpServicesVoucherTender = class extends i3 {
     this.busy = true;
     this.feedback = "";
     try {
-      await erplora4().command("services.packages.release_hold", {
+      await erplora5().command("services.packages.release_hold", {
         redemption_id: held.redemption_id
       });
       this.held = null;
@@ -5247,7 +5684,7 @@ var ErpServicesVoucherTender = class extends i3 {
       );
       await this.load();
     } catch (e5) {
-      this.feedback = domainMessage(e5, erplora4().locale, this.t("ui.tender.releaseFailed"));
+      this.feedback = domainMessage(e5, erplora5().locale, this.t("ui.tender.releaseFailed"));
     } finally {
       this.busy = false;
     }
@@ -5265,7 +5702,7 @@ var ErpServicesVoucherTender = class extends i3 {
   }
   renderReason(o7) {
     if (Number(o7.is_default) !== 1) return A;
-    const known = REASONS.includes(o7.default_reason);
+    const known = REASONS2.includes(o7.default_reason);
     return b2`<div class="reason">
       ${known ? this.t(`ui.tender.reason.${o7.default_reason}`) : this.t("ui.tender.reason.generic")}
     </div>`;
@@ -5289,7 +5726,7 @@ var ErpServicesVoucherTender = class extends i3 {
           ${this.renderCounter(o7)}
           ${o7.expires_at ? b2`<span
                 >${this.t("ui.tender.expires", {
-      date: new Date(o7.expires_at).toLocaleDateString(erplora4().locale)
+      date: new Date(o7.expires_at).toLocaleDateString(erplora5().locale)
     })}</span
               >` : A}
         </div>
