@@ -417,6 +417,15 @@
       },
       "expose_api": true
     },
+    "services.packages.redemptions_for_sale": {
+      "permission": "services.view_package_balance",
+      "sql": "queries/package_redemptions_for_sale.sql",
+      "schema": "schemas/package_redemptions_for_sale.json",
+      "ai": {
+        "description": "Lists the voucher sessions a given SALE spent, so the return screen can give them back. It is services.packages.refund_check by sale: one row per settled redemption — ALWAYS one, including for a session that cannot go back, which carries its business reason (already_refunded, not_settled) instead of disappearing — with the same fields refund_check answers: refundable, reason, already_refunded, the sessions before and after the return, the voucher's expiry and voucher_expired. The order is stable (when the session was taken, then its ordinal on the voucher, then its id), which is what pairs the nth covered line of a service with the nth session that paid for it when the same service appears twice on one ticket. voucher_expired WARNS that the voucher has already expired — never a refusal: a return undoes a past act. A sale that spent no session answers an empty list, never an error."
+      },
+      "expose_api": true
+    },
     "services.packages.redemption_history": {
       "permission": "services.view_package_balance",
       "sql": "queries/package_redemption_history.sql",
@@ -969,6 +978,12 @@
       "slot": "sales.pos.tender",
       "component": "erp-services-voucher-tender",
       "permission": "services.view_package_balance",
+      "priority": 100
+    },
+    {
+      "slot": "sales.refund.tender",
+      "component": "erp-services-session-refund",
+      "permission": "services.refund_package",
       "priority": 100
     }
   ]

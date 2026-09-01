@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "services.packages.redemptions_for_sale params",
+  "description": "Las sesiones de bono que gastó UNA venta, para que la pantalla de devolución de sales pueda devolverlas (services#88, ADR-0386). Es services.packages.refund_check pero por venta: devuelve SIEMPRE una fila por canje liquidado —también cuando no es devolvible, con su reason— y los mismos campos (refundable, reason, already_refunded, remaining_before/after, expires_at, voucher_expired), de modo que el hueco pinta sin una segunda vuelta. El orden es estable (redeemed_at, use_index, id): es lo que empareja el lineIndex n del hueco con el n-ésimo canje de ese (venta, servicio) cuando el mismo servicio aparece dos veces en el tique. voucher_expired AVISA de que el bono está caducado; nunca es un motivo de rechazo. No muta: la autoridad transaccional sigue siendo services.packages.refund_redemption.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["sale_id"],
+  "properties": {
+    "sale_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Id de la venta ya cobrada que se está devolviendo. Opaco para services: lo escribe la liquidación (hold_settle / settle_holds_for_sale) y aquí solo se compara, no se interpreta."
+    }
+  }
+}

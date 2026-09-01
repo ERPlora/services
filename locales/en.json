@@ -136,6 +136,22 @@
         "generic": "This is the voucher that will be used."
       }
     },
+    "sessionRefund": {
+      "title": "Voucher session",
+      "giveBack": "Give the session back to {name}",
+      "remainingAfter": "{before} sessions left · {after} after this return",
+      "unlimited": "Unlimited sessions",
+      "expired": "{name} expired on {date}. The session goes back to it anyway.",
+      "done": "{name}: the session is back on the voucher.",
+      "loadFailed": "The voucher sessions of this sale could not be read. Try again before finishing the return.",
+      "refundFailed": "That voucher session could not be given back.",
+      "btnRetry": "Try again",
+      "reason": {
+        "already_refunded": "This session was already given back on another return.",
+        "not_settled": "This session was never paid, so there is nothing to give back.",
+        "generic": "This session cannot be given back."
+      }
+    },
     "actionMovements": "Movements",
     "movementsTitle": "Voucher movements",
     "movementsHint": "every session of this voucher: reserved, delivered, released and given back.",
