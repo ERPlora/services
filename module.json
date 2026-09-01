@@ -102,7 +102,7 @@
     }
   ],
   "settings": {
-    "title": "Servicios",
+    "title": "Services",
     "icon": "briefcase-outline",
     "schema": "schemas/settings_update.json",
     "get": "services.settings.get",

@@ -16,6 +16,35 @@
       "label": "Bonos y paquetes"
     }
   },
+  "settings": {
+    "title": "Servicios",
+    "fields": {
+      "default_duration": {
+        "label": "Duración por defecto (min)"
+      },
+      "default_buffer_time": {
+        "label": "Tiempo de margen por defecto (min)"
+      },
+      "default_tax_category_key": {
+        "label": "Tipo de IVA por defecto"
+      },
+      "show_prices": {
+        "label": "Mostrar precios"
+      },
+      "show_duration": {
+        "label": "Mostrar duración"
+      },
+      "allow_online_booking": {
+        "label": "Permitir reserva online"
+      },
+      "include_tax_in_price": {
+        "label": "Precios con IVA incluido"
+      },
+      "currency": {
+        "label": "Moneda"
+      }
+    }
+  },
   "ui": {
     "title": "Servicios",
     "colName": "Nombre",
