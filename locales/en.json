@@ -15,6 +15,35 @@
       "label": "Packages"
     }
   },
+  "settings": {
+    "title": "Services",
+    "fields": {
+      "default_duration": {
+        "label": "Default duration (min)"
+      },
+      "default_buffer_time": {
+        "label": "Default buffer time (min)"
+      },
+      "default_tax_category_key": {
+        "label": "Default VAT rate"
+      },
+      "show_prices": {
+        "label": "Show prices"
+      },
+      "show_duration": {
+        "label": "Show duration"
+      },
+      "allow_online_booking": {
+        "label": "Allow online booking"
+      },
+      "include_tax_in_price": {
+        "label": "Prices include VAT"
+      },
+      "currency": {
+        "label": "Currency"
+      }
+    }
+  },
   "ui": {
     "title": "Services",
     "colName": "Name",
