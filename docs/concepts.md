@@ -118,6 +118,19 @@ After settling, it refuses: `services.hold_not_releasable`. Giving that session 
 not an undo, and it goes through its own audited door. Release and settle are the same conditional
 UPDATE over the same row, so they can never both win.
 
+**And the cart giving up on the line frees it too, on the spot** (services#84). Take a covered line
+out of the cart, or cancel the whole ticket, and the session comes back within a second — not when
+the deadline sweeps it a day later. It arrives by EVENT, never by a button: the tender component is
+mounted per line, so it is torn down *with* the line and cannot let go of anything, and it could not
+tell that tear-down apart from the one that happens when the payment sheet closes, where the hold
+must survive. What knows is the server, so `sales` raises `sales.order.line_removed` and
+`sales.order.voided` where the fact happens and `services` listens — the same channel
+`sale.completed` already uses to settle, and the reason it works with no screen mounted at all: a
+cart cleared from another device, a tablet that died, a ticket voided with the sheet closed. Both
+listeners are one conditional UPDATE, so a redelivered event cannot move the counter twice, and both
+stamp `release_reason = 'released'`: removing the line is the cashier **deciding**, which the ledger
+has to tell apart from a checkout nobody came back to.
+
 ## …and a PAID session can be given back when the sale is returned
 
 `services.packages.refund_redemption` is that door. It soft-deletes the redemption — which is what

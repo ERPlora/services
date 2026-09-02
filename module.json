@@ -900,6 +900,20 @@
         }
       ]
     },
+    "services._on_order_line_removed": {
+      "permission": "services.hold_package",
+      "transaction": true,
+      "sql": [
+        "commands/hold_release_on_line_removed.sql"
+      ]
+    },
+    "services._on_order_voided": {
+      "permission": "services.hold_package",
+      "transaction": true,
+      "sql": [
+        "commands/hold_release_on_checkout_voided.sql"
+      ]
+    },
     "services.packages.expire_holds": {
       "permission": "services.hold_package",
       "transaction": true,
@@ -945,6 +959,12 @@
     "listen": {
       "sale.completed": {
         "command": "services._on_sale_completed"
+      },
+      "sales.order.line_removed": {
+        "command": "services._on_order_line_removed"
+      },
+      "sales.order.voided": {
+        "command": "services._on_order_voided"
       }
     },
     "emits": [
