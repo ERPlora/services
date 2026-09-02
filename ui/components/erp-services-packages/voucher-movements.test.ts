@@ -1,15 +1,18 @@
 // services#71 — the voucher's MOVEMENTS are consultable from its sheet (ADR-0386).
+// services#76 — and they arrive a PAGE at a time.
 //
 // «El movimiento es auditable y consultable desde la ficha del bono — no un decremento silencioso»
 // is half the issue, and it is the half a database cannot deliver on its own: a refund that only
 // exists as a soft-deleted row nobody can look at is exactly Mindbody's failure with better
 // bookkeeping. So the packages screen grows one row action that opens the voucher's ledger —
-// held, consumed, released and REFUNDED, with who, when and against which return document.
+// held, consumed, released, expired and REFUNDED, with who, when and against which return document.
 //
 // What is asserted here is the part that breaks silently: that the screen asks for the movements
-// with the voucher it was opened on, that it paints the three states a real screen has (loading,
-// empty, error) instead of only the happy path, and that a refund is rendered as a refund — with
-// its author and its document — rather than as one more consumed session.
+// with the voucher it was opened on, that it asks for ONE PAGE of them instead of the whole ledger
+// (`queryAll` walks every page and hands a tablet thousands of rows — services#76), that «load
+// more» ADDS to what is on screen instead of replacing it, that it paints the three states a real
+// screen has (loading, empty, error) instead of only the happy path, and that a refund is rendered
+// as a refund — with its author and its document — rather than as one more consumed session.
 import { beforeEach, describe, expect, it } from 'vitest';
 
 const ROWS = [
@@ -44,6 +47,7 @@ const MOVEMENTS = [
     refund_note: 'la clienta cambió de idea',
     refund_expired: 0,
     is_deleted: 1,
+    release_reason: '',
     movement: 'refunded',
   },
   {
@@ -63,22 +67,45 @@ const MOVEMENTS = [
     refund_note: '',
     refund_expired: 0,
     is_deleted: 0,
+    release_reason: '',
     movement: 'consumed',
   },
 ];
 
+/** A session on a checkout nobody ever came back to: a timeout, NOT the cashier's undo. */
+const EXPIRED = {
+  ...MOVEMENTS[1],
+  redemption_id: 'r1',
+  use_index: 0,
+  settled_at: null,
+  sale_id: null,
+  status: 'held',
+  is_deleted: 1,
+  release_reason: 'expired',
+  movement: 'expired',
+};
+
 const asked: { name: string; params: Record<string, unknown> }[] = [];
-let answer: () => Promise<unknown[]>;
+const askedAll: string[] = [];
+let answer: (params: Record<string, unknown>) => Promise<{ rows: unknown[]; total: number }>;
+
+const page = (rows: unknown[], total = rows.length) => async () => ({ rows, total });
 
 beforeEach(() => {
   asked.length = 0;
-  answer = async () => MOVEMENTS;
+  askedAll.length = 0;
+  answer = page(MOVEMENTS);
   (globalThis as Record<string, unknown>).erplora = {
     query: async () => [],
-    queryPage: async () => ({ rows: ROWS, total: 1 }),
-    queryAll: async (name: string, params?: Record<string, unknown>) => {
-      asked.push({ name, params: params ?? {} });
-      if (name === 'services.packages.redemption_history') return answer();
+    queryPage: async (name: string, params?: Record<string, unknown>) => {
+      if (name === 'services.packages.redemption_history') {
+        asked.push({ name, params: params ?? {} });
+        return answer(params ?? {});
+      }
+      return { rows: ROWS, total: 1 };
+    },
+    queryAll: async (name: string) => {
+      askedAll.push(name);
       return [];
     },
     command: async () => ({}),
@@ -98,9 +125,11 @@ type Mounted = HTMLElement & {
   actions: { id: string }[];
   movementsOf: { id: string; name: string } | null;
   movements: Record<string, unknown>[];
+  movementsTotal: number;
   movementsLoading: boolean;
   movementsError: string;
   onRowAction(ev: CustomEvent<{ actionId: string; row: Record<string, unknown> }>): Promise<void>;
+  loadMoreMovements(): Promise<void>;
 };
 
 async function mount(): Promise<Mounted> {
@@ -138,7 +167,7 @@ describe("the voucher's movements are one click from its row", () => {
     await open(el);
     const call = asked.find((a) => a.name === 'services.packages.redemption_history');
     expect(call).toBeDefined();
-    expect(call?.params).toEqual({ package_id: 'p1' });
+    expect(call?.params.params).toEqual({ package_id: 'p1' });
     expect(el.movementsOf?.name).toBe('Bono 5 cortes');
   });
 
@@ -155,8 +184,20 @@ describe("the voucher's movements are one click from its row", () => {
     expect(text).toContain('return-7');
   });
 
+  it('tells a session nobody came back for apart from one the cashier undid', async () => {
+    // Migration 014 added `release_reason` exactly so the ledger could tell them apart; a screen
+    // with no label for `expired` would print a raw key at a salon, or nothing at all.
+    answer = page([EXPIRED]);
+    const el = await mount();
+    await open(el);
+    await el.updateComplete;
+    const text = el.shadowRoot.textContent ?? '';
+    expect(text).toContain('ui.movement.expired');
+    expect(text).not.toContain('ui.movement.released');
+  });
+
   it('says so when the voucher has no movements yet, instead of showing an empty box', async () => {
-    answer = async () => [];
+    answer = page([]);
     const el = await mount();
     await open(el);
     await el.updateComplete;
@@ -176,15 +217,72 @@ describe("the voucher's movements are one click from its row", () => {
   });
 
   it('is loading before it has an answer, and not after', async () => {
-    let release: (rows: unknown[]) => void = () => {};
-    answer = () => new Promise<unknown[]>((r) => (release = r));
+    let release: (p: { rows: unknown[]; total: number }) => void = () => {};
+    answer = () => new Promise((r) => (release = r));
     const el = await mount();
     const pending = open(el);
     await el.updateComplete;
     expect(el.movementsLoading).toBe(true);
-    release(MOVEMENTS);
+    release({ rows: MOVEMENTS, total: MOVEMENTS.length });
     await pending;
     await el.updateComplete;
     expect(el.movementsLoading).toBe(false);
+  });
+});
+
+// ── services#76: a ledger with two years of movements is read a page at a time ────────────────
+describe('the ledger arrives a page at a time', () => {
+  it('asks for a PAGE, never for the whole ledger', async () => {
+    const el = await mount();
+    await open(el);
+    // `queryAll` walks every page of a list query and hands back the lot: on the star voucher of
+    // a salon after two years that is thousands of rows in one response, on a tablet.
+    expect(askedAll).not.toContain('services.packages.redemption_history');
+    expect(asked[0].params.offset).toBe(0);
+  });
+
+  it('keeps the movements already on screen when it brings the next page', async () => {
+    answer = async (params) =>
+      Number(params.offset ?? 0) === 0
+        ? { rows: MOVEMENTS, total: 3 }
+        : { rows: [EXPIRED], total: 3 };
+    const el = await mount();
+    await open(el);
+    await el.updateComplete;
+    expect(el.movements.map((m) => m.redemption_id)).toEqual(['r3', 'r2']);
+    expect(el.movementsTotal).toBe(3);
+
+    await el.loadMoreMovements();
+    await el.updateComplete;
+    expect(asked[1].params.offset).toBe(2);
+    expect(el.movements.map((m) => m.redemption_id)).toEqual(['r3', 'r2', 'r1']);
+  });
+
+  it('offers «load more» only while there is more, and says how much is left', async () => {
+    answer = page(MOVEMENTS, 3);
+    const el = await mount();
+    await open(el);
+    await el.updateComplete;
+    let text = el.shadowRoot.textContent ?? '';
+    expect(text).toContain('ui.movementsMore');
+    expect(text).toContain('"shown":2');
+    expect(text).toContain('"total":3');
+
+    answer = page([EXPIRED], 3);
+    await el.loadMoreMovements();
+    await el.updateComplete;
+    text = el.shadowRoot.textContent ?? '';
+    expect(text).not.toContain('ui.movementsMore');
+  });
+
+  it('reopening the sheet starts the ledger again instead of stacking it', async () => {
+    answer = page(MOVEMENTS, 3);
+    const el = await mount();
+    await open(el);
+    await el.updateComplete;
+    await open(el);
+    await el.updateComplete;
+    expect(el.movements.map((m) => m.redemption_id)).toEqual(['r3', 'r2']);
+    expect(asked[asked.length - 1].params.offset).toBe(0);
   });
 });

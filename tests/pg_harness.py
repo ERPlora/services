@@ -205,7 +205,10 @@ def as_the_runtime_applies(sql: str, kind: str) -> str:
     """The SQL the hub really executes. Only a `contract` is rewritten; everything else runs as written."""
     if kind != "contract":
         return sql
-    return ";\n".join(set_aside_instead_of_dropping(s) for s in split_statements(sql)) + ";"
+    return (
+        ";\n".join(set_aside_instead_of_dropping(s) for s in split_statements(sql))
+        + ";"
+    )
 
 
 class ScratchDb:
@@ -310,7 +313,9 @@ def lower_bridge(name: str, args: list[str]) -> str | None:
     if name == "erp_dt" and len(args) == 1:
         return f"(({args[0]})::timestamptz)"
     if name == "erp_dateadd" and len(args) == 3:
-        return f"(({args[0]})::timestamptz + (({args[1]}) || ' ' || {args[2]})::interval)"
+        return (
+            f"(({args[0]})::timestamptz + (({args[1]}) || ' ' || {args[2]})::interval)"
+        )
     return None
 
 
@@ -342,7 +347,7 @@ def lower_bridges(sql: str) -> str:
         args.append(inner[start:])
         native = lower_bridge(m.group(1).lower(), [a.strip() for a in args])
         if native is None:
-            raise RuntimeError(f"cannot lower the bridge call {sql[m.start():i]!r}")
+            raise RuntimeError(f"cannot lower the bridge call {sql[m.start() : i]!r}")
         sql = sql[: m.start()] + native + sql[i:]
 
 
@@ -370,5 +375,110 @@ def query_sql(name: str, params: dict, hub: str = HUB) -> str:
     p = dict(params)
     p.setdefault("hub_id", hub)
     p.setdefault("now", NOW)
-    sql = (MODULE_DIR / MANIFEST["queries"][name]["sql"]).read_text().rstrip().rstrip(";")
+    sql = (
+        (MODULE_DIR / MANIFEST["queries"][name]["sql"]).read_text().rstrip().rstrip(";")
+    )
     return lower_bridges(bind(sql, p))
+
+
+# ── the paginated LIST engine (crates/runtime/src/queries.rs::run_list) ──────
+#
+# A query that declares a `list` block is NOT served as written: the runtime wraps the base SELECT
+# as a derived table and composes search + per-column filters + a whitelisted ORDER BY +
+# LIMIT/OFFSET around it, returning `{rows,total,limit,offset}`. `ScratchDb.run_query` runs the
+# base SELECT alone, so a battery that used it would prove the query is correct and prove NOTHING
+# about the page a screen actually receives — the filter that never composed, the sort column the
+# whitelist dropped, the total that counts the page instead of the set.
+#
+# What is reproduced, statement for statement, and only that:
+#   * the wrapper `SELECT sub.*, COUNT(*) OVER() AS _total FROM ( base ) AS sub …`;
+#   * `search` over the declared columns and `eq`/`like`/`range` per column, emitted ONLY when the
+#     caller sent the parameter (an absent filter is «no condition», never `IS NULL`) and in the
+#     manifest's own key order, which is the `BTreeMap` the runtime iterates;
+#   * `CAST(… AS TEXT)` on search/eq/like and NO cast on `range`, which is what makes a `'1'` from
+#     an HTML <select> match an INTEGER column in Postgres;
+#   * the ORDER BY whitelist: a `sort` outside `list.sort` falls back to `default_sort`, then to
+#     the first sortable column — never interpolated raw;
+#   * `limit` from the caller or the manifest's `page_size`, and `offset` defaulting to 0.
+
+IDENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
+
+
+def list_page(db: "ScratchDb", name: str, params: dict, hub: str = HUB) -> dict:
+    """Serve a manifest LIST query the way the runtime serves it, and return its page."""
+    q = MANIFEST["queries"][name]
+    spec = q.get("list")
+    if spec is None:
+        raise RuntimeError(
+            f"{name} declares no `list` block: it is a simple query, use run_query()"
+        )
+    p = dict(params)
+    p.setdefault("hub_id", hub)
+    p.setdefault("now", NOW)
+    base = (MODULE_DIR / q["sql"]).read_text().rstrip().rstrip(";")
+    base = lower_bridges(bind(base, p))
+
+    def sent(key: str) -> bool:
+        return p.get(key) is not None
+
+    conds: list[str] = []
+    search_cols = [c for c in spec.get("search", []) if IDENT.match(c)]
+    if search_cols and sent("search"):
+        needle = literal(p["search"])
+        conds.append(
+            "("
+            + " OR ".join(
+                f"CAST(sub.{c} AS TEXT) LIKE '%' || CAST({needle} AS TEXT) || '%'"
+                for c in search_cols
+            )
+            + ")"
+        )
+    for col, f in sorted(spec.get("filters", {}).items()):
+        if not IDENT.match(col):
+            continue
+        op = f["op"]
+        if op == "eq" and sent(f"f_{col}"):
+            conds.append(
+                f"CAST(sub.{col} AS TEXT) = CAST({literal(p[f'f_{col}'])} AS TEXT)"
+            )
+        elif op == "like" and sent(f"f_{col}"):
+            conds.append(
+                f"CAST(sub.{col} AS TEXT) LIKE '%' || CAST({literal(p[f'f_{col}'])} AS TEXT) || '%'"
+            )
+        elif op == "range":
+            if sent(f"f_{col}_from"):
+                conds.append(f"sub.{col} >= {literal(p[f'f_{col}_from'])}")
+            if sent(f"f_{col}_to"):
+                conds.append(f"sub.{col} <= {literal(p[f'f_{col}_to'])}")
+
+    whitelist = spec.get("sort", [])
+    requested = p.get("sort")
+    sort_col = requested if requested in whitelist else spec.get("default_sort")
+    if sort_col is None and whitelist:
+        sort_col = whitelist[0]
+    if sort_col is not None and not IDENT.match(sort_col):
+        sort_col = None
+    direction = str(p.get("dir") or spec.get("default_dir") or "asc").lower()
+    direction = "DESC" if direction == "desc" else "ASC"
+
+    limit = int(p.get("limit") or spec.get("page_size", 50))
+    offset = int(p.get("offset") or 0)
+
+    where = f" WHERE {' AND '.join(conds)}" if conds else ""
+    order = f" ORDER BY sub.{sort_col} {direction}" if sort_col else ""
+    sql = (
+        f"SELECT sub.*, COUNT(*) OVER() AS _total FROM ( {base} ) AS sub"
+        f"{where}{order} LIMIT {limit} OFFSET {offset}"
+    )
+    out = db.psql(
+        [
+            "-tAc",
+            "SELECT COALESCE(json_agg(t ORDER BY t.ord), '[]'::json) FROM ("
+            f"SELECT row_number() OVER () AS ord, * FROM ({sql}) w) t",
+        ],
+        db=db.name,
+    )
+    raw = json.loads(out.strip() or "[]")
+    total = int(raw[0]["_total"]) if raw else 0
+    rows = [{k: v for k, v in r.items() if k not in ("_total", "ord")} for r in raw]
+    return {"rows": rows, "total": total, "limit": limit, "offset": offset}

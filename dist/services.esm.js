@@ -3553,6 +3553,35 @@ var es_default = {
       label: "Bonos y paquetes"
     }
   },
+  settings: {
+    title: "Servicios",
+    fields: {
+      default_duration: {
+        label: "Duraci\xF3n por defecto (min)"
+      },
+      default_buffer_time: {
+        label: "Tiempo de margen por defecto (min)"
+      },
+      default_tax_category_key: {
+        label: "Tipo de IVA por defecto"
+      },
+      show_prices: {
+        label: "Mostrar precios"
+      },
+      show_duration: {
+        label: "Mostrar duraci\xF3n"
+      },
+      allow_online_booking: {
+        label: "Permitir reserva online"
+      },
+      include_tax_in_price: {
+        label: "Precios con IVA incluido"
+      },
+      currency: {
+        label: "Moneda"
+      }
+    }
+  },
   ui: {
     title: "Servicios",
     colName: "Nombre",
@@ -3692,7 +3721,9 @@ var es_default = {
     },
     actionMovements: "Movimientos",
     movementsTitle: "Movimientos del bono",
-    movementsHint: "todas las sesiones de este bono: reservadas, entregadas, liberadas y devueltas.",
+    movementsHint: "todas las sesiones de este bono: reservadas, entregadas, liberadas, caducadas y devueltas.",
+    movementsMore: "Cargar m\xE1s",
+    movementsCount: "Se muestran {shown} de {total}",
     movementCustomer: "Cliente",
     movementSale: "Venta",
     movementNoService: "Sin servicio en la l\xEDnea",
@@ -3706,7 +3737,8 @@ var es_default = {
       held: "Reservada",
       consumed: "Entregada",
       released: "Liberada",
-      refunded: "Devuelta"
+      refunded: "Devuelta",
+      expired: "Caducada"
     }
   },
   errors: {
@@ -3750,6 +3782,35 @@ var en_default = {
     },
     packages: {
       label: "Packages"
+    }
+  },
+  settings: {
+    title: "Services",
+    fields: {
+      default_duration: {
+        label: "Default duration (min)"
+      },
+      default_buffer_time: {
+        label: "Default buffer time (min)"
+      },
+      default_tax_category_key: {
+        label: "Default VAT rate"
+      },
+      show_prices: {
+        label: "Show prices"
+      },
+      show_duration: {
+        label: "Show duration"
+      },
+      allow_online_booking: {
+        label: "Allow online booking"
+      },
+      include_tax_in_price: {
+        label: "Prices include VAT"
+      },
+      currency: {
+        label: "Currency"
+      }
     }
   },
   ui: {
@@ -3891,7 +3952,9 @@ var en_default = {
     },
     actionMovements: "Movements",
     movementsTitle: "Voucher movements",
-    movementsHint: "every session of this voucher: reserved, delivered, released and given back.",
+    movementsHint: "every session of this voucher: reserved, delivered, released, expired and given back.",
+    movementsMore: "Load more",
+    movementsCount: "Showing {shown} of {total}",
     movementCustomer: "Customer",
     movementSale: "Sale",
     movementNoService: "No service on the line",
@@ -3905,7 +3968,8 @@ var en_default = {
       held: "Reserved",
       consumed: "Delivered",
       released: "Released",
-      refunded: "Given back"
+      refunded: "Given back",
+      expired: "Expired"
     }
   },
   errors: {
@@ -4840,6 +4904,7 @@ var ErpServicesPackages = class extends i3 {
     this.deleteTarget = null;
     this.movementsOf = null;
     this.movements = [];
+    this.movementsTotal = 0;
     this.movementsLoading = false;
     this.movementsError = "";
     this.onLocaleChange = () => this.requestUpdate();
@@ -4855,6 +4920,7 @@ var ErpServicesPackages = class extends i3 {
     .lines-title { font-size: 0.85rem; font-weight: 600; margin: 0.3rem 0 0; }
     .movement h3 { display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; }
     .movement .refund { font-size: 0.82rem; opacity: 0.85; }
+    .more { font-size: 0.82rem; opacity: 0.75; margin: 0.6rem 0 0; text-align: center; }
   `;
   }
   get columns() {
@@ -4971,14 +5037,44 @@ var ErpServicesPackages = class extends i3 {
       this.deleteTarget = p4;
     }
   }
-  /** Open the voucher's ledger and load it. The three states are painted, not only the happy one. */
+  /** Open the voucher's ledger and load its FIRST page. The three states are painted, not only the
+   *  happy one. Reopening starts from the top: the sheet is a fresh read of the ledger, never the
+   *  previous one with a second copy stacked underneath. */
   async openMovements(p4) {
     this.movementsOf = { id: p4.id, name: p4.name };
     this.movements = [];
+    this.movementsTotal = 0;
     this.movementsError = "";
+    await this.loadMovementsPage();
+  }
+  /**
+   * One more page of the ledger, ADDED to what is on screen (services#76).
+   *
+   * 🔴 It is `queryPage`, not `queryAll`, and that is the whole issue: `queryAll` walks EVERY page
+   * of a list query and hands back the lot. For a voucher created last week that is the same
+   * thing; for the star voucher of a salon after two years — N customers × `max_uses` sessions,
+   * plus the releases, the expiries and the refunds, which count too because the query includes
+   * the soft-deleted rows on purpose — it is hundreds or thousands of rows in one response, on a
+   * tablet. The page size is the module's own (`list.page_size` in the manifest): the screen does
+   * not repeat the number, it just asks for what comes after what it already has.
+   */
+  async loadMoreMovements() {
+    if (this.movementsLoading || this.movements.length >= this.movementsTotal) return;
+    await this.loadMovementsPage();
+  }
+  async loadMovementsPage() {
+    const target = this.movementsOf;
+    if (!target) return;
     this.movementsLoading = true;
+    this.movementsError = "";
     try {
-      this.movements = await erplora3().queryAll("services.packages.redemption_history", { package_id: p4.id }) ?? [];
+      const page = await erplora3().queryPage("services.packages.redemption_history", {
+        offset: this.movements.length,
+        params: { package_id: target.id }
+      });
+      if (this.movementsOf?.id !== target.id) return;
+      this.movements = [...this.movements, ...page?.rows ?? []];
+      this.movementsTotal = page?.total ?? this.movements.length;
     } catch (e5) {
       this.movementsError = domainMessage(e5, erplora3().locale, erplora3().t(CATALOG3, "ui.errorMovements"));
     } finally {
@@ -5078,13 +5174,28 @@ var ErpServicesPackages = class extends i3 {
     const d3 = new Date(value);
     return Number.isNaN(d3.getTime()) ? value : d3.toLocaleString(erplora3().locale, { dateStyle: "short", timeStyle: "short" });
   }
+  /** The colour of a movement. `expired` shares `released`'s neutral tone — the session is back
+   *  either way — and only the LABEL tells a timeout from the cashier's undo (migration 014). */
+  movementTone(movement) {
+    switch (movement) {
+      case "refunded":
+        return "warning";
+      case "released":
+      case "expired":
+        return "neutral";
+      case "held":
+        return "info";
+      default:
+        return "success";
+    }
+  }
   renderMovement(m4) {
     const t5 = (k2, p4) => erplora3().t(CATALOG3, k2, p4);
     const refunded = m4.movement === "refunded";
     return b2`<ion-item class="movement">
       <ion-label class="ion-text-wrap">
         <h3>
-          <ok-status-pill size="sm" tone=${refunded ? "warning" : m4.movement === "released" ? "neutral" : m4.movement === "held" ? "info" : "success"}>${t5(`ui.movement.${m4.movement}`)}</ok-status-pill>
+          <ok-status-pill size="sm" tone=${this.movementTone(m4.movement)}>${t5(`ui.movement.${m4.movement}`)}</ok-status-pill>
           ${m4.service_name ?? t5("ui.movementNoService")}
         </h3>
         <p>${this.stamp(m4.redeemed_at)} · ${t5("ui.movementCustomer")}: ${m4.customer_id}${m4.sale_id ? b2` · ${t5("ui.movementSale")}: ${m4.sale_id}` : A}</p>
@@ -5111,7 +5222,14 @@ var ErpServicesPackages = class extends i3 {
       <ion-content class="ion-padding">
         <!-- Self-styled: ion-modal is reparented to <body>, this component's CSS does not reach it. -->
         <p><b>${this.movementsOf?.name ?? ""}</b> — ${t5("ui.movementsHint")}</p>
-        ${this.movementsError ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.movementsError}</ok-inline-feedback>` : this.movementsLoading ? b2`<ok-inline-feedback tone="neutral" icon="time-outline">${t5("ui.loading")}</ok-inline-feedback>` : this.movements.length === 0 ? b2`<ok-inline-feedback tone="neutral" icon="information-circle-outline">${t5("ui.emptyMovements")}</ok-inline-feedback>` : b2`<ion-list lines="full">${this.movements.map((m4) => this.renderMovement(m4))}</ion-list>`}
+        <!-- The error goes ABOVE the list, not instead of it: a page that failed to load must not
+             take away the movements already on screen. -->
+        ${this.movementsError ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.movementsError}</ok-inline-feedback>` : A}
+        ${this.movements.length === 0 ? this.movementsLoading ? b2`<ok-inline-feedback tone="neutral" icon="time-outline">${t5("ui.loading")}</ok-inline-feedback>` : this.movementsError ? A : b2`<ok-inline-feedback tone="neutral" icon="information-circle-outline">${t5("ui.emptyMovements")}</ok-inline-feedback>` : b2`<ion-list lines="full">${this.movements.map((m4) => this.renderMovement(m4))}</ion-list>
+              ${this.movements.length < this.movementsTotal ? b2`<p class="more">${t5("ui.movementsCount", { shown: this.movements.length, total: this.movementsTotal })}</p>
+                    <ion-button expand="block" fill="clear" ?disabled=${this.movementsLoading} @click=${() => this.loadMoreMovements()}>
+                      ${this.movementsLoading ? t5("ui.loading") : t5("ui.movementsMore")}
+                    </ion-button>` : A}`}
       </ion-content>
     </ion-modal>`;
   }
@@ -5185,6 +5303,9 @@ __decorateClass([
 __decorateClass([
   r5()
 ], ErpServicesPackages.prototype, "movements", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "movementsTotal", 2);
 __decorateClass([
   r5()
 ], ErpServicesPackages.prototype, "movementsLoading", 2);

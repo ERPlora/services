@@ -143,14 +143,23 @@ employee has this.
 ### The voucher's movements (`erp-services-packages` → «Movements»)
 
 The row action next to «edit» on the packages screen, gated by `services.view_package_balance`. It
-opens the voucher's ledger — every session it has moved: **reserved**, **delivered**, **released**
-and **given back** — with the customer, the sale and, for a return, who returned it, when and
-against which document. A session that came back into an already expired voucher says so, because a
-session that is on the books but cannot be spent is exactly the thing an operator must not discover
-later.
+opens the voucher's ledger — every session it has moved: **reserved**, **delivered**, **released**,
+**expired** and **given back** — with the customer, the sale and, for a return, who returned it,
+when and against which document. A session that came back into an already expired voucher says so,
+because a session that is on the books but cannot be spent is exactly the thing an operator must not
+discover later. «Released» and «expired» are different rows on purpose: the first is the cashier
+undoing a hold, the second is a checkout nobody ever came back to.
 
 It reads `services.packages.redemption_history`, which includes the soft-deleted rows on purpose:
-that is where releases and refunds live. Loading, empty and error are painted, not assumed.
+that is where releases, expiries and refunds live. Loading, empty and error are painted, not
+assumed.
+
+**It arrives a page at a time** (services#76). The read is a paginated `list` query and the sheet
+asks for one page with `queryPage`, showing «Load more» with the count of what is left. The star
+voucher of a salon after two years is N customers × `max_uses` sessions plus every release, expiry
+and refund, and answering all of it in one response is a ceiling nobody sees until the business has
+been running a while. Newest movement first; a caller may also filter by customer, by kind of
+movement (`movement = refunded` is the audit of what the salon gave back) or by date.
 
 ### Pay a line with a voucher (`erp-services-voucher-tender`)
 

@@ -65,7 +65,8 @@ interface Movement {
   refund_ref: string | null;
   refund_note: string;
   refund_expired: number;
-  movement: 'held' | 'consumed' | 'released' | 'refunded' | string;
+  release_reason: string;
+  movement: 'held' | 'consumed' | 'released' | 'expired' | 'refunded' | string;
 }
 
 /** Row of `services.services.list` (the selector of the lines). */
@@ -162,6 +163,7 @@ export class ErpServicesPackages extends LitElement {
     .lines-title { font-size: 0.85rem; font-weight: 600; margin: 0.3rem 0 0; }
     .movement h3 { display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; }
     .movement .refund { font-size: 0.82rem; opacity: 0.85; }
+    .more { font-size: 0.82rem; opacity: 0.75; margin: 0.6rem 0 0; text-align: center; }
   `;
 
   @state() form: PackageForm = { ...EMPTY_FORM };
@@ -175,6 +177,8 @@ export class ErpServicesPackages extends LitElement {
   /** Voucher whose ledger is open; `null` = the sheet is closed. */
   @state() movementsOf: { id: string; name: string } | null = null;
   @state() movements: Movement[] = [];
+  /** Movements the voucher has IN TOTAL, which is almost never how many are on screen. */
+  @state() movementsTotal = 0;
   @state() movementsLoading = false;
   @state() movementsError = '';
 
@@ -309,15 +313,48 @@ export class ErpServicesPackages extends LitElement {
     }
   }
 
-  /** Open the voucher's ledger and load it. The three states are painted, not only the happy one. */
+  /** Open the voucher's ledger and load its FIRST page. The three states are painted, not only the
+   *  happy one. Reopening starts from the top: the sheet is a fresh read of the ledger, never the
+   *  previous one with a second copy stacked underneath. */
   private async openMovements(p: Package): Promise<void> {
     this.movementsOf = { id: p.id, name: p.name };
     this.movements = [];
+    this.movementsTotal = 0;
     this.movementsError = '';
+    await this.loadMovementsPage();
+  }
+
+  /**
+   * One more page of the ledger, ADDED to what is on screen (services#76).
+   *
+   * 🔴 It is `queryPage`, not `queryAll`, and that is the whole issue: `queryAll` walks EVERY page
+   * of a list query and hands back the lot. For a voucher created last week that is the same
+   * thing; for the star voucher of a salon after two years — N customers × `max_uses` sessions,
+   * plus the releases, the expiries and the refunds, which count too because the query includes
+   * the soft-deleted rows on purpose — it is hundreds or thousands of rows in one response, on a
+   * tablet. The page size is the module's own (`list.page_size` in the manifest): the screen does
+   * not repeat the number, it just asks for what comes after what it already has.
+   */
+  async loadMoreMovements(): Promise<void> {
+    if (this.movementsLoading || this.movements.length >= this.movementsTotal) return;
+    await this.loadMovementsPage();
+  }
+
+  private async loadMovementsPage(): Promise<void> {
+    const target = this.movementsOf;
+    if (!target) return;
     this.movementsLoading = true;
+    this.movementsError = '';
     try {
-      this.movements =
-        (await erplora().queryAll<Movement>('services.packages.redemption_history', { package_id: p.id })) ?? [];
+      const page = await erplora().queryPage<Movement>('services.packages.redemption_history', {
+        offset: this.movements.length,
+        params: { package_id: target.id },
+      });
+      // The sheet may have been closed (or moved to another voucher) while the page was in
+      // flight; painting it then would stack one voucher's ledger under another's name.
+      if (this.movementsOf?.id !== target.id) return;
+      this.movements = [...this.movements, ...(page?.rows ?? [])];
+      this.movementsTotal = page?.total ?? this.movements.length;
     } catch (e) {
       this.movementsError = domainMessage(e, erplora().locale, erplora().t(CATALOG, 'ui.errorMovements'));
     } finally {
@@ -431,13 +468,29 @@ export class ErpServicesPackages extends LitElement {
       : d.toLocaleString(erplora().locale, { dateStyle: 'short', timeStyle: 'short' });
   }
 
+  /** The colour of a movement. `expired` shares `released`'s neutral tone — the session is back
+   *  either way — and only the LABEL tells a timeout from the cashier's undo (migration 014). */
+  private movementTone(movement: string): string {
+    switch (movement) {
+      case 'refunded':
+        return 'warning';
+      case 'released':
+      case 'expired':
+        return 'neutral';
+      case 'held':
+        return 'info';
+      default:
+        return 'success';
+    }
+  }
+
   private renderMovement(m: Movement) {
     const t = (k: string, p?: Record<string, unknown>): string => erplora().t(CATALOG, k, p);
     const refunded = m.movement === 'refunded';
     return html`<ion-item class="movement">
       <ion-label class="ion-text-wrap">
         <h3>
-          <ok-status-pill size="sm" tone=${refunded ? 'warning' : m.movement === 'released' ? 'neutral' : m.movement === 'held' ? 'info' : 'success'}>${t(`ui.movement.${m.movement}`)}</ok-status-pill>
+          <ok-status-pill size="sm" tone=${this.movementTone(m.movement)}>${t(`ui.movement.${m.movement}`)}</ok-status-pill>
           ${m.service_name ?? t('ui.movementNoService')}
         </h3>
         <p>${this.stamp(m.redeemed_at)} · ${t('ui.movementCustomer')}: ${m.customer_id}${m.sale_id ? html` · ${t('ui.movementSale')}: ${m.sale_id}` : nothing}</p>
@@ -469,13 +522,24 @@ export class ErpServicesPackages extends LitElement {
       <ion-content class="ion-padding">
         <!-- Self-styled: ion-modal is reparented to <body>, this component's CSS does not reach it. -->
         <p><b>${this.movementsOf?.name ?? ''}</b> — ${t('ui.movementsHint')}</p>
+        <!-- The error goes ABOVE the list, not instead of it: a page that failed to load must not
+             take away the movements already on screen. -->
         ${this.movementsError
           ? html`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.movementsError}</ok-inline-feedback>`
-          : this.movementsLoading
+          : nothing}
+        ${this.movements.length === 0
+          ? this.movementsLoading
             ? html`<ok-inline-feedback tone="neutral" icon="time-outline">${t('ui.loading')}</ok-inline-feedback>`
-            : this.movements.length === 0
-              ? html`<ok-inline-feedback tone="neutral" icon="information-circle-outline">${t('ui.emptyMovements')}</ok-inline-feedback>`
-              : html`<ion-list lines="full">${this.movements.map((m) => this.renderMovement(m))}</ion-list>`}
+            : this.movementsError
+              ? nothing
+              : html`<ok-inline-feedback tone="neutral" icon="information-circle-outline">${t('ui.emptyMovements')}</ok-inline-feedback>`
+          : html`<ion-list lines="full">${this.movements.map((m) => this.renderMovement(m))}</ion-list>
+              ${this.movements.length < this.movementsTotal
+                ? html`<p class="more">${t('ui.movementsCount', { shown: this.movements.length, total: this.movementsTotal })}</p>
+                    <ion-button expand="block" fill="clear" ?disabled=${this.movementsLoading} @click=${() => this.loadMoreMovements()}>
+                      ${this.movementsLoading ? t('ui.loading') : t('ui.movementsMore')}
+                    </ion-button>`
+                : nothing}`}
       </ion-content>
     </ion-modal>`;
   }

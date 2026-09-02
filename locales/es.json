@@ -184,7 +184,9 @@
     },
     "actionMovements": "Movimientos",
     "movementsTitle": "Movimientos del bono",
-    "movementsHint": "todas las sesiones de este bono: reservadas, entregadas, liberadas y devueltas.",
+    "movementsHint": "todas las sesiones de este bono: reservadas, entregadas, liberadas, caducadas y devueltas.",
+    "movementsMore": "Cargar más",
+    "movementsCount": "Se muestran {shown} de {total}",
     "movementCustomer": "Cliente",
     "movementSale": "Venta",
     "movementNoService": "Sin servicio en la línea",
@@ -198,7 +200,8 @@
       "held": "Reservada",
       "consumed": "Entregada",
       "released": "Liberada",
-      "refunded": "Devuelta"
+      "refunded": "Devuelta",
+      "expired": "Caducada"
     }
   },
   "errors": {
