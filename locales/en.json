@@ -183,7 +183,9 @@
     },
     "actionMovements": "Movements",
     "movementsTitle": "Voucher movements",
-    "movementsHint": "every session of this voucher: reserved, delivered, released and given back.",
+    "movementsHint": "every session of this voucher: reserved, delivered, released, expired and given back.",
+    "movementsMore": "Load more",
+    "movementsCount": "Showing {shown} of {total}",
     "movementCustomer": "Customer",
     "movementSale": "Sale",
     "movementNoService": "No service on the line",
@@ -197,7 +199,8 @@
       "held": "Reserved",
       "consumed": "Delivered",
       "released": "Released",
-      "refunded": "Given back"
+      "refunded": "Given back",
+      "expired": "Expired"
     }
   },
   "errors": {

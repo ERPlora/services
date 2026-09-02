@@ -430,8 +430,32 @@
       "permission": "services.view_package_balance",
       "sql": "queries/package_redemption_history.sql",
       "schema": "schemas/package_redemption_history.json",
+      "list": {
+        "sort": [
+          "movement_seq",
+          "redeemed_at",
+          "settled_at",
+          "use_index",
+          "movement",
+          "service_name"
+        ],
+        "default_sort": "movement_seq",
+        "default_dir": "desc",
+        "filters": {
+          "customer_id": {
+            "op": "eq"
+          },
+          "movement": {
+            "op": "eq"
+          },
+          "redeemed_at": {
+            "op": "range"
+          }
+        },
+        "page_size": 50
+      },
       "ai": {
-        "description": "Lists every movement of a voucher — held, consumed, released and refunded — with who did it, when, which sale it belonged to and, for a refund, the return document behind it. Soft-deleted rows are included on purpose: that is where the releases and the refunds live."
+        "description": "Lists, one page at a time, every movement of a voucher — held, consumed, released, expired and refunded — with who did it, when, which sale it belonged to and, for a refund, the return document behind it. Soft-deleted rows are included on purpose: that is where the releases, the expiries and the refunds live, so filtering on movement = refunded is the audit of the sessions a salon gave back. Newest movement first. Filter by customer_id to read one customer's sessions on this voucher, by movement to read one kind of event, and by redeemed_at to cut the ledger by date."
       },
       "expose_api": true
     },

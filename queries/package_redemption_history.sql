@@ -11,17 +11,39 @@
 -- are two ledgers under one template, and without the grant on the row nobody could tell which
 -- session came out of which purchase — which is exactly what an audit of the accrual has to do.
 --
--- Binds: :package_id. The runtime injects :hub_id. There is no `:customer_id` filter on purpose:
--- the screen this feeds is the VOUCHER's sheet, not a customer's, and `customer_id` travels in the
--- row so the caller can group or filter without a second round trip. A customer's balance across
--- vouchers is the other question and it already has its own door, `services.packages.balance`.
+-- Binds: :package_id. The runtime injects :hub_id. Everything else — the page, the order and the
+-- filters — belongs to the runtime's LIST engine, declared in the `list` block of the manifest
+-- (services#76). It used to answer the WHOLE ledger with no `LIMIT`, which is invisible on a
+-- voucher created last week and hundreds or thousands of rows on the star voucher of a salon after
+-- two years, on a tablet. So: no `ORDER BY` and no `LIMIT` here — the engine wraps this SELECT as a
+-- derived table and composes them, and an `ORDER BY` inside a subquery is a sort the outer one
+-- throws away anyway.
 --
--- `movement` is the one derived field, and the order of its branches is the semantics:
+-- A customer's balance across vouchers is the other question and it already has its own door,
+-- `services.packages.balance`; `f_customer_id` here answers «this customer's movements ON THIS
+-- voucher», which is the question the sheet is asked most.
+--
+-- `movement` is the derived field the ledger is read by, and the order of its branches is the
+-- semantics:
 --   * `refunded` — a delivered session that went back because the sale was returned. It wins over
 --     the soft-delete flag, because a refund IS a soft-delete plus a reason;
---   * `released`  — a hold undone before the sale was paid. Nothing was owed and nobody was charged;
---   * `consumed`  — the session was delivered and the sale is settled;
---   * `held`      — the checkout is still open.
+--   * `expired`  — a hold on a checkout nobody ever came back to, swept by the deadline. It also
+--     wins over the plain soft-delete: migration 014 added `release_reason` precisely so this
+--     ledger could tell an operator's undo from a timeout, and while both were printed `released`
+--     a salon read two identical rows for two very different events — and the `movement` filter
+--     would have handed an auditor the timeouts along with the choices;
+--   * `released` — a hold undone before the sale was paid. Nothing was owed and nobody was charged;
+--   * `consumed` — the session was delivered and the sale is settled;
+--   * `held`     — the checkout is still open.
+--
+-- `movement_seq` is the ledger's own cursor, and it exists because the list engine sorts by ONE
+-- column (`crates/runtime/src/queries.rs::run_list`): the composite order this query used to
+-- carry — instant, then ordinal, then id — has to collapse into a single comparable key, or two
+-- movements written in the same instant can swap between two queries and the reader gets one of
+-- them twice and never sees the other. `redeemed_at` is already an ISO-8601 string, so comparing
+-- it as text is comparing it as a date, and `id` is the primary key: the pair is a TOTAL order.
+-- The ordinal is no longer the middle tie-break — it stays in the row for the reader — because
+-- `use_index` is a number and a number padded into a string is one more rule to keep in sync.
 --
 -- The service is LEFT-joined and matched on `hub_id` as well: without that a line pointing at
 -- another hub's service would print its name here (the bug `package_items_list.sql` already had).
@@ -49,15 +71,18 @@ SELECT
     COALESCE(r.refund_note, '')             AS refund_note,
     COALESCE(r.refund_expired, 0)           AS refund_expired,
     r.is_deleted                            AS is_deleted,
+    COALESCE(r.release_reason, '')          AS release_reason,
     r.created_by                            AS created_by,
     CASE
-        WHEN r.refunded_at IS NOT NULL THEN 'refunded'
-        WHEN r.is_deleted = 1          THEN 'released'
-        WHEN r.status = 'consumed'     THEN 'consumed'
+        WHEN r.refunded_at IS NOT NULL             THEN 'refunded'
+        WHEN r.is_deleted = 1
+             AND r.release_reason = 'expired'      THEN 'expired'
+        WHEN r.is_deleted = 1                      THEN 'released'
+        WHEN r.status = 'consumed'                 THEN 'consumed'
         ELSE 'held'
-    END                                     AS movement
+    END                                     AS movement,
+    r.redeemed_at || '|' || r.id            AS movement_seq
 FROM services_package_redemption r
 LEFT JOIN services_service s
        ON s.id = r.service_id AND s.hub_id = r.hub_id
 WHERE r.hub_id = :hub_id AND r.package_id = :package_id
-ORDER BY r.redeemed_at DESC, r.use_index DESC, r.id DESC;

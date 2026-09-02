@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "services.packages.redemption_history params",
-  "description": "Movimientos de un bono: reservas, consumos, liberaciones y DEVOLUCIONES, con quién y cuándo (ADR-0386, services#71). Incluye a propósito las filas soft-deleted, que es donde viven las liberaciones y las devoluciones. El scope hub_id lo inyecta el runtime (§2.5).",
+  "description": "Movimientos de un bono: reservas, consumos, liberaciones, caducidades y DEVOLUCIONES, con quién y cuándo (ADR-0386, services#71/#76). Incluye a propósito las filas soft-deleted, que es donde viven las liberaciones, las caducidades y las devoluciones. Es una query PAGINADA: el vocabulario del motor de listas (limit/offset/sort/dir/search y los filtros f_<columna>) viaja en el mismo payload, y por eso el schema queda ABIERTO — cerrarlo haría que el runtime rechazara la primera página que pidiera cualquier pantalla. El scope hub_id lo inyecta el runtime (§2.5).",
   "type": "object",
-  "additionalProperties": false,
+  "additionalProperties": true,
   "required": ["package_id"],
   "properties": {
     "package_id": { "type": "string", "minLength": 1, "description": "Id del bono/paquete cuyos movimientos se consultan." }
