@@ -20,18 +20,18 @@ CREATE INDEX IF NOT EXISTS ix_services_grant_orphan
 --
 -- 🔴 WHY THE DELETE IS LET THROUGH AND THE MONEY IS KEPT, RATHER THAN THE DELETE BEING REFUSED
 --
--- Decided by the market, not by us (12 references; the full table with its URLs is in the pull
+-- Decided by the market, not by us (12 references — the full table with its URLs is in the pull
 -- request of services#81). There are two schools and they answer different questions:
 --
 --   * REFUSE THE DELETE while the customer holds value — **Vagaro** will not remove a customer who
 --     has «gift cards that are not expired or have a balance, memberships or packages (active or
---     inactive)»; **Lightspeed X-Series** refuses a customer with an owing balance; **Business
---     Central** answers `Blocked`, not delete; **Odoo** cannot delete a contact linked to documents,
+--     inactive)». **Lightspeed X-Series** refuses a customer with an owing balance. **Business
+--     Central** answers `Blocked`, not delete. **Odoo** cannot delete a contact linked to documents,
 --     it archives it.
 --   * LET THE DELETE THROUGH AND KEEP THE MONEY ALIVE AND VISIBLE SOMEWHERE ELSE — **Square**
---     unlinks the gift card from the deleted profile and the balance stays spendable;
+--     unlinks the gift card from the deleted profile and the balance stays spendable,
 --     **Lightspeed**'s store credit report LISTS DELETED CUSTOMERS, which is a door that does not
---     start from the sheet; **Fresha** keeps past sales and recommends blocking over deleting;
+--     start from the sheet. **Fresha** keeps past sales and recommends blocking over deleting,
 --     **Shopify** and **WooCommerce** redact the personal data and keep the row.
 --
 -- The first school is the more common one, and it is NOT AVAILABLE TO US — this is a structural

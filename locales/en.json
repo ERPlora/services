@@ -201,7 +201,19 @@
       "released": "Released",
       "refunded": "Given back",
       "expired": "Expired"
-    }
+    },
+    "openOrphans": "Vouchers with no customer",
+    "orphansTitle": "Vouchers with no customer",
+    "orphansHint": "Their customer sheet was deleted or anonymised. The voucher keeps everything it was sold with — refund it or move it to another sheet.",
+    "emptyOrphans": "No voucher has lost its customer.",
+    "errorOrphans": "The vouchers with no customer could not be loaded.",
+    "orphanRemaining": "{remaining} session(s) left",
+    "orphanNoValue": "Fully used",
+    "orphanDeletedAt": "Customer deleted on {when}",
+    "orphanExpired": "Expired",
+    "orphanCustomerRef": "Customer reference",
+    "orphansCount": "{shown} of {total}",
+    "orphansMore": "Load more"
   },
   "errors": {
     "services.category_unavailable": "That category is not available: it does not exist in this business or it has been deleted.",

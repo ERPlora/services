@@ -202,7 +202,19 @@
       "released": "Liberada",
       "refunded": "Devuelta",
       "expired": "Caducada"
-    }
+    },
+    "openOrphans": "Bonos sin cliente",
+    "orphansTitle": "Bonos sin cliente",
+    "orphansHint": "Se borró o se anonimizó su ficha de cliente. El bono conserva todo lo que se vendió — devuélvelo o pásalo a otra ficha.",
+    "emptyOrphans": "Ningún bono se ha quedado sin cliente.",
+    "errorOrphans": "No se han podido cargar los bonos sin cliente.",
+    "orphanRemaining": "Quedan {remaining} sesión(es)",
+    "orphanNoValue": "Agotado",
+    "orphanDeletedAt": "Cliente borrado el {when}",
+    "orphanExpired": "Caducado",
+    "orphanCustomerRef": "Referencia del cliente",
+    "orphansCount": "{shown} de {total}",
+    "orphansMore": "Cargar más"
   },
   "errors": {
     "services.category_unavailable": "Esa categoría no está disponible: no existe en este negocio o se ha eliminado.",

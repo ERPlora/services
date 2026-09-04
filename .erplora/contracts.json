@@ -7,6 +7,7 @@
       "services.packages.get",
       "services.packages.holds_for_checkout",
       "services.packages.list",
+      "services.packages.orphans",
       "services.packages.redemption_history",
       "services.packages.redemptions_for_sale",
       "services.packages.tender_options",

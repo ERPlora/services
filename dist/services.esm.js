@@ -1924,6 +1924,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
     this.page = 0;
     this.searchable = false;
     this.sortDir = "asc";
+    this.filterValues = {};
     this.title = "";
     this.views = false;
     this.exportable = false;
@@ -1941,6 +1942,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
     this.clientSortDir = "asc";
     this.clientFilters = {};
     this.filterDraft = {};
+    this.serverFilters = {};
     this.panel = "none";
     this.viewMode = "table";
     this.viewChosenByUser = false;
@@ -2553,11 +2555,54 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
   get hasFilterRow() {
     return this.filterColumns.length > 0;
   }
-  /** Nº de filtros activos (modo cliente) → badge del botón Filtros. */
+  /** Nº de filtros activos → badge del botón Filtros. En servidor cuenta `filterValues` (#106): sin
+   *  esto el embudo no daba NINGUNA señal de que la lista venía acotada. */
   get activeFilterCount() {
+    if (this.serverSide) {
+      return Object.keys(this.serverFilters).filter((k2) => this.serverFilterState(k2) !== void 0).length;
+    }
     return Object.values(this.clientFilters).filter(
       (f3) => f3.values && f3.values.size > 0 || f3.from || f3.to
     ).length;
+  }
+  // ── Estado de filtro VISIBLE (#106) ──────────────────────────────────────────────────────────
+  /** Traduce un valor de `filterValues` (la forma que emite `filterChange`) a la forma interna que
+   *  usan los `render*Filter`. `undefined` = ese filtro no está puesto. */
+  serverFilterState(key) {
+    const raw = this.serverFilters[key];
+    if (raw === void 0 || raw === null || raw === "") return void 0;
+    if (Array.isArray(raw)) {
+      const values = raw.filter((v3) => v3 !== null && v3 !== void 0 && v3 !== "").map((v3) => String(v3));
+      return values.length ? { values: new Set(values) } : void 0;
+    }
+    if (typeof raw === "object") {
+      const range = raw;
+      const from = range.from === null || range.from === void 0 || range.from === "" ? void 0 : String(range.from);
+      const to = range.to === null || range.to === void 0 || range.to === "" ? void 0 : String(range.to);
+      return from !== void 0 || to !== void 0 ? { from, to } : void 0;
+    }
+    return { values: /* @__PURE__ */ new Set([String(raw)]) };
+  }
+  /** Estado de filtro efectivo de una columna: servidor → `filterValues`/espejo; cliente → memoria. */
+  filterStateOf(key) {
+    return this.serverSide ? this.serverFilterState(key) : this.clientFilters[key];
+  }
+  /** Fija (o borra) el valor visible de un filtro en el espejo de servidor. */
+  setServerFilter(key, value) {
+    const next = { ...this.serverFilters };
+    const empty = value === void 0 || value === null || value === "" || Array.isArray(value) && value.length === 0;
+    if (empty) delete next[key];
+    else next[key] = value;
+    this.serverFilters = next;
+  }
+  /** Fija UN extremo de un rango en el espejo. Los dos extremos viajan en eventos SEPARADOS
+   *  (`{from}` y luego `{to}`), así que aquí se MEZCLA: reemplazar borraría el otro extremo. */
+  setServerRangeEdge(key, edge, value) {
+    const prev = this.serverFilters[key];
+    const base = prev && typeof prev === "object" && !Array.isArray(prev) ? { ...prev } : {};
+    base[edge] = value;
+    const alive = (v3) => v3 !== void 0 && v3 !== null && v3 !== "";
+    this.setServerFilter(key, alive(base.from) || alive(base.to) ? base : void 0);
   }
   /** Valor crudo de una columna para ordenar/filtrar (usa format si lo hay, si no row[key]). */
   rawValue(col, row) {
@@ -2647,15 +2692,18 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
   }
   onFilterInput(col, ev) {
     const value = ev.target.value ?? "";
+    this.setServerFilter(col.key, value);
     this.emit("filterChange", { col: col.key, value });
   }
   onRangeInput(col, edge, ev) {
     const raw = ev.target.value ?? "";
     const v3 = raw === "" ? "" : Number(raw);
+    this.setServerRangeEdge(col.key, edge, v3);
     this.emit("filterChange", { col: col.key, value: { [edge]: v3 } });
   }
   onDateRangeInput(col, edge, ev) {
     const v3 = ev.target.value ?? "";
+    this.setServerRangeEdge(col.key, edge, v3);
     this.emit("filterChange", { col: col.key, value: { [edge]: v3 } });
   }
   // ── Filtros EN LÍNEA (toolbar) ────────────────────────────────────────────────────────────
@@ -2675,7 +2723,9 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
   // `filterChange`; en cliente escribe `clientFilters` (multiselect ⇒ filtra por inclusión).
   onFilterSelect(col, value, multi) {
     if (this.serverSide) {
-      this.emit("filterChange", { col: col.key, value: value ?? (multi ? [] : "") });
+      const next = value ?? (multi ? [] : "");
+      this.setServerFilter(col.key, next);
+      this.emit("filterChange", { col: col.key, value: next });
       return;
     }
     if (multi) {
@@ -2689,6 +2739,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
   onInlineRange(col, edge, ev) {
     const v3 = ev.target.value ?? "";
     if (this.serverSide) {
+      this.setServerRangeEdge(col.key, edge, v3);
       this.emit("filterChange", { col: col.key, value: { [edge]: v3 } });
       return;
     }
@@ -2719,6 +2770,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
    */
   willUpdate(changed) {
     this.applyInitialView();
+    if (changed.has("filterValues")) this.serverFilters = { ...this.filterValues ?? {} };
     if (!this.serverSide && changed.has("rows") && this.mobileShown !== 0) this.mobileShown = 0;
   }
   applyInitialView() {
@@ -2741,9 +2793,11 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
   renderFilterControl(col) {
     if (!col.filterable) return A;
     const type = col.filterType ?? "text";
+    const f3 = this.filterStateOf(col.key);
     if (type === "select" || type === "multiselect") {
       const multi = type === "multiselect";
       const opts = col.options ?? this.distinctValues(col).map((v3) => ({ value: v3, label: v3 }));
+      const current = this.selectValue(f3, multi);
       return b2`
         <ion-select
           label=${col.header}
@@ -2753,6 +2807,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
           interface="modal"
           .interfaceOptions=${{ cssClass: "ok-overlay" }}
           placeholder=${this.t.select}
+          .value=${current}
           @ionChange=${(e5) => this.onFilterSelect(col, e5.detail.value, multi)}
         >
           ${multi ? A : b2`<ion-select-option value="">${this.t.select}</ion-select-option>`}
@@ -2768,8 +2823,10 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
           <span class="flabel">${col.header}</span>
           <div class="frange">
             <ion-input type=${t5} fill="outline" mode="md" placeholder=${type === "daterange" ? this.t.from : this.t.gte}
+              .value=${f3?.from ?? ""}
               @ionInput=${(e5) => onEdge(col, "from", e5)}></ion-input>
             <ion-input type=${t5} fill="outline" mode="md" placeholder=${type === "daterange" ? this.t.to : this.t.lte}
+              .value=${f3?.to ?? ""}
               @ionInput=${(e5) => onEdge(col, "to", e5)}></ion-input>
           </div>
         </div>
@@ -2783,9 +2840,17 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
         label=${col.header}
         label-placement="stacked"
         placeholder=${this.t.filterPlaceholder}
+        .value=${this.selectValue(f3, false)}
         @ionInput=${(e5) => this.onFilterInput(col, e5)}
       ></ion-input>
     `;
+  }
+  /** Valor para un control de un solo valor (`ion-select`/`ion-input`) o multi (`ion-select
+   *  multiple`) a partir del estado de filtro interno. '' / [] = sin filtro. */
+  selectValue(f3, multi) {
+    const values = [...f3?.values ?? /* @__PURE__ */ new Set()];
+    if (multi) return values;
+    return values.length ? values[0] : "";
   }
   // Controles de filtro COMPACTOS para la toolbar (modo `inlineFilters`). Solo select y rango de
   // fechas (los del screenshot); el resto de tipos siguen disponibles vía el drawer si no se activa
@@ -2800,11 +2865,11 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
   }
   renderInlineFilter(col) {
     const type = col.filterType ?? "text";
-    const f3 = this.clientFilters[col.key];
+    const f3 = this.filterStateOf(col.key);
     if (type === "select" || type === "multiselect") {
       const multi = type === "multiselect";
       const opts = col.options ?? this.distinctValues(col).map((v3) => ({ value: v3, label: v3 }));
-      const current = multi ? [...f3?.values ?? /* @__PURE__ */ new Set()] : f3?.values && f3.values.size ? [...f3.values][0] : "";
+      const current = this.selectValue(f3, multi);
       return b2`
         <ion-select
           class="tk-filter"
@@ -2870,6 +2935,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
       (a3) => {
         const loading = a3.loading?.(row) === true;
         const disabled = loading || a3.disabled?.(row) === true;
+        const label = typeof a3.label === "function" ? a3.label(row) : a3.label;
         return b2`
             <ion-button
               size="small"
@@ -2877,11 +2943,11 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
               color=${a3.color ?? "medium"}
               ?disabled=${disabled}
               aria-disabled=${disabled ? "true" : A}
-              aria-label=${a3.label}
-              title=${a3.label}
+              aria-label=${label}
+              title=${label}
               @click=${() => this.emit("rowAction", { actionId: a3.id, row })}
             >
-              ${loading ? b2`<ion-spinner slot="icon-only" name="dots"></ion-spinner>` : a3.icon ? b2`<ion-icon slot="icon-only" .icon=${okIcon(a3.icon)}></ion-icon>` : a3.label}
+              ${loading ? b2`<ion-spinner slot="icon-only" name="dots"></ion-spinner>` : a3.icon ? b2`<ion-icon slot="icon-only" .icon=${okIcon(a3.icon)}></ion-icon>` : label}
             </ion-button>
           `;
       }
@@ -3002,7 +3068,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
                             ${this.toolButton("grid-outline", this.viewMode === "cards", () => this.setViewMode("cards"), this.t.viewCards)}
                           </span>
                         ` : A}
-                    ${this.hasFilterRow && !this.inlineFilters ? this.toolButton("funnel-outline", this.panel === "filters" || this.activeFilterCount > 0, () => this.toggle("filters"), this.t.filters, this.serverSide ? void 0 : this.activeFilterCount) : A}
+                    ${this.hasFilterRow && !this.inlineFilters ? this.toolButton("funnel-outline", this.panel === "filters" || this.activeFilterCount > 0, () => this.toggle("filters"), this.t.filters, this.activeFilterCount) : A}
                     ${this.effImport ? b2`
                           ${this.toolButton("cloud-upload-outline", false, () => this.renderRoot.querySelector(".tk-file")?.click(), this.t.importCsv)}
                           <input class="tk-file" type="file" accept=".csv,text/csv" hidden @change=${(e5) => this.onImportFile(e5)} />
@@ -3314,6 +3380,9 @@ __decorateClass3([
   n4({ attribute: "sort-dir" })
 ], _OkDataTable.prototype, "sortDir");
 __decorateClass3([
+  n4({ attribute: false })
+], _OkDataTable.prototype, "filterValues");
+__decorateClass3([
   n4()
 ], _OkDataTable.prototype, "title");
 __decorateClass3([
@@ -3385,6 +3454,9 @@ __decorateClass3([
 __decorateClass3([
   r5()
 ], _OkDataTable.prototype, "filterDraft");
+__decorateClass3([
+  r5()
+], _OkDataTable.prototype, "serverFilters");
 __decorateClass3([
   r5()
 ], _OkDataTable.prototype, "panel");
@@ -3739,7 +3811,19 @@ var es_default = {
       released: "Liberada",
       refunded: "Devuelta",
       expired: "Caducada"
-    }
+    },
+    openOrphans: "Bonos sin cliente",
+    orphansTitle: "Bonos sin cliente",
+    orphansHint: "Se borr\xF3 o se anonimiz\xF3 su ficha de cliente. El bono conserva todo lo que se vendi\xF3 \u2014 devu\xE9lvelo o p\xE1salo a otra ficha.",
+    emptyOrphans: "Ning\xFAn bono se ha quedado sin cliente.",
+    errorOrphans: "No se han podido cargar los bonos sin cliente.",
+    orphanRemaining: "Quedan {remaining} sesi\xF3n(es)",
+    orphanNoValue: "Agotado",
+    orphanDeletedAt: "Cliente borrado el {when}",
+    orphanExpired: "Caducado",
+    orphanCustomerRef: "Referencia del cliente",
+    orphansCount: "{shown} de {total}",
+    orphansMore: "Cargar m\xE1s"
   },
   errors: {
     "services.category_unavailable": "Esa categor\xEDa no est\xE1 disponible: no existe en este negocio o se ha eliminado.",
@@ -3970,7 +4054,19 @@ var en_default = {
       released: "Released",
       refunded: "Given back",
       expired: "Expired"
-    }
+    },
+    openOrphans: "Vouchers with no customer",
+    orphansTitle: "Vouchers with no customer",
+    orphansHint: "Their customer sheet was deleted or anonymised. The voucher keeps everything it was sold with \u2014 refund it or move it to another sheet.",
+    emptyOrphans: "No voucher has lost its customer.",
+    errorOrphans: "The vouchers with no customer could not be loaded.",
+    orphanRemaining: "{remaining} session(s) left",
+    orphanNoValue: "Fully used",
+    orphanDeletedAt: "Customer deleted on {when}",
+    orphanExpired: "Expired",
+    orphanCustomerRef: "Customer reference",
+    orphansCount: "{shown} of {total}",
+    orphansMore: "Load more"
   },
   errors: {
     "services.category_unavailable": "That category is not available: it does not exist in this business or it has been deleted.",
@@ -4907,6 +5003,11 @@ var ErpServicesPackages = class extends i3 {
     this.movementsTotal = 0;
     this.movementsLoading = false;
     this.movementsError = "";
+    this.orphansOpen = false;
+    this.orphans = [];
+    this.orphansTotal = 0;
+    this.orphansLoading = false;
+    this.orphansError = "";
     this.onLocaleChange = () => this.requestUpdate();
   }
   static {
@@ -5081,6 +5182,41 @@ var ErpServicesPackages = class extends i3 {
       this.movementsLoading = false;
     }
   }
+  /**
+   * Open the rescue drawer (services#81).
+   *
+   * It reloads from scratch every time rather than keeping what it had: the set only changes when a
+   * customer is deleted somewhere else in the hub, so a stale list is the one thing this screen
+   * cannot afford — it exists to be the single place where this money is visible.
+   */
+  async openOrphans() {
+    this.orphansOpen = true;
+    this.orphans = [];
+    this.orphansTotal = 0;
+    this.orphansError = "";
+    await this.loadOrphansPage();
+  }
+  /** One more page, ADDED to what is on screen — same contract as the movements ledger. */
+  async loadMoreOrphans() {
+    if (this.orphansLoading || this.orphans.length >= this.orphansTotal) return;
+    await this.loadOrphansPage();
+  }
+  async loadOrphansPage() {
+    this.orphansLoading = true;
+    this.orphansError = "";
+    try {
+      const page = await erplora3().queryPage("services.packages.orphans", {
+        offset: this.orphans.length
+      });
+      if (!this.orphansOpen) return;
+      this.orphans = [...this.orphans, ...page?.rows ?? []];
+      this.orphansTotal = page?.total ?? this.orphans.length;
+    } catch (e5) {
+      this.orphansError = domainMessage(e5, erplora3().locale, erplora3().t(CATALOG3, "ui.errorOrphans"));
+    } finally {
+      this.orphansLoading = false;
+    }
+  }
   /** Back to a clean CREATE form. */
   cancelEdit() {
     this.editingId = null;
@@ -5233,6 +5369,53 @@ var ErpServicesPackages = class extends i3 {
       </ion-content>
     </ion-modal>`;
   }
+  renderOrphan(o7) {
+    const t5 = (k2, p4) => erplora3().t(CATALOG3, k2, p4);
+    const worthless = !Number(o7.has_value);
+    return b2`<ion-item class="movement">
+      <ion-label class="ion-text-wrap">
+        <h3>
+          <ok-status-pill size="sm" tone=${worthless ? "neutral" : "warning"}>
+            ${worthless ? t5("ui.orphanNoValue") : t5("ui.orphanRemaining", { remaining: o7.remaining ?? 0 })}
+          </ok-status-pill>
+          ${o7.package_name}
+        </h3>
+        <p>
+          ${erplora3().formatMoney(Number(o7.amount_cents) || 0)}
+          · ${t5("ui.orphanDeletedAt", { when: this.stamp(o7.customer_deleted_at) })}
+          ${Number(o7.is_expired) ? b2` · ${t5("ui.orphanExpired")}` : A}
+        </p>
+        <!-- The opaque id, which is all there is: no name, no e-mail, no phone. It is the only
+             handle that matches this voucher against the sale that paid for it. -->
+        <p>${t5("ui.orphanCustomerRef")}: ${o7.customer_id}</p>
+      </ion-label>
+    </ion-item>`;
+  }
+  renderOrphans() {
+    const t5 = (k2, p4) => erplora3().t(CATALOG3, k2, p4);
+    return b2`<ion-modal .isOpen=${this.orphansOpen} @ionModalDidDismiss=${() => this.orphansOpen = false}>
+      <ion-header class="ion-no-border">
+        <ion-toolbar>
+          <ion-title>${t5("ui.orphansTitle")}</ion-title>
+          <ion-buttons slot="end">
+            <ion-button @click=${() => this.orphansOpen = false}>${t5("ui.btnClose")}</ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="ion-padding">
+        <!-- Self-styled: ion-modal is reparented to <body>, this component's CSS does not reach it. -->
+        <p>${t5("ui.orphansHint")}</p>
+        <!-- The error goes ABOVE the list, not instead of it: a page that failed must not take away
+             the rows already on screen. -->
+        ${this.orphansError ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.orphansError}</ok-inline-feedback>` : A}
+        ${this.orphans.length === 0 ? this.orphansLoading ? b2`<ok-inline-feedback tone="neutral" icon="time-outline">${t5("ui.loading")}</ok-inline-feedback>` : this.orphansError ? A : b2`<ok-inline-feedback tone="neutral" icon="information-circle-outline">${t5("ui.emptyOrphans")}</ok-inline-feedback>` : b2`<ion-list lines="full">${this.orphans.map((o7) => this.renderOrphan(o7))}</ion-list>
+              ${this.orphans.length < this.orphansTotal ? b2`<p class="more">${t5("ui.orphansCount", { shown: this.orphans.length, total: this.orphansTotal })}</p>
+                    <ion-button expand="block" fill="clear" ?disabled=${this.orphansLoading} @click=${() => this.loadMoreOrphans()}>
+                      ${this.orphansLoading ? t5("ui.loading") : t5("ui.orphansMore")}
+                    </ion-button>` : A}`}
+      </ion-content>
+    </ion-modal>`;
+  }
   renderLines() {
     const t5 = (k2) => erplora3().t(CATALOG3, k2);
     return b2`<p class="lines-title">${t5("ui.packageLinesTitle")}</p>
@@ -5251,6 +5434,9 @@ var ErpServicesPackages = class extends i3 {
     return b2`<div class="page">
       ${this.formError ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : A}
       ${this.ctrl?.error ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : A}
+      ${can3("services.view_orphan_grant") ? b2`<ion-button class="orphans-entry" data-testid="open-orphans" size="small" fill="clear" @click=${() => this.openOrphans()}>
+            <ion-icon slot="start" name="person-remove-outline"></ion-icon>${t5("ui.openOrphans")}
+          </ion-button>` : A}
       <ok-data-table .serverSide=${true} .fill=${true} .views=${true} .addable=${can3("services.add_package")} .cardTitle=${(row) => String(row.name ?? "")} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "asc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchPackagePlaceholder")} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.emptyPackages")} @rowAction=${(e5) => this.onRowAction(e5)} @rowClick=${(e5) => this.onRowAction({ detail: { actionId: "edit", row: e5.detail.row } })}
  @pageChange=${(e5) => this.ctrl.setPage(e5.detail)} @pageSizeChange=${(e5) => this.ctrl.setPageSize(e5.detail)} @sortChange=${(e5) => this.ctrl.setSort(e5.detail.sort, e5.detail.dir)} @searchChange=${(e5) => this.ctrl.setSearch(e5.detail)} @filterChange=${(e5) => this.ctrl.setFilter(e5.detail.col, e5.detail.value)}>
         <form slot="create" class="form" @submit=${(e5) => this.save(e5)}>
@@ -5273,6 +5459,7 @@ var ErpServicesPackages = class extends i3 {
       </ok-data-table>
       ${this.renderDeleteConfirm()}
       ${this.renderMovements()}
+      ${this.renderOrphans()}
     </div>`;
   }
 };
@@ -5312,6 +5499,21 @@ __decorateClass([
 __decorateClass([
   r5()
 ], ErpServicesPackages.prototype, "movementsError", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "orphansOpen", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "orphans", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "orphansTotal", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "orphansLoading", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "orphansError", 2);
 define("erp-services-packages", ErpServicesPackages);
 
 // ui/components/erp-services-session-refund/erp-services-session-refund.ts

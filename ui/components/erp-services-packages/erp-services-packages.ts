@@ -152,6 +152,33 @@ function toIntOrNull(v: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/**
+ * Row of `services.packages.orphans` — a voucher whose customer sheet no longer exists
+ * (services#81).
+ *
+ * `has_value` and `is_expired` are the QUERY's own derived fields, not something re-derived here: a
+ * screen that recomputed «is there anything left?» from `remaining` and `max_uses` would be a
+ * second implementation of a rule that already lives in SQL, free to drift from it. There is no
+ * customer name anywhere in this shape and there must not be: the sheet was deleted — in the
+ * `customer.anonymized` case precisely because somebody asked for their data to be erased — so the
+ * opaque id is all this module has and all it should show.
+ */
+interface OrphanGrant {
+  grant_id: string;
+  package_id: string;
+  package_name: string;
+  customer_id: string;
+  customer_deleted_at: string | null;
+  granted_at: string | null;
+  amount_cents: number;
+  max_uses: number | null;
+  used: number;
+  remaining: number | null;
+  has_value: number;
+  expires_at: string | null;
+  is_expired: number;
+}
+
 export class ErpServicesPackages extends LitElement {
   static styles = css`
     :host { display: flex; flex-direction: column; height: 100%; min-height: 0; font-family: system-ui, sans-serif; color: var(--ion-text-color, #1c1b18); }
@@ -181,6 +208,12 @@ export class ErpServicesPackages extends LitElement {
   @state() movementsTotal = 0;
   @state() movementsLoading = false;
   @state() movementsError = '';
+
+  @state() orphansOpen = false;
+  @state() orphans: OrphanGrant[] = [];
+  @state() orphansTotal = 0;
+  @state() orphansLoading = false;
+  @state() orphansError = '';
 
   private ctrl!: ListController<Package>;
   private unsub?: () => void;
@@ -359,6 +392,46 @@ export class ErpServicesPackages extends LitElement {
       this.movementsError = domainMessage(e, erplora().locale, erplora().t(CATALOG, 'ui.errorMovements'));
     } finally {
       this.movementsLoading = false;
+    }
+  }
+
+  /**
+   * Open the rescue drawer (services#81).
+   *
+   * It reloads from scratch every time rather than keeping what it had: the set only changes when a
+   * customer is deleted somewhere else in the hub, so a stale list is the one thing this screen
+   * cannot afford — it exists to be the single place where this money is visible.
+   */
+  async openOrphans(): Promise<void> {
+    this.orphansOpen = true;
+    this.orphans = [];
+    this.orphansTotal = 0;
+    this.orphansError = '';
+    await this.loadOrphansPage();
+  }
+
+  /** One more page, ADDED to what is on screen — same contract as the movements ledger. */
+  async loadMoreOrphans(): Promise<void> {
+    if (this.orphansLoading || this.orphans.length >= this.orphansTotal) return;
+    await this.loadOrphansPage();
+  }
+
+  private async loadOrphansPage(): Promise<void> {
+    this.orphansLoading = true;
+    this.orphansError = '';
+    try {
+      // 🔴 NO `params`, and that is the entire point of this query: every other door into a voucher
+      // is keyed by `customer_id`, and the customer is exactly what stopped existing.
+      const page = await erplora().queryPage<OrphanGrant>('services.packages.orphans', {
+        offset: this.orphans.length,
+      });
+      if (!this.orphansOpen) return; // closed while the page was in flight
+      this.orphans = [...this.orphans, ...(page?.rows ?? [])];
+      this.orphansTotal = page?.total ?? this.orphans.length;
+    } catch (e) {
+      this.orphansError = domainMessage(e, erplora().locale, erplora().t(CATALOG, 'ui.errorOrphans'));
+    } finally {
+      this.orphansLoading = false;
     }
   }
 
@@ -544,6 +617,66 @@ export class ErpServicesPackages extends LitElement {
     </ion-modal>`;
   }
 
+  private renderOrphan(o: OrphanGrant) {
+    const t = (k: string, p?: Record<string, unknown>): string => erplora().t(CATALOG, k, p);
+    // `has_value` and `is_expired` come from the query; the screen only chooses the colour.
+    const worthless = !Number(o.has_value);
+    return html`<ion-item class="movement">
+      <ion-label class="ion-text-wrap">
+        <h3>
+          <ok-status-pill size="sm" tone=${worthless ? 'neutral' : 'warning'}>
+            ${worthless ? t('ui.orphanNoValue') : t('ui.orphanRemaining', { remaining: o.remaining ?? 0 })}
+          </ok-status-pill>
+          ${o.package_name}
+        </h3>
+        <p>
+          ${erplora().formatMoney(Number(o.amount_cents) || 0)}
+          · ${t('ui.orphanDeletedAt', { when: this.stamp(o.customer_deleted_at) })}
+          ${Number(o.is_expired) ? html` · ${t('ui.orphanExpired')}` : nothing}
+        </p>
+        <!-- The opaque id, which is all there is: no name, no e-mail, no phone. It is the only
+             handle that matches this voucher against the sale that paid for it. -->
+        <p>${t('ui.orphanCustomerRef')}: ${o.customer_id}</p>
+      </ion-label>
+    </ion-item>`;
+  }
+
+  private renderOrphans() {
+    const t = (k: string, p?: Record<string, unknown>): string => erplora().t(CATALOG, k, p);
+    return html`<ion-modal .isOpen=${this.orphansOpen} @ionModalDidDismiss=${() => (this.orphansOpen = false)}>
+      <ion-header class="ion-no-border">
+        <ion-toolbar>
+          <ion-title>${t('ui.orphansTitle')}</ion-title>
+          <ion-buttons slot="end">
+            <ion-button @click=${() => (this.orphansOpen = false)}>${t('ui.btnClose')}</ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="ion-padding">
+        <!-- Self-styled: ion-modal is reparented to <body>, this component's CSS does not reach it. -->
+        <p>${t('ui.orphansHint')}</p>
+        <!-- The error goes ABOVE the list, not instead of it: a page that failed must not take away
+             the rows already on screen. -->
+        ${this.orphansError
+          ? html`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.orphansError}</ok-inline-feedback>`
+          : nothing}
+        ${this.orphans.length === 0
+          ? this.orphansLoading
+            ? html`<ok-inline-feedback tone="neutral" icon="time-outline">${t('ui.loading')}</ok-inline-feedback>`
+            : this.orphansError
+              ? nothing
+              : html`<ok-inline-feedback tone="neutral" icon="information-circle-outline">${t('ui.emptyOrphans')}</ok-inline-feedback>`
+          : html`<ion-list lines="full">${this.orphans.map((o) => this.renderOrphan(o))}</ion-list>
+              ${this.orphans.length < this.orphansTotal
+                ? html`<p class="more">${t('ui.orphansCount', { shown: this.orphans.length, total: this.orphansTotal })}</p>
+                    <ion-button expand="block" fill="clear" ?disabled=${this.orphansLoading} @click=${() => this.loadMoreOrphans()}>
+                      ${this.orphansLoading ? t('ui.loading') : t('ui.orphansMore')}
+                    </ion-button>`
+                : nothing}`}
+      </ion-content>
+    </ion-modal>`;
+  }
+
   private renderLines() {
     const t = (k: string): string => erplora().t(CATALOG, k);
     return html`<p class="lines-title">${t('ui.packageLinesTitle')}</p>
@@ -563,6 +696,11 @@ export class ErpServicesPackages extends LitElement {
     return html`<div class="page">
       ${this.formError ? html`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : nothing}
       ${this.ctrl?.error ? html`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : nothing}
+      ${can('services.view_orphan_grant')
+        ? html`<ion-button class="orphans-entry" data-testid="open-orphans" size="small" fill="clear" @click=${() => this.openOrphans()}>
+            <ion-icon slot="start" name="person-remove-outline"></ion-icon>${t('ui.openOrphans')}
+          </ion-button>`
+        : nothing}
       <ok-data-table .serverSide=${true} .fill=${true} .views=${true} .addable=${can('services.add_package')} .cardTitle=${(row: Record<string, unknown>) => String(row.name ?? '')} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? 'asc'} .searchable=${true} .searchPlaceholder=${t('ui.searchPackagePlaceholder')} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t('ui.loading') : t('ui.emptyPackages')} @rowAction=${(e: CustomEvent<{ actionId: string; row: Record<string, unknown> }>) => this.onRowAction(e)} @rowClick=${(e: CustomEvent<{ row: Record<string, unknown> }>) => this.onRowAction({ detail: { actionId: 'edit', row: e.detail.row } } as CustomEvent<{ actionId: string; row: Record<string, unknown> }>)}
  @pageChange=${(e: CustomEvent<number>) => this.ctrl.setPage(e.detail)} @pageSizeChange=${(e: CustomEvent<number>) => this.ctrl.setPageSize(e.detail)} @sortChange=${(e: CustomEvent<{ sort: string; dir: 'asc' | 'desc' }>) => this.ctrl.setSort(e.detail.sort, e.detail.dir)} @searchChange=${(e: CustomEvent<string>) => this.ctrl.setSearch(e.detail)} @filterChange=${(e: CustomEvent<{ col: string; value: unknown }>) => this.ctrl.setFilter(e.detail.col, e.detail.value)}>
         <form slot="create" class="form" @submit=${(e: Event) => this.save(e)}>
@@ -589,6 +727,7 @@ export class ErpServicesPackages extends LitElement {
       </ok-data-table>
       ${this.renderDeleteConfirm()}
       ${this.renderMovements()}
+      ${this.renderOrphans()}
     </div>`;
   }
 }
