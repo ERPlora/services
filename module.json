@@ -37,7 +37,8 @@
     "services.manage_settings",
     "services.hold_package",
     "services.settle_package",
-    "services.refund_package"
+    "services.refund_package",
+    "services.view_orphan_grant"
   ],
   "role_permissions": {
     "admin": [
@@ -68,7 +69,8 @@
       "services.hold_package",
       "services.settle_package",
       "services.refund_package",
-      "services.grant_package"
+      "services.grant_package",
+      "services.view_orphan_grant"
     ],
     "employee": [
       "services.view_service",
@@ -148,7 +150,8 @@
       "migrations/postgres/011_voucher_tender.sql",
       "migrations/postgres/012_voucher_refund.sql",
       "migrations/postgres/013_package_grant.sql",
-      "migrations/postgres/014_hold_deadline.sql"
+      "migrations/postgres/014_hold_deadline.sql",
+      "migrations/postgres/015_grant_orphan.sql"
     ]
   },
   "queries": {
@@ -342,6 +345,46 @@
       "schema": "schemas/package_balance.json",
       "ai": {
         "description": "Returns the remaining uses and validity of a customer's service packages (bonos)"
+      },
+      "expose_api": true
+    },
+    "services.packages.orphans": {
+      "permission": "services.view_orphan_grant",
+      "sql": "queries/package_orphans.sql",
+      "list": {
+        "search": [
+          "package_name",
+          "customer_id"
+        ],
+        "sort": [
+          "customer_deleted_at",
+          "granted_at",
+          "package_name",
+          "amount_cents",
+          "remaining",
+          "has_value",
+          "is_expired"
+        ],
+        "default_sort": "customer_deleted_at",
+        "default_dir": "desc",
+        "filters": {
+          "has_value": {
+            "op": "eq"
+          },
+          "is_expired": {
+            "op": "eq"
+          },
+          "package_id": {
+            "op": "eq"
+          },
+          "customer_id": {
+            "op": "eq"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists the vouchers (bonos) whose customer was deleted or anonymised, with the sessions and the amount still owed, so they can be refunded or transferred"
       },
       "expose_api": true
     },
@@ -938,6 +981,13 @@
         "commands/hold_release_on_checkout_voided.sql"
       ]
     },
+    "services._on_customer_deleted": {
+      "permission": "services.view_orphan_grant",
+      "transaction": true,
+      "sql": [
+        "commands/grant_orphan_stamp.sql"
+      ]
+    },
     "services.packages.expire_holds": {
       "permission": "services.hold_package",
       "transaction": true,
@@ -989,6 +1039,12 @@
       },
       "sales.order.voided": {
         "command": "services._on_order_voided"
+      },
+      "customer.deleted": {
+        "command": "services._on_customer_deleted"
+      },
+      "customer.anonymized": {
+        "command": "services._on_customer_deleted"
       }
     },
     "emits": [
