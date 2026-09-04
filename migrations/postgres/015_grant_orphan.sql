@@ -1,0 +1,80 @@
+ALTER TABLE services_package_grant ADD COLUMN IF NOT EXISTS customer_deleted_at TEXT;
+
+CREATE INDEX IF NOT EXISTS ix_services_grant_orphan
+    ON services_package_grant (hub_id, customer_deleted_at)
+    WHERE is_deleted = 0 AND customer_deleted_at IS NOT NULL;
+
+-- Services · migration 015 — a voucher whose owner is deleted keeps its money AND stays findable
+-- (services#81). The prose is at the BOTTOM by house rule (hub#1137/ADR-0387): the migration guard
+-- matches a `DROP` at the START of the statement text and its splitter keeps a preceding comment
+-- inside the statement, so a header above SQL is the shape that silently defeats it. There is no
+-- `DROP` here — this is an `expand`, nothing is destroyed and nothing is renamed.
+--
+-- WHAT WAS WRONG. `services_package_grant.customer_id` is an OPAQUE reference with no cross-module
+-- foreign key — that is the module contract and it is right. The price of it is this: when
+-- `customers` removes a sheet, `services` never hears about it. The grant stays alive in the table
+-- with its sessions and its amount, and it stops appearing ANYWHERE, because every door into a
+-- voucher starts from the customer (`services.packages.balance` takes `:customer_id`, and so does
+-- every screen that leads to it). Money that was charged becomes invisible — not lost, worse:
+-- unfindable, because there is no query in the module that can even be asked the question.
+--
+-- 🔴 WHY THE DELETE IS LET THROUGH AND THE MONEY IS KEPT, RATHER THAN THE DELETE BEING REFUSED
+--
+-- Decided by the market, not by us (12 references; the full table with its URLs is in the pull
+-- request of services#81). There are two schools and they answer different questions:
+--
+--   * REFUSE THE DELETE while the customer holds value — **Vagaro** will not remove a customer who
+--     has «gift cards that are not expired or have a balance, memberships or packages (active or
+--     inactive)»; **Lightspeed X-Series** refuses a customer with an owing balance; **Business
+--     Central** answers `Blocked`, not delete; **Odoo** cannot delete a contact linked to documents,
+--     it archives it.
+--   * LET THE DELETE THROUGH AND KEEP THE MONEY ALIVE AND VISIBLE SOMEWHERE ELSE — **Square**
+--     unlinks the gift card from the deleted profile and the balance stays spendable;
+--     **Lightspeed**'s store credit report LISTS DELETED CUSTOMERS, which is a door that does not
+--     start from the sheet; **Fresha** keeps past sales and recommends blocking over deleting;
+--     **Shopify** and **WooCommerce** redact the personal data and keep the row.
+--
+-- The first school is the more common one, and it is NOT AVAILABLE TO US — this is a structural
+-- fact, not a preference. `customer.deleted` is published AFTER the transaction commits
+-- (`crates/runtime/src/events.rs`: the sink is notified once the commit is through, and the
+-- `_event_outbox` relay delivers later), and there is no cross-module veto anywhere in the
+-- dispatcher — no `preconditions` in the manifest, and ADR-0203 is the FISCAL gate with its own
+-- structural trigger, not a general one. For `customers` to refuse a delete it would have to ask
+-- `services` for permission first, which is a hard dependency between modules and exactly what the
+-- module contract forbids. So the second school is what we implement — and it is also the one that
+-- never destroys what a customer already paid for.
+--
+-- 🔴 THE STAMP IS THE ONLY THING THAT CHANGES
+--
+-- `customer_deleted_at` is a mark, not a state machine. Sessions, amount, `max_uses`, `granted_at`
+-- and the expiry are untouched, because the voucher did not change: the same three sessions are
+-- still owed. `services.packages.balance` keeps answering exactly what it answered the day before —
+-- which is what makes this safe to install on a live hub — and the refund and transfer doors
+-- (services#79, services#82) keep working on the grant as they always did.
+--
+-- It is `TEXT` and not a boolean because WHEN matters: an operator looking at the rescue list needs
+-- to know whether the sheet went away this morning or eighteen months ago, and the sweep order of
+-- the list is «most recently orphaned first». It holds NO personal data — only a timestamp — which
+-- is what makes it legitimate on the `customer.anonymized` path: a GDPR erasure removes the
+-- person's data, and this column adds none.
+--
+-- The index is PARTIAL on the live orphans, which are a handful in a hub that will hold thousands
+-- of grants: `WHERE is_deleted = 0 AND customer_deleted_at IS NOT NULL` is the exact predicate of
+-- `queries/package_orphans.sql`, so the rescue list is an index scan over the orphans instead of a
+-- sequential scan over every voucher the salon ever sold. It is also what keeps the listener cheap
+-- on the write side: stamping is keyed by `(hub_id, customer_id)`, which `013_package_grant.sql`
+-- already indexed.
+--
+-- SAFE ON A HUB THAT ALREADY HAS ROWS. The column is added with `IF NOT EXISTS` and is nullable
+-- with no default, so nothing is backfilled and no existing row changes: every grant a hub holds
+-- today reads as «owner alive», which is what it was before this migration and what it will keep
+-- being until an event says otherwise. There is no CHECK to validate and no table rewrite, so a
+-- legacy row cannot make `migrate` abort and leave the module half-installed (the lesson of
+-- migration 007). A hub that has not taken this migration keeps working exactly as before: its
+-- orphaned vouchers simply stay invisible, which is today's behaviour.
+--
+-- WHAT IS NOT HERE, ON PURPOSE. There is no column for the MERGE case. Merging customers does not
+-- exist (customers#12 was closed as out of the MVP on 2026-08-06) and nothing emits
+-- `customer.merged`, so the listener that would REPOINT `customer_id` — which is what Odoo,
+-- Lightspeed and Mindbody all do, and what we will do too — has no event to hear. Writing it today
+-- would be a skeleton nobody calls.
