@@ -151,7 +151,12 @@
       "migrations/postgres/012_voucher_refund.sql",
       "migrations/postgres/013_package_grant.sql",
       "migrations/postgres/014_hold_deadline.sql",
-      "migrations/postgres/015_grant_orphan.sql"
+      "migrations/postgres/015_grant_orphan.sql",
+    {
+      "file": "migrations/postgres/016_named_gate_constraints.sql",
+      "kind": "contract",
+      "since": "1.5.44"
+    }
     ]
   },
   "queries": {
