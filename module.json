@@ -1,7 +1,7 @@
 {
   "id": "services",
   "name": "Services",
-  "version": "1.5.43",
+  "version": "1.5.44",
   "description": "Service catalogue with categories and packages, and their availability.",
   "agent": {
     "description": "Manages the service catalogue: create, update and delete services, categories, and service packages; list available services and packages; configure module settings.",
@@ -152,11 +152,11 @@
       "migrations/postgres/013_package_grant.sql",
       "migrations/postgres/014_hold_deadline.sql",
       "migrations/postgres/015_grant_orphan.sql",
-    {
-      "file": "migrations/postgres/016_named_gate_constraints.sql",
-      "kind": "contract",
-      "since": "1.5.44"
-    }
+      {
+        "file": "migrations/postgres/016_named_gate_constraints.sql",
+        "kind": "contract",
+        "since": "1.5.44"
+      }
     ]
   },
   "queries": {
