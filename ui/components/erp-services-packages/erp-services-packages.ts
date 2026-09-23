@@ -11,6 +11,7 @@ import type { ListController, ListClient, ListParams, ListPage } from '@erplora/
 import esLocale from '../../../locales/es.json';
 import enLocale from '../../../locales/en.json';
 import { domainMessage } from '../../lib/domain-error';
+import { ionTone } from '../../lib/ion-tone';
 const CATALOG: Record<string, unknown> = { es: esLocale, en: enLocale };
 
 // «Packages» view of the services module (services#4): the CRUD of packages/vouchers (bonos) that
@@ -526,7 +527,7 @@ export class ErpServicesPackages extends LitElement {
             <ion-label class="ion-text-wrap"><b>${this.deleteTarget?.name ?? ''}</b> — ${t('ui.deletePackageHint', { count: Number(this.deleteTarget?.items ?? 0) || 0 })}</ion-label>
           </ion-item>
         </ion-list>
-        <ion-button class="ion-margin-top" expand="block" color="danger" ?disabled=${this.saving} @click=${() => this.confirmDelete()}>${t('ui.actionDelete')}</ion-button>
+        <ion-button class="ion-margin-top" expand="block" data-testid="services-packages-delete-submit" style=${ionTone('solid', 'danger')} ?disabled=${this.saving} @click=${() => this.confirmDelete()}>${t('ui.actionDelete')}</ion-button>
         <ion-button expand="block" fill="outline" ?disabled=${this.saving} @click=${() => (this.deleteTarget = null)}>${t('ui.btnCancel')}</ion-button>
       </ion-content>
     </ion-modal>`;
