@@ -10,6 +10,7 @@ import type { ListController, ListClient, ListParams, ListPage } from '@erplora/
 import esLocale from '../../../locales/es.json';
 import enLocale from '../../../locales/en.json';
 import { domainMessage } from '../../lib/domain-error';
+import { ionTone } from '../../lib/ion-tone';
 const CATALOG: Record<string, unknown> = { es: esLocale, en: enLocale };
 
 // «Categories» view of the services module (services#4): the CRUD of `services_category` that
@@ -221,12 +222,12 @@ export class ErpServicesCategories extends LitElement {
           </ion-item>
           ${count > 0
             ? html`<ion-item>
-                <ion-icon slot="start" name="alert-circle-outline" color="warning"></ion-icon>
+                <ion-icon slot="start" name="alert-circle-outline" data-testid="services-categories-delete-impact-icon" style=${ionTone('text', 'warning')}></ion-icon>
                 <ion-label class="ion-text-wrap">${t('ui.deleteCategoryImpact', { count })}</ion-label>
               </ion-item>`
             : nothing}
         </ion-list>
-        <ion-button class="ion-margin-top" expand="block" color="danger" ?disabled=${this.saving} @click=${() => this.confirmDelete()}>${t('ui.actionDelete')}</ion-button>
+        <ion-button class="ion-margin-top" expand="block" data-testid="services-categories-delete-submit" style=${ionTone('solid', 'danger')} ?disabled=${this.saving} @click=${() => this.confirmDelete()}>${t('ui.actionDelete')}</ion-button>
         <ion-button expand="block" fill="outline" ?disabled=${this.saving} @click=${() => (this.deleteTarget = null)}>${t('ui.btnCancel')}</ion-button>
       </ion-content>
     </ion-modal>`;
