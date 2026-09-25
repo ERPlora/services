@@ -343,9 +343,9 @@ export class ErpServicesVoucherTender extends LitElement {
       class="option"
       role="radio"
       aria-checked=${chosen ? 'true' : 'false'}
-      data-test="option"
     >
       <ion-radio
+        data-testid=${`services-voucher-tender-option-${o.grant_id}`}
         .value=${o.grant_id}
         ?checked=${chosen}
         @click=${() => this.select(o.grant_id)}
@@ -371,19 +371,26 @@ export class ErpServicesVoucherTender extends LitElement {
     const held = this.held;
     if (!held) return nothing;
     return html`<div class="box">
-      <ok-inline-feedback tone="success" icon="checkmark-circle-outline">
+      <ok-inline-feedback
+        data-testid="services-voucher-tender-held"
+        tone="success"
+        icon="checkmark-circle-outline"
+      >
         ${held.remaining_after === null
           ? this.t('ui.tender.heldUnlimited', { name: held.package_name })
           : this.t('ui.tender.held', { name: held.package_name, after: held.remaining_after })}
       </ok-inline-feedback>
       ${this.feedback
-        ? html`<ok-inline-feedback tone="danger" icon="alert-circle-outline"
+        ? html`<ok-inline-feedback
+            data-testid="services-voucher-tender-error"
+            tone="danger"
+            icon="alert-circle-outline"
             >${this.feedback}</ok-inline-feedback
           >`
         : nothing}
       <div class="actions">
         <ion-button
-          data-test="undo"
+          data-testid="services-voucher-tender-undo"
           fill="clear"
           ?disabled=${this.busy}
           @click=${() => this.undo()}
@@ -405,11 +412,15 @@ export class ErpServicesVoucherTender extends LitElement {
       // the cashier must read is «do not charge full price yet, this customer may have a voucher».
       const detail = this.feedback && this.feedback !== this.t('ui.tender.loadFailed') ? this.feedback : '';
       return html`<div class="box">
-        <ok-inline-feedback tone="danger" icon="alert-circle-outline">
+        <ok-inline-feedback
+          data-testid="services-voucher-tender-load-error"
+          tone="danger"
+          icon="alert-circle-outline"
+        >
           ${this.t('ui.tender.loadFailed')}${detail ? html` <span class="meta">${detail}</span>` : nothing}
         </ok-inline-feedback>
         <div class="actions">
-          <ion-button fill="clear" data-test="retry" @click=${() => this.load()}
+          <ion-button fill="clear" data-testid="services-voucher-tender-retry" @click=${() => this.load()}
             >${this.t('ui.tender.btnRetry')}</ion-button
           >
         </div>
@@ -417,7 +428,10 @@ export class ErpServicesVoucherTender extends LitElement {
     }
     if (this.options.length === 0) {
       return html`<div class="box">
-        <ok-inline-feedback tone="neutral" icon="information-circle-outline"
+        <ok-inline-feedback
+          data-testid="services-voucher-tender-none"
+          tone="neutral"
+          icon="information-circle-outline"
           >${this.t('ui.tender.none')}</ok-inline-feedback
         >
       </div>`;
@@ -436,14 +450,17 @@ export class ErpServicesVoucherTender extends LitElement {
         ${this.options.map((o) => this.renderOption(o))}
       </div>
       ${this.feedback
-        ? html`<ok-inline-feedback tone="danger" icon="alert-circle-outline"
+        ? html`<ok-inline-feedback
+            data-testid="services-voucher-tender-error"
+            tone="danger"
+            icon="alert-circle-outline"
             >${this.feedback}</ok-inline-feedback
           >`
         : nothing}
       ${can('services.hold_package')
         ? html`<div class="actions">
             <ion-button
-              data-test="confirm"
+              data-testid="services-voucher-tender-confirm"
               ?disabled=${this.busy || !this.selectedId}
               @click=${() => this.confirm()}
               >${this.busy ? this.t('ui.tender.btnHolding') : this.t('ui.tender.btnConfirm')}</ion-button

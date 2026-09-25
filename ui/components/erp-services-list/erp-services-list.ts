@@ -606,51 +606,51 @@ export class ErpServicesList extends LitElement {
         <ion-button class="ion-margin-top" expand="block" data-testid="services-list-archive-submit" style=${ionTone('solid', 'danger')} ?disabled=${this.saving} @click=${() => this.confirmArchive()}>
           ${this.saving ? t('ui.btnSaving') : t('ui.archiveConfirm')}
         </ion-button>
-        <ion-button expand="block" fill="outline" ?disabled=${this.saving} @click=${() => (this.archiveTarget = null)}>
+        <ion-button expand="block" fill="outline" data-testid="services-list-archive-cancel" ?disabled=${this.saving} @click=${() => (this.archiveTarget = null)}>
           ${t('ui.btnCancel')}
         </ion-button>
       </ion-content>
     </ion-modal>`;
   }
 
-  // El título de la vista lo pinta el topbar del shell: repetirlo aquí lo duplicaba en pantalla.
+  // The view title is painted by the shell topbar: repeating it here showed it twice on screen.
   render() {
     const t = (k: string): string => erplora().t(CATALOG, k);
     return html`<div class="page">
-        ${this.formError ? html`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : nothing}
-        ${this.ctrl?.error ? html`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : nothing}
-        <ok-data-table .serverSide=${true} .fill=${true} .addable=${true} .views=${true} .cardTitle=${(row: Record<string, unknown>) => String(row.name ?? '')} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? 'asc'} .searchable=${true} .searchPlaceholder=${t('ui.searchPlaceholder')} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t('ui.loading') : t('ui.empty')} @rowAction=${(e: CustomEvent) => this.onRowAction(e)} @rowClick=${(e: CustomEvent<{ row: Record<string, unknown> }>) => this.onRowAction({ detail: { actionId: 'edit', row: e.detail.row } } as CustomEvent<{ actionId: string; row: Record<string, unknown> }>)}
+        ${this.formError ? html`<ok-inline-feedback data-testid="services-list-form-error" tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : nothing}
+        ${this.ctrl?.error ? html`<ok-inline-feedback data-testid="services-list-load-error" tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : nothing}
+        <ok-data-table testid="services-list-table" .serverSide=${true} .fill=${true} .addable=${true} .views=${true} .cardTitle=${(row: Record<string, unknown>) => String(row.name ?? '')} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? 'asc'} .searchable=${true} .searchPlaceholder=${t('ui.searchPlaceholder')} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t('ui.loading') : t('ui.empty')} @rowAction=${(e: CustomEvent) => this.onRowAction(e)} @rowClick=${(e: CustomEvent<{ row: Record<string, unknown> }>) => this.onRowAction({ detail: { actionId: 'edit', row: e.detail.row } } as CustomEvent<{ actionId: string; row: Record<string, unknown> }>)}
  @pageChange=${(e: CustomEvent<number>) => this.ctrl.setPage(e.detail)} @pageSizeChange=${(e: CustomEvent<number>) => this.ctrl.setPageSize(e.detail)} @sortChange=${(e: CustomEvent<{ sort: string; dir: 'asc' | 'desc' }>) => this.ctrl.setSort(e.detail.sort, e.detail.dir)} @searchChange=${(e: CustomEvent<string>) => this.ctrl.setSearch(e.detail)} @filterChange=${(e: CustomEvent<{ col: string; value: unknown }>) => this.onFilterChange(e.detail.col, e.detail.value)}>
-          <!-- Alta: se proyecta SIEMPRE (aunque el panel esté cerrado); si solo se pintara al abrir,
-               el «+» de la barra desplegaría un panel vacío. -->
-          <form slot="create" class="form" @submit=${(e: Event) => this.createService(e)}>
+          <!-- Create form: ALWAYS projected (even with the panel shut); painted only on open, the
+               toolbar «+» would slide out an empty panel. -->
+          <form slot="create" class="form" data-testid="services-list-form" @submit=${(e: Event) => this.createService(e)}>
             ${this.editingId
-              ? html`<ok-inline-feedback tone="info" icon="create-outline">
+              ? html`<ok-inline-feedback data-testid="services-list-editing" tone="info" icon="create-outline">
                   <b>${t('ui.editingTitle')}</b> — ${this.newName}
-                  <ion-button size="small" fill="clear" @click=${() => this.cancelEdit()}>${t('ui.editingCancel')}</ion-button>
+                  <ion-button size="small" fill="clear" data-testid="services-list-edit-cancel" @click=${() => this.cancelEdit()}>${t('ui.editingCancel')}</ion-button>
                 </ok-inline-feedback>`
               : nothing}
-            <ion-input fill="outline" label-placement="floating" label=${t('ui.colName')} .value=${this.newName} @ionInput=${(e: any) => (this.newName = e.target.value)}></ion-input>
-            <ion-input fill="outline" label-placement="floating" label=${t('ui.colPrice')} type="text" inputmode="decimal" .value=${this.newPrice} @ionInput=${(e: any) => (this.newPrice = e.target.value)}></ion-input>
-            <ion-input fill="outline" label-placement="floating" label=${t('ui.colDuration')} type="number" step="1" .value=${this.newDuration} @ionInput=${(e: any) => (this.newDuration = e.target.value)}></ion-input>
-            <!-- Los dos selects van SIN placeholder, a propósito (services#57): con la etiqueta
-                 flotante, Ionic sube el label al hueco del borde en cuanto el campo tiene foco y
-                 pinta el placeholder DENTRO — dos textos casi iguales a unos píxeles. La etiqueta
-                 sola ya dice qué es el campo; un placeholder solo cabe si añade algo (un formato,
-                 un ejemplo), no si repite el nombre. -->
-            <ion-select fill="outline" label-placement="floating" label=${t('ui.colCategory')} .value=${this.newCategory} @ionChange=${(e: any) => (this.newCategory = e.target.value)}>
+            <ion-input data-testid="services-list-name" fill="outline" label-placement="floating" label=${t('ui.colName')} .value=${this.newName} @ionInput=${(e: any) => (this.newName = e.target.value)}></ion-input>
+            <ion-input data-testid="services-list-price" fill="outline" label-placement="floating" label=${t('ui.colPrice')} type="text" inputmode="decimal" .value=${this.newPrice} @ionInput=${(e: any) => (this.newPrice = e.target.value)}></ion-input>
+            <ion-input data-testid="services-list-duration" fill="outline" label-placement="floating" label=${t('ui.colDuration')} type="number" step="1" .value=${this.newDuration} @ionInput=${(e: any) => (this.newDuration = e.target.value)}></ion-input>
+            <!-- Both selects go WITHOUT a placeholder, on purpose (services#57): with a floating
+                 label, Ionic lifts the label into the border gap as soon as the field has focus and
+                 paints the placeholder INSIDE — two near-identical texts a few pixels apart. The
+                 label alone says what the field is; a placeholder only fits if it adds something
+                 (a format, an example), not if it repeats the name. -->
+            <ion-select data-testid="services-list-category" fill="outline" label-placement="floating" label=${t('ui.colCategory')} .value=${this.newCategory} @ionChange=${(e: any) => (this.newCategory = e.target.value)}>
               <ion-select-option value="">${t('ui.optionNoCategory')}</ion-select-option>
               ${this.categories.map((c) => html`<ion-select-option .value=${c.id}>${c.name}</ion-select-option>`)}
             </ion-select>
-            <ion-select fill="outline" label-placement="floating" label=${t('ui.colTax')} .value=${this.newTaxRateId} @ionChange=${(e: any) => (this.newTaxRateId = e.target.value)}>
+            <ion-select data-testid="services-list-tax" fill="outline" label-placement="floating" label=${t('ui.colTax')} .value=${this.newTaxRateId} @ionChange=${(e: any) => (this.newTaxRateId = e.target.value)}>
               ${this.taxOptions()}
             </ion-select>
-            <!-- Sin categorías fiscales el alta es imposible (la categoría es obligatoria): se dice
-                 dónde se arregla, en vez de dejar un desplegable vacío sin explicación. -->
+            <!-- Without tax categories creating is impossible (the category is required): say where
+                 to fix it, instead of leaving an empty dropdown with no explanation. -->
             ${this.taxRates.length === 0
-              ? html`<ok-inline-feedback tone="warning" icon="alert-circle-outline">${t('ui.taxCategoriesMissing')}</ok-inline-feedback>`
+              ? html`<ok-inline-feedback data-testid="services-list-tax-missing" tone="warning" icon="alert-circle-outline">${t('ui.taxCategoriesMissing')}</ok-inline-feedback>`
               : nothing}
-            <ion-button type="submit" ?disabled=${this.saving || !this.newName || !this.newTaxRateId}>${this.saving ? t('ui.btnSaving') : this.editingId ? t('ui.btnSave') : t('ui.btnAdd')}</ion-button>
+            <ion-button type="submit" data-testid="services-list-submit" ?disabled=${this.saving || !this.newName || !this.newTaxRateId}>${this.saving ? t('ui.btnSaving') : this.editingId ? t('ui.btnSave') : t('ui.btnAdd')}</ion-button>
           </form>
         </ok-data-table>
         ${this.renderArchiveConfirm()}
