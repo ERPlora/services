@@ -186,7 +186,7 @@ describe('the preview: which voucher, which line, and how many sessions are left
     options = [];
     const el = await mount();
     expect(text(el)).toContain('ui.tender.none');
-    expect(el.shadowRoot.querySelector('[data-test="confirm"]')).toBeFalsy();
+    expect(el.shadowRoot.querySelector('[data-testid="services-voucher-tender-confirm"]')).toBeFalsy();
   });
 });
 
@@ -221,8 +221,8 @@ describe('the hold is explicit, and undoable while the sale is not paid', () => 
     await el.confirm();
     await settle(el);
     expect(el.held?.redemption_id).toBe('red-1');
-    expect(el.shadowRoot.querySelector('[data-test="undo"]')).toBeTruthy();
-    expect(el.shadowRoot.querySelector('[data-test="confirm"]')).toBeFalsy();
+    expect(el.shadowRoot.querySelector('[data-testid="services-voucher-tender-undo"]')).toBeTruthy();
+    expect(el.shadowRoot.querySelector('[data-testid="services-voucher-tender-confirm"]')).toBeFalsy();
   });
 
   it('undo releases THAT redemption and puts the choice back on screen', async () => {
@@ -236,7 +236,7 @@ describe('the hold is explicit, and undoable while the sale is not paid', () => 
       payload: { redemption_id: 'red-1' },
     });
     expect(el.held).toBeNull();
-    expect(el.shadowRoot.querySelector('[data-test="confirm"]')).toBeTruthy();
+    expect(el.shadowRoot.querySelector('[data-testid="services-voucher-tender-confirm"]')).toBeTruthy();
   });
 
   it('a refused undo is SHOWN, never swallowed — the session stays spent', async () => {
@@ -270,7 +270,7 @@ describe('permissions and the loading state', () => {
   it('without services.hold_package there is nothing to confirm', async () => {
     sdk.hasPermission = (p: string) => p === 'services.view_package_balance';
     const el = await mount();
-    expect(el.shadowRoot.querySelector('[data-test="confirm"]')).toBeFalsy();
+    expect(el.shadowRoot.querySelector('[data-testid="services-voucher-tender-confirm"]')).toBeFalsy();
   });
 
   it('a failing read says so instead of rendering an empty list as «no vouchers»', async () => {
@@ -315,8 +315,8 @@ describe('services#77 · a taken session survives the screen reloading', () => {
     // customer twice.
     expect(el.held).toMatchObject({ redemption_id: 'red-9', package_name: 'Bono 5 cortes' });
     expect(text(el)).toContain('ui.tender.held:{"name":"Bono 5 cortes","after":2}');
-    expect(el.shadowRoot.querySelector('[data-test="undo"]')).not.toBeNull();
-    expect(el.shadowRoot.querySelector('[data-test="confirm"]')).toBeNull();
+    expect(el.shadowRoot.querySelector('[data-testid="services-voucher-tender-undo"]')).not.toBeNull();
+    expect(el.shadowRoot.querySelector('[data-testid="services-voucher-tender-confirm"]')).toBeNull();
   });
 
   it('the recovered id is what the undo releases, and the chooser comes back', async () => {
@@ -342,7 +342,7 @@ describe('services#77 · a taken session survives the screen reloading', () => {
     });
     expect(el.held).toBeNull();
     // …and the cashier can spend a voucher on this line again, which is the point of undoing.
-    expect(el.shadowRoot.querySelector('[data-test="confirm"]')).not.toBeNull();
+    expect(el.shadowRoot.querySelector('[data-testid="services-voucher-tender-confirm"]')).not.toBeNull();
   });
 
   it('only the hold of THIS line comes back — a checkout covers several', async () => {
@@ -361,7 +361,7 @@ describe('services#77 · a taken session survives the screen reloading', () => {
         : options;
     const el = await mount();
     expect(el.held).toBeNull();
-    expect(el.shadowRoot.querySelector('[data-test="confirm"]')).not.toBeNull();
+    expect(el.shadowRoot.querySelector('[data-testid="services-voucher-tender-confirm"]')).not.toBeNull();
   });
 
   it('nothing held: the chooser, exactly as before', async () => {
@@ -382,9 +382,9 @@ describe('services#77 · a taken session survives the screen reloading', () => {
       return options;
     };
     const el = await mount();
-    expect(el.shadowRoot.querySelector('[data-test="confirm"]')).toBeNull();
+    expect(el.shadowRoot.querySelector('[data-testid="services-voucher-tender-confirm"]')).toBeNull();
     expect(text(el)).toContain('ui.tender.loadFailed');
-    expect(el.shadowRoot.querySelector('[data-test="retry"]')).not.toBeNull();
+    expect(el.shadowRoot.querySelector('[data-testid="services-voucher-tender-retry"]')).not.toBeNull();
   });
 
   it('an unlimited voucher recovered does not invent a countdown', async () => {

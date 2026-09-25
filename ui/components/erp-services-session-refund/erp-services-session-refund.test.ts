@@ -225,7 +225,7 @@ describe('arming: the host is told this line goes back', () => {
     // both fire and the second undoes the first, with every test still green.
     const seen = listenOnHost();
     const el = await mount();
-    const box = el.shadowRoot.querySelector('[data-test="give-back"]') as HTMLElement;
+    const box = el.shadowRoot.querySelector('[data-testid="services-session-refund-give-back"]') as HTMLElement;
     expect(box).toBeTruthy();
     box.dispatchEvent(new CustomEvent('ionChange', { detail: { checked: false } }));
     await el.updateComplete;
@@ -243,7 +243,7 @@ describe('arming: the host is told this line goes back', () => {
     // tick becomes dead on a real till while happy-dom — which raises neither by itself — stays
     // green. Here the click is raised on its own, and it must do nothing at all.
     const el = await mount();
-    const box = el.shadowRoot.querySelector('[data-test="give-back"]') as HTMLElement;
+    const box = el.shadowRoot.querySelector('[data-testid="services-session-refund-give-back"]') as HTMLElement;
     box.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
     await el.updateComplete;
     expect(el.armed).toBe(true);
@@ -379,7 +379,7 @@ describe('the read failing is not «nothing to give back»', () => {
     const el = await mount();
     expect(text(el)).toContain('ui.sessionRefund.loadFailed');
     expect(seen.armed).toHaveLength(0);
-    expect(el.shadowRoot.querySelector('[data-test="retry"]')).toBeTruthy();
+    expect(el.shadowRoot.querySelector('[data-testid="services-session-refund-retry"]')).toBeTruthy();
   });
 
   it('and a failed read never sends a refund on the operator pressing Devolver', async () => {

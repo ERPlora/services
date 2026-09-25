@@ -228,7 +228,7 @@ export class ErpServicesCategories extends LitElement {
             : nothing}
         </ion-list>
         <ion-button class="ion-margin-top" expand="block" data-testid="services-categories-delete-submit" style=${ionTone('solid', 'danger')} ?disabled=${this.saving} @click=${() => this.confirmDelete()}>${t('ui.actionDelete')}</ion-button>
-        <ion-button expand="block" fill="outline" ?disabled=${this.saving} @click=${() => (this.deleteTarget = null)}>${t('ui.btnCancel')}</ion-button>
+        <ion-button expand="block" fill="outline" data-testid="services-categories-delete-cancel" ?disabled=${this.saving} @click=${() => (this.deleteTarget = null)}>${t('ui.btnCancel')}</ion-button>
       </ion-content>
     </ion-modal>`;
   }
@@ -238,24 +238,24 @@ export class ErpServicesCategories extends LitElement {
     // A category cannot be its own parent (the server refuses it: `category_update_rejected`).
     const parentOptions = this.allCategories.filter((c) => c.id !== this.editingId);
     return html`<div class="page">
-      ${this.formError ? html`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : nothing}
-      ${this.ctrl?.error ? html`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : nothing}
-      <ok-data-table .serverSide=${true} .fill=${true} .views=${true} .addable=${can('services.add_category')} .cardTitle=${(row: Record<string, unknown>) => String(row.name ?? '')} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? 'asc'} .searchable=${true} .searchPlaceholder=${t('ui.searchCategoryPlaceholder')} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t('ui.loading') : t('ui.emptyCategories')} @rowAction=${(e: CustomEvent<{ actionId: string; row: Record<string, unknown> }>) => this.onRowAction(e)} @rowClick=${(e: CustomEvent<{ row: Record<string, unknown> }>) => this.onRowAction({ detail: { actionId: 'edit', row: e.detail.row } } as CustomEvent<{ actionId: string; row: Record<string, unknown> }>)}
+      ${this.formError ? html`<ok-inline-feedback data-testid="services-categories-form-error" tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : nothing}
+      ${this.ctrl?.error ? html`<ok-inline-feedback data-testid="services-categories-load-error" tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : nothing}
+      <ok-data-table testid="services-categories-table" .serverSide=${true} .fill=${true} .views=${true} .addable=${can('services.add_category')} .cardTitle=${(row: Record<string, unknown>) => String(row.name ?? '')} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? 'asc'} .searchable=${true} .searchPlaceholder=${t('ui.searchCategoryPlaceholder')} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t('ui.loading') : t('ui.emptyCategories')} @rowAction=${(e: CustomEvent<{ actionId: string; row: Record<string, unknown> }>) => this.onRowAction(e)} @rowClick=${(e: CustomEvent<{ row: Record<string, unknown> }>) => this.onRowAction({ detail: { actionId: 'edit', row: e.detail.row } } as CustomEvent<{ actionId: string; row: Record<string, unknown> }>)}
  @pageChange=${(e: CustomEvent<number>) => this.ctrl.setPage(e.detail)} @pageSizeChange=${(e: CustomEvent<number>) => this.ctrl.setPageSize(e.detail)} @sortChange=${(e: CustomEvent<{ sort: string; dir: 'asc' | 'desc' }>) => this.ctrl.setSort(e.detail.sort, e.detail.dir)} @searchChange=${(e: CustomEvent<string>) => this.ctrl.setSearch(e.detail)} @filterChange=${(e: CustomEvent<{ col: string; value: unknown }>) => this.ctrl.setFilter(e.detail.col, e.detail.value)}>
-        <form slot="create" class="form" @submit=${(e: Event) => this.save(e)}>
+        <form slot="create" class="form" data-testid="services-categories-form" @submit=${(e: Event) => this.save(e)}>
           ${this.editingId
-            ? html`<ok-inline-feedback tone="info" icon="create-outline">
+            ? html`<ok-inline-feedback data-testid="services-categories-editing" tone="info" icon="create-outline">
                 <b>${t('ui.editingCategoryTitle')}</b> — ${this.newName}
-                <ion-button size="small" fill="clear" @click=${() => this.cancelEdit()}>${t('ui.editingCancel')}</ion-button>
+                <ion-button size="small" fill="clear" data-testid="services-categories-edit-cancel" @click=${() => this.cancelEdit()}>${t('ui.editingCancel')}</ion-button>
               </ok-inline-feedback>`
             : nothing}
-          <ion-input fill="outline" label-placement="floating" label=${t('ui.colName')} .value=${this.newName} @ionInput=${(e: any) => (this.newName = e.target.value)}></ion-input>
-          <ion-select fill="outline" label-placement="floating" label=${t('ui.colParent')} placeholder=${t('ui.placeholderParent')} .value=${this.newParent} @ionChange=${(e: any) => (this.newParent = e.target.value)}>
+          <ion-input data-testid="services-categories-name" fill="outline" label-placement="floating" label=${t('ui.colName')} .value=${this.newName} @ionInput=${(e: any) => (this.newName = e.target.value)}></ion-input>
+          <ion-select data-testid="services-categories-parent" fill="outline" label-placement="floating" label=${t('ui.colParent')} placeholder=${t('ui.placeholderParent')} .value=${this.newParent} @ionChange=${(e: any) => (this.newParent = e.target.value)}>
             <ion-select-option value="">${t('ui.optionNoParent')}</ion-select-option>
             ${parentOptions.map((c) => html`<ion-select-option .value=${c.id}>${c.name}</ion-select-option>`)}
           </ion-select>
-          <ion-input fill="outline" label-placement="floating" label=${t('ui.colSortOrder')} type="number" step="1" .value=${this.newSortOrder} @ionInput=${(e: any) => (this.newSortOrder = e.target.value)}></ion-input>
-          <ion-button type="submit" ?disabled=${this.saving || !this.newName}>${this.saving ? t('ui.btnSaving') : this.editingId ? t('ui.btnSave') : t('ui.btnAdd')}</ion-button>
+          <ion-input data-testid="services-categories-sort-order" fill="outline" label-placement="floating" label=${t('ui.colSortOrder')} type="number" step="1" .value=${this.newSortOrder} @ionInput=${(e: any) => (this.newSortOrder = e.target.value)}></ion-input>
+          <ion-button type="submit" data-testid="services-categories-submit" ?disabled=${this.saving || !this.newName}>${this.saving ? t('ui.btnSaving') : this.editingId ? t('ui.btnSave') : t('ui.btnAdd')}</ion-button>
         </form>
       </ok-data-table>
       ${this.renderDeleteConfirm()}

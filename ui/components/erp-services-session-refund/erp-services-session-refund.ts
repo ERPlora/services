@@ -310,7 +310,10 @@ export class ErpServicesSessionRefund extends LitElement {
 
   private renderReason(s: SoldSession) {
     const known = (REASONS as readonly string[]).includes(s.reason);
-    return html`<ok-inline-feedback tone="neutral" icon="information-circle-outline"
+    return html`<ok-inline-feedback
+      data-testid="services-session-refund-reason"
+      tone="neutral"
+      icon="information-circle-outline"
       >${known
         ? this.t(`ui.sessionRefund.reason.${s.reason}`)
         : this.t('ui.sessionRefund.reason.generic')}</ok-inline-feedback
@@ -319,7 +322,10 @@ export class ErpServicesSessionRefund extends LitElement {
 
   private renderFeedback() {
     if (!this.feedback) return nothing;
-    return html`<ok-inline-feedback tone="danger" icon="alert-circle-outline"
+    return html`<ok-inline-feedback
+      data-testid="services-session-refund-error"
+      tone="danger"
+      icon="alert-circle-outline"
       >${this.feedback}</ok-inline-feedback
     >`;
   }
@@ -332,11 +338,14 @@ export class ErpServicesSessionRefund extends LitElement {
     }
     if (this.loadFailed) {
       return html`<div class="box">
-        <ok-inline-feedback tone="danger" icon="alert-circle-outline"
+        <ok-inline-feedback
+          data-testid="services-session-refund-load-error"
+          tone="danger"
+          icon="alert-circle-outline"
           >${this.t('ui.sessionRefund.loadFailed')}</ok-inline-feedback
         >
         <div class="actions">
-          <ion-button fill="clear" data-test="retry" @click=${() => this.load(true)}
+          <ion-button fill="clear" data-testid="services-session-refund-retry" @click=${() => this.load(true)}
             >${this.t('ui.sessionRefund.btnRetry')}</ion-button
           >
         </div>
@@ -348,7 +357,10 @@ export class ErpServicesSessionRefund extends LitElement {
     if (!s) return nothing;
     if (this.refunded) {
       return html`<div class="box">
-        <ok-inline-feedback tone="success" icon="checkmark-circle-outline"
+        <ok-inline-feedback
+          data-testid="services-session-refund-done"
+          tone="success"
+          icon="checkmark-circle-outline"
           >${this.t('ui.sessionRefund.done', { name: s.package_name })}</ok-inline-feedback
         >
       </div>`;
@@ -369,7 +381,7 @@ export class ErpServicesSessionRefund extends LitElement {
              every test would still be green. The label goes INSIDE the control, which is Ionic's
              own pattern and gives the whole row as a tap target. -->
         <ion-checkbox
-          data-test="give-back"
+          data-testid="services-session-refund-give-back"
           label-placement="end"
           justify="start"
           ?checked=${this.armed}
@@ -387,7 +399,10 @@ export class ErpServicesSessionRefund extends LitElement {
         </ion-checkbox>
       </div>
       ${warning
-        ? html`<ok-inline-feedback tone="warning" icon="alert-circle-outline"
+        ? html`<ok-inline-feedback
+            data-testid="services-session-refund-expiry-warning"
+            tone="warning"
+            icon="alert-circle-outline"
             >${warning}</ok-inline-feedback
           >`
         : nothing}

@@ -4543,7 +4543,7 @@ var ErpServicesCategories = class extends i3 {
               </ion-item>` : A}
         </ion-list>
         <ion-button class="ion-margin-top" expand="block" data-testid="services-categories-delete-submit" style=${ionTone("solid", "danger")} ?disabled=${this.saving} @click=${() => this.confirmDelete()}>${t5("ui.actionDelete")}</ion-button>
-        <ion-button expand="block" fill="outline" ?disabled=${this.saving} @click=${() => this.deleteTarget = null}>${t5("ui.btnCancel")}</ion-button>
+        <ion-button expand="block" fill="outline" data-testid="services-categories-delete-cancel" ?disabled=${this.saving} @click=${() => this.deleteTarget = null}>${t5("ui.btnCancel")}</ion-button>
       </ion-content>
     </ion-modal>`;
   }
@@ -4551,22 +4551,22 @@ var ErpServicesCategories = class extends i3 {
     const t5 = (k2) => erplora().t(CATALOG, k2);
     const parentOptions = this.allCategories.filter((c5) => c5.id !== this.editingId);
     return b2`<div class="page">
-      ${this.formError ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : A}
-      ${this.ctrl?.error ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : A}
-      <ok-data-table .serverSide=${true} .fill=${true} .views=${true} .addable=${can("services.add_category")} .cardTitle=${(row) => String(row.name ?? "")} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "asc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchCategoryPlaceholder")} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.emptyCategories")} @rowAction=${(e5) => this.onRowAction(e5)} @rowClick=${(e5) => this.onRowAction({ detail: { actionId: "edit", row: e5.detail.row } })}
+      ${this.formError ? b2`<ok-inline-feedback data-testid="services-categories-form-error" tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : A}
+      ${this.ctrl?.error ? b2`<ok-inline-feedback data-testid="services-categories-load-error" tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : A}
+      <ok-data-table testid="services-categories-table" .serverSide=${true} .fill=${true} .views=${true} .addable=${can("services.add_category")} .cardTitle=${(row) => String(row.name ?? "")} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "asc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchCategoryPlaceholder")} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.emptyCategories")} @rowAction=${(e5) => this.onRowAction(e5)} @rowClick=${(e5) => this.onRowAction({ detail: { actionId: "edit", row: e5.detail.row } })}
  @pageChange=${(e5) => this.ctrl.setPage(e5.detail)} @pageSizeChange=${(e5) => this.ctrl.setPageSize(e5.detail)} @sortChange=${(e5) => this.ctrl.setSort(e5.detail.sort, e5.detail.dir)} @searchChange=${(e5) => this.ctrl.setSearch(e5.detail)} @filterChange=${(e5) => this.ctrl.setFilter(e5.detail.col, e5.detail.value)}>
-        <form slot="create" class="form" @submit=${(e5) => this.save(e5)}>
-          ${this.editingId ? b2`<ok-inline-feedback tone="info" icon="create-outline">
+        <form slot="create" class="form" data-testid="services-categories-form" @submit=${(e5) => this.save(e5)}>
+          ${this.editingId ? b2`<ok-inline-feedback data-testid="services-categories-editing" tone="info" icon="create-outline">
                 <b>${t5("ui.editingCategoryTitle")}</b> — ${this.newName}
-                <ion-button size="small" fill="clear" @click=${() => this.cancelEdit()}>${t5("ui.editingCancel")}</ion-button>
+                <ion-button size="small" fill="clear" data-testid="services-categories-edit-cancel" @click=${() => this.cancelEdit()}>${t5("ui.editingCancel")}</ion-button>
               </ok-inline-feedback>` : A}
-          <ion-input fill="outline" label-placement="floating" label=${t5("ui.colName")} .value=${this.newName} @ionInput=${(e5) => this.newName = e5.target.value}></ion-input>
-          <ion-select fill="outline" label-placement="floating" label=${t5("ui.colParent")} placeholder=${t5("ui.placeholderParent")} .value=${this.newParent} @ionChange=${(e5) => this.newParent = e5.target.value}>
+          <ion-input data-testid="services-categories-name" fill="outline" label-placement="floating" label=${t5("ui.colName")} .value=${this.newName} @ionInput=${(e5) => this.newName = e5.target.value}></ion-input>
+          <ion-select data-testid="services-categories-parent" fill="outline" label-placement="floating" label=${t5("ui.colParent")} placeholder=${t5("ui.placeholderParent")} .value=${this.newParent} @ionChange=${(e5) => this.newParent = e5.target.value}>
             <ion-select-option value="">${t5("ui.optionNoParent")}</ion-select-option>
             ${parentOptions.map((c5) => b2`<ion-select-option .value=${c5.id}>${c5.name}</ion-select-option>`)}
           </ion-select>
-          <ion-input fill="outline" label-placement="floating" label=${t5("ui.colSortOrder")} type="number" step="1" .value=${this.newSortOrder} @ionInput=${(e5) => this.newSortOrder = e5.target.value}></ion-input>
-          <ion-button type="submit" ?disabled=${this.saving || !this.newName}>${this.saving ? t5("ui.btnSaving") : this.editingId ? t5("ui.btnSave") : t5("ui.btnAdd")}</ion-button>
+          <ion-input data-testid="services-categories-sort-order" fill="outline" label-placement="floating" label=${t5("ui.colSortOrder")} type="number" step="1" .value=${this.newSortOrder} @ionInput=${(e5) => this.newSortOrder = e5.target.value}></ion-input>
+          <ion-button type="submit" data-testid="services-categories-submit" ?disabled=${this.saving || !this.newName}>${this.saving ? t5("ui.btnSaving") : this.editingId ? t5("ui.btnSave") : t5("ui.btnAdd")}</ion-button>
         </form>
       </ok-data-table>
       ${this.renderDeleteConfirm()}
@@ -5003,46 +5003,46 @@ var ErpServicesList = class extends i3 {
         <ion-button class="ion-margin-top" expand="block" data-testid="services-list-archive-submit" style=${ionTone("solid", "danger")} ?disabled=${this.saving} @click=${() => this.confirmArchive()}>
           ${this.saving ? t5("ui.btnSaving") : t5("ui.archiveConfirm")}
         </ion-button>
-        <ion-button expand="block" fill="outline" ?disabled=${this.saving} @click=${() => this.archiveTarget = null}>
+        <ion-button expand="block" fill="outline" data-testid="services-list-archive-cancel" ?disabled=${this.saving} @click=${() => this.archiveTarget = null}>
           ${t5("ui.btnCancel")}
         </ion-button>
       </ion-content>
     </ion-modal>`;
   }
-  // El título de la vista lo pinta el topbar del shell: repetirlo aquí lo duplicaba en pantalla.
+  // The view title is painted by the shell topbar: repeating it here showed it twice on screen.
   render() {
     const t5 = (k2) => erplora2().t(CATALOG2, k2);
     return b2`<div class="page">
-        ${this.formError ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : A}
-        ${this.ctrl?.error ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : A}
-        <ok-data-table .serverSide=${true} .fill=${true} .addable=${true} .views=${true} .cardTitle=${(row) => String(row.name ?? "")} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "asc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchPlaceholder")} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.empty")} @rowAction=${(e5) => this.onRowAction(e5)} @rowClick=${(e5) => this.onRowAction({ detail: { actionId: "edit", row: e5.detail.row } })}
+        ${this.formError ? b2`<ok-inline-feedback data-testid="services-list-form-error" tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : A}
+        ${this.ctrl?.error ? b2`<ok-inline-feedback data-testid="services-list-load-error" tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : A}
+        <ok-data-table testid="services-list-table" .serverSide=${true} .fill=${true} .addable=${true} .views=${true} .cardTitle=${(row) => String(row.name ?? "")} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "asc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchPlaceholder")} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.empty")} @rowAction=${(e5) => this.onRowAction(e5)} @rowClick=${(e5) => this.onRowAction({ detail: { actionId: "edit", row: e5.detail.row } })}
  @pageChange=${(e5) => this.ctrl.setPage(e5.detail)} @pageSizeChange=${(e5) => this.ctrl.setPageSize(e5.detail)} @sortChange=${(e5) => this.ctrl.setSort(e5.detail.sort, e5.detail.dir)} @searchChange=${(e5) => this.ctrl.setSearch(e5.detail)} @filterChange=${(e5) => this.onFilterChange(e5.detail.col, e5.detail.value)}>
-          <!-- Alta: se proyecta SIEMPRE (aunque el panel esté cerrado); si solo se pintara al abrir,
-               el «+» de la barra desplegaría un panel vacío. -->
-          <form slot="create" class="form" @submit=${(e5) => this.createService(e5)}>
-            ${this.editingId ? b2`<ok-inline-feedback tone="info" icon="create-outline">
+          <!-- Create form: ALWAYS projected (even with the panel shut); painted only on open, the
+               toolbar «+» would slide out an empty panel. -->
+          <form slot="create" class="form" data-testid="services-list-form" @submit=${(e5) => this.createService(e5)}>
+            ${this.editingId ? b2`<ok-inline-feedback data-testid="services-list-editing" tone="info" icon="create-outline">
                   <b>${t5("ui.editingTitle")}</b> — ${this.newName}
-                  <ion-button size="small" fill="clear" @click=${() => this.cancelEdit()}>${t5("ui.editingCancel")}</ion-button>
+                  <ion-button size="small" fill="clear" data-testid="services-list-edit-cancel" @click=${() => this.cancelEdit()}>${t5("ui.editingCancel")}</ion-button>
                 </ok-inline-feedback>` : A}
-            <ion-input fill="outline" label-placement="floating" label=${t5("ui.colName")} .value=${this.newName} @ionInput=${(e5) => this.newName = e5.target.value}></ion-input>
-            <ion-input fill="outline" label-placement="floating" label=${t5("ui.colPrice")} type="text" inputmode="decimal" .value=${this.newPrice} @ionInput=${(e5) => this.newPrice = e5.target.value}></ion-input>
-            <ion-input fill="outline" label-placement="floating" label=${t5("ui.colDuration")} type="number" step="1" .value=${this.newDuration} @ionInput=${(e5) => this.newDuration = e5.target.value}></ion-input>
-            <!-- Los dos selects van SIN placeholder, a propósito (services#57): con la etiqueta
-                 flotante, Ionic sube el label al hueco del borde en cuanto el campo tiene foco y
-                 pinta el placeholder DENTRO — dos textos casi iguales a unos píxeles. La etiqueta
-                 sola ya dice qué es el campo; un placeholder solo cabe si añade algo (un formato,
-                 un ejemplo), no si repite el nombre. -->
-            <ion-select fill="outline" label-placement="floating" label=${t5("ui.colCategory")} .value=${this.newCategory} @ionChange=${(e5) => this.newCategory = e5.target.value}>
+            <ion-input data-testid="services-list-name" fill="outline" label-placement="floating" label=${t5("ui.colName")} .value=${this.newName} @ionInput=${(e5) => this.newName = e5.target.value}></ion-input>
+            <ion-input data-testid="services-list-price" fill="outline" label-placement="floating" label=${t5("ui.colPrice")} type="text" inputmode="decimal" .value=${this.newPrice} @ionInput=${(e5) => this.newPrice = e5.target.value}></ion-input>
+            <ion-input data-testid="services-list-duration" fill="outline" label-placement="floating" label=${t5("ui.colDuration")} type="number" step="1" .value=${this.newDuration} @ionInput=${(e5) => this.newDuration = e5.target.value}></ion-input>
+            <!-- Both selects go WITHOUT a placeholder, on purpose (services#57): with a floating
+                 label, Ionic lifts the label into the border gap as soon as the field has focus and
+                 paints the placeholder INSIDE — two near-identical texts a few pixels apart. The
+                 label alone says what the field is; a placeholder only fits if it adds something
+                 (a format, an example), not if it repeats the name. -->
+            <ion-select data-testid="services-list-category" fill="outline" label-placement="floating" label=${t5("ui.colCategory")} .value=${this.newCategory} @ionChange=${(e5) => this.newCategory = e5.target.value}>
               <ion-select-option value="">${t5("ui.optionNoCategory")}</ion-select-option>
               ${this.categories.map((c5) => b2`<ion-select-option .value=${c5.id}>${c5.name}</ion-select-option>`)}
             </ion-select>
-            <ion-select fill="outline" label-placement="floating" label=${t5("ui.colTax")} .value=${this.newTaxRateId} @ionChange=${(e5) => this.newTaxRateId = e5.target.value}>
+            <ion-select data-testid="services-list-tax" fill="outline" label-placement="floating" label=${t5("ui.colTax")} .value=${this.newTaxRateId} @ionChange=${(e5) => this.newTaxRateId = e5.target.value}>
               ${this.taxOptions()}
             </ion-select>
-            <!-- Sin categorías fiscales el alta es imposible (la categoría es obligatoria): se dice
-                 dónde se arregla, en vez de dejar un desplegable vacío sin explicación. -->
-            ${this.taxRates.length === 0 ? b2`<ok-inline-feedback tone="warning" icon="alert-circle-outline">${t5("ui.taxCategoriesMissing")}</ok-inline-feedback>` : A}
-            <ion-button type="submit" ?disabled=${this.saving || !this.newName || !this.newTaxRateId}>${this.saving ? t5("ui.btnSaving") : this.editingId ? t5("ui.btnSave") : t5("ui.btnAdd")}</ion-button>
+            <!-- Without tax categories creating is impossible (the category is required): say where
+                 to fix it, instead of leaving an empty dropdown with no explanation. -->
+            ${this.taxRates.length === 0 ? b2`<ok-inline-feedback data-testid="services-list-tax-missing" tone="warning" icon="alert-circle-outline">${t5("ui.taxCategoriesMissing")}</ok-inline-feedback>` : A}
+            <ion-button type="submit" data-testid="services-list-submit" ?disabled=${this.saving || !this.newName || !this.newTaxRateId}>${this.saving ? t5("ui.btnSaving") : this.editingId ? t5("ui.btnSave") : t5("ui.btnAdd")}</ion-button>
           </form>
         </ok-data-table>
         ${this.renderArchiveConfirm()}
@@ -5560,7 +5560,7 @@ var ErpServicesPackages = class extends i3 {
           </ion-item>
         </ion-list>
         <ion-button class="ion-margin-top" expand="block" data-testid="services-packages-delete-submit" style=${ionTone("solid", "danger")} ?disabled=${this.saving} @click=${() => this.confirmDelete()}>${t5("ui.actionDelete")}</ion-button>
-        <ion-button expand="block" fill="outline" ?disabled=${this.saving} @click=${() => this.deleteTarget = null}>${t5("ui.btnCancel")}</ion-button>
+        <ion-button expand="block" fill="outline" data-testid="services-packages-delete-cancel" ?disabled=${this.saving} @click=${() => this.deleteTarget = null}>${t5("ui.btnCancel")}</ion-button>
       </ion-content>
     </ion-modal>`;
   }
@@ -5600,7 +5600,7 @@ var ErpServicesPackages = class extends i3 {
               · ${t5("ui.movementRefundDoc")}: ${m4.refund_ref ?? "\u2014"}
               ${m4.refund_note ? b2` · ${m4.refund_note}` : A}
             </p>
-            ${Number(m4.refund_expired) ? b2`<ok-inline-feedback tone="warning" icon="alert-circle-outline">${t5("ui.movementRefundedExpired")}</ok-inline-feedback>` : A}` : A}
+            ${Number(m4.refund_expired) ? b2`<ok-inline-feedback data-testid=${`services-packages-movement-refund-expired-${m4.redemption_id}`} tone="warning" icon="alert-circle-outline">${t5("ui.movementRefundedExpired")}</ok-inline-feedback>` : A}` : A}
       </ion-label>
     </ion-item>`;
   }
@@ -5611,7 +5611,7 @@ var ErpServicesPackages = class extends i3 {
         <ion-toolbar>
           <ion-title>${t5("ui.movementsTitle")}</ion-title>
           <ion-buttons slot="end">
-            <ion-button @click=${() => this.movementsOf = null}>${t5("ui.btnClose")}</ion-button>
+            <ion-button data-testid="services-packages-movements-close" @click=${() => this.movementsOf = null}>${t5("ui.btnClose")}</ion-button>
           </ion-buttons>
         </ion-toolbar>
       </ion-header>
@@ -5620,10 +5620,10 @@ var ErpServicesPackages = class extends i3 {
         <p><b>${this.movementsOf?.name ?? ""}</b> — ${t5("ui.movementsHint")}</p>
         <!-- The error goes ABOVE the list, not instead of it: a page that failed to load must not
              take away the movements already on screen. -->
-        ${this.movementsError ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.movementsError}</ok-inline-feedback>` : A}
-        ${this.movements.length === 0 ? this.movementsLoading ? b2`<ok-inline-feedback tone="neutral" icon="time-outline">${t5("ui.loading")}</ok-inline-feedback>` : this.movementsError ? A : b2`<ok-inline-feedback tone="neutral" icon="information-circle-outline">${t5("ui.emptyMovements")}</ok-inline-feedback>` : b2`<ion-list lines="full">${this.movements.map((m4) => this.renderMovement(m4))}</ion-list>
+        ${this.movementsError ? b2`<ok-inline-feedback data-testid="services-packages-movements-error" tone="danger" icon="alert-circle-outline">${this.movementsError}</ok-inline-feedback>` : A}
+        ${this.movements.length === 0 ? this.movementsLoading ? b2`<ok-inline-feedback data-testid="services-packages-movements-loading" tone="neutral" icon="time-outline">${t5("ui.loading")}</ok-inline-feedback>` : this.movementsError ? A : b2`<ok-inline-feedback data-testid="services-packages-movements-empty" tone="neutral" icon="information-circle-outline">${t5("ui.emptyMovements")}</ok-inline-feedback>` : b2`<ion-list lines="full">${this.movements.map((m4) => this.renderMovement(m4))}</ion-list>
               ${this.movements.length < this.movementsTotal ? b2`<p class="more">${t5("ui.movementsCount", { shown: this.movements.length, total: this.movementsTotal })}</p>
-                    <ion-button expand="block" fill="clear" ?disabled=${this.movementsLoading} @click=${() => this.loadMoreMovements()}>
+                    <ion-button expand="block" fill="clear" data-testid="services-packages-movements-more" ?disabled=${this.movementsLoading} @click=${() => this.loadMoreMovements()}>
                       ${this.movementsLoading ? t5("ui.loading") : t5("ui.movementsMore")}
                     </ion-button>` : A}`}
       </ion-content>
@@ -5658,7 +5658,7 @@ var ErpServicesPackages = class extends i3 {
         <ion-toolbar>
           <ion-title>${t5("ui.orphansTitle")}</ion-title>
           <ion-buttons slot="end">
-            <ion-button @click=${() => this.orphansOpen = false}>${t5("ui.btnClose")}</ion-button>
+            <ion-button data-testid="services-packages-orphans-close" @click=${() => this.orphansOpen = false}>${t5("ui.btnClose")}</ion-button>
           </ion-buttons>
         </ion-toolbar>
       </ion-header>
@@ -5667,10 +5667,10 @@ var ErpServicesPackages = class extends i3 {
         <p>${t5("ui.orphansHint")}</p>
         <!-- The error goes ABOVE the list, not instead of it: a page that failed must not take away
              the rows already on screen. -->
-        ${this.orphansError ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.orphansError}</ok-inline-feedback>` : A}
-        ${this.orphans.length === 0 ? this.orphansLoading ? b2`<ok-inline-feedback tone="neutral" icon="time-outline">${t5("ui.loading")}</ok-inline-feedback>` : this.orphansError ? A : b2`<ok-inline-feedback tone="neutral" icon="information-circle-outline">${t5("ui.emptyOrphans")}</ok-inline-feedback>` : b2`<ion-list lines="full">${this.orphans.map((o7) => this.renderOrphan(o7))}</ion-list>
+        ${this.orphansError ? b2`<ok-inline-feedback data-testid="services-packages-orphans-error" tone="danger" icon="alert-circle-outline">${this.orphansError}</ok-inline-feedback>` : A}
+        ${this.orphans.length === 0 ? this.orphansLoading ? b2`<ok-inline-feedback data-testid="services-packages-orphans-loading" tone="neutral" icon="time-outline">${t5("ui.loading")}</ok-inline-feedback>` : this.orphansError ? A : b2`<ok-inline-feedback data-testid="services-packages-orphans-empty" tone="neutral" icon="information-circle-outline">${t5("ui.emptyOrphans")}</ok-inline-feedback>` : b2`<ion-list lines="full">${this.orphans.map((o7) => this.renderOrphan(o7))}</ion-list>
               ${this.orphans.length < this.orphansTotal ? b2`<p class="more">${t5("ui.orphansCount", { shown: this.orphans.length, total: this.orphansTotal })}</p>
-                    <ion-button expand="block" fill="clear" ?disabled=${this.orphansLoading} @click=${() => this.loadMoreOrphans()}>
+                    <ion-button expand="block" fill="clear" data-testid="services-packages-orphans-more" ?disabled=${this.orphansLoading} @click=${() => this.loadMoreOrphans()}>
                       ${this.orphansLoading ? t5("ui.loading") : t5("ui.orphansMore")}
                     </ion-button>` : A}`}
       </ion-content>
@@ -5680,41 +5680,41 @@ var ErpServicesPackages = class extends i3 {
     const t5 = (k2) => erplora3().t(CATALOG3, k2);
     return b2`<p class="lines-title">${t5("ui.packageLinesTitle")}</p>
       ${this.items.map((line, i7) => b2`<div class="line">
-        <ion-select fill="outline" label-placement="floating" label=${t5("ui.colService")} .value=${line.serviceId} @ionChange=${(e5) => this.setItem(i7, { serviceId: e5.target.value })}>
+        <ion-select data-testid=${`services-packages-line-service-${i7}`} fill="outline" label-placement="floating" label=${t5("ui.colService")} .value=${line.serviceId} @ionChange=${(e5) => this.setItem(i7, { serviceId: e5.target.value })}>
           ${this.services.map((s5) => b2`<ion-select-option .value=${s5.id}>${s5.name} · ${erplora3().formatMoney(Number(s5.price) || 0)}</ion-select-option>`)}
         </ion-select>
-        <ion-input fill="outline" label-placement="floating" label=${t5("ui.colSessions")} type="number" min="1" step="1" .value=${line.sessions} @ionInput=${(e5) => this.setItem(i7, { sessions: e5.target.value })}></ion-input>
-        <ion-button fill="clear" size="small" aria-label=${t5("ui.removeLine")} @click=${() => this.removeItem(i7)}><ion-icon slot="icon-only" name="close-outline"></ion-icon></ion-button>
+        <ion-input data-testid=${`services-packages-line-sessions-${i7}`} fill="outline" label-placement="floating" label=${t5("ui.colSessions")} type="number" min="1" step="1" .value=${line.sessions} @ionInput=${(e5) => this.setItem(i7, { sessions: e5.target.value })}></ion-input>
+        <ion-button data-testid=${`services-packages-line-remove-${i7}`} fill="clear" size="small" aria-label=${t5("ui.removeLine")} @click=${() => this.removeItem(i7)}><ion-icon slot="icon-only" name="close-outline"></ion-icon></ion-button>
       </div>`)}
-      <ion-button fill="outline" size="small" @click=${() => this.addItem()}>${t5("ui.addLine")}</ion-button>`;
+      <ion-button data-testid="services-packages-add-line" fill="outline" size="small" @click=${() => this.addItem()}>${t5("ui.addLine")}</ion-button>`;
   }
   render() {
     const t5 = (k2) => erplora3().t(CATALOG3, k2);
     const fixed = this.form.discountType === "fixed";
     return b2`<div class="page">
-      ${this.formError ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : A}
-      ${this.ctrl?.error ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : A}
-      ${can3("services.view_orphan_grant") ? b2`<ion-button class="orphans-entry" data-testid="open-orphans" size="small" fill="clear" @click=${() => this.openOrphans()}>
+      ${this.formError ? b2`<ok-inline-feedback data-testid="services-packages-form-error" tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : A}
+      ${this.ctrl?.error ? b2`<ok-inline-feedback data-testid="services-packages-load-error" tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : A}
+      ${can3("services.view_orphan_grant") ? b2`<ion-button class="orphans-entry" data-testid="services-packages-open-orphans" size="small" fill="clear" @click=${() => this.openOrphans()}>
             <ion-icon slot="start" name="person-remove-outline"></ion-icon>${t5("ui.openOrphans")}
           </ion-button>` : A}
-      <ok-data-table .serverSide=${true} .fill=${true} .views=${true} .addable=${can3("services.add_package")} .cardTitle=${(row) => String(row.name ?? "")} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "asc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchPackagePlaceholder")} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.emptyPackages")} @rowAction=${(e5) => this.onRowAction(e5)} @rowClick=${(e5) => this.onRowAction({ detail: { actionId: "edit", row: e5.detail.row } })}
+      <ok-data-table testid="services-packages-table" .serverSide=${true} .fill=${true} .views=${true} .addable=${can3("services.add_package")} .cardTitle=${(row) => String(row.name ?? "")} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "asc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchPackagePlaceholder")} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.emptyPackages")} @rowAction=${(e5) => this.onRowAction(e5)} @rowClick=${(e5) => this.onRowAction({ detail: { actionId: "edit", row: e5.detail.row } })}
  @pageChange=${(e5) => this.ctrl.setPage(e5.detail)} @pageSizeChange=${(e5) => this.ctrl.setPageSize(e5.detail)} @sortChange=${(e5) => this.ctrl.setSort(e5.detail.sort, e5.detail.dir)} @searchChange=${(e5) => this.ctrl.setSearch(e5.detail)} @filterChange=${(e5) => this.ctrl.setFilter(e5.detail.col, e5.detail.value)}>
-        <form slot="create" class="form" @submit=${(e5) => this.save(e5)}>
-          ${this.editingId ? b2`<ok-inline-feedback tone="info" icon="create-outline">
+        <form slot="create" class="form" data-testid="services-packages-form" @submit=${(e5) => this.save(e5)}>
+          ${this.editingId ? b2`<ok-inline-feedback data-testid="services-packages-editing" tone="info" icon="create-outline">
                 <b>${t5("ui.editingPackageTitle")}</b> — ${this.form.name}
-                <ion-button size="small" fill="clear" @click=${() => this.cancelEdit()}>${t5("ui.editingCancel")}</ion-button>
+                <ion-button size="small" fill="clear" data-testid="services-packages-edit-cancel" @click=${() => this.cancelEdit()}>${t5("ui.editingCancel")}</ion-button>
               </ok-inline-feedback>` : A}
-          <ion-input fill="outline" label-placement="floating" label=${t5("ui.colName")} .value=${this.form.name} @ionInput=${(e5) => this.form = { ...this.form, name: e5.target.value }}></ion-input>
-          <ion-select fill="outline" label-placement="floating" label=${t5("ui.colDiscountType")} .value=${this.form.discountType} @ionChange=${(e5) => this.form = { ...this.form, discountType: e5.target.value }}>
+          <ion-input data-testid="services-packages-name" fill="outline" label-placement="floating" label=${t5("ui.colName")} .value=${this.form.name} @ionInput=${(e5) => this.form = { ...this.form, name: e5.target.value }}></ion-input>
+          <ion-select data-testid="services-packages-discount-type" fill="outline" label-placement="floating" label=${t5("ui.colDiscountType")} .value=${this.form.discountType} @ionChange=${(e5) => this.form = { ...this.form, discountType: e5.target.value }}>
             <ion-select-option value="percentage">${t5("ui.discountType.percentage")}</ion-select-option>
             <ion-select-option value="fixed">${t5("ui.discountType.fixed")}</ion-select-option>
           </ion-select>
-          <ion-input fill="outline" label-placement="floating" label=${fixed ? t5("ui.colDiscountAmount") : t5("ui.colDiscountPercent")} type="text" inputmode="decimal" .value=${this.form.discountValue} @ionInput=${(e5) => this.form = { ...this.form, discountValue: e5.target.value }}></ion-input>
-          <ion-input fill="outline" label-placement="floating" label=${t5("ui.colFixedPrice")} helper-text=${t5("ui.fixedPriceHelp")} type="text" inputmode="decimal" .value=${this.form.fixedPrice} @ionInput=${(e5) => this.form = { ...this.form, fixedPrice: e5.target.value }}></ion-input>
-          <ion-input fill="outline" label-placement="floating" label=${t5("ui.colValidityDays")} helper-text=${t5("ui.validityHelp")} type="number" min="1" step="1" .value=${this.form.validityDays} @ionInput=${(e5) => this.form = { ...this.form, validityDays: e5.target.value }}></ion-input>
-          <ion-input fill="outline" label-placement="floating" label=${t5("ui.colMaxUses")} helper-text=${t5("ui.maxUsesHelp")} type="number" min="1" step="1" .value=${this.form.maxUses} @ionInput=${(e5) => this.form = { ...this.form, maxUses: e5.target.value }}></ion-input>
-          ${this.editingId ? b2`<ok-inline-feedback tone="neutral" icon="information-circle-outline">${t5("ui.packageLinesFixed")}</ok-inline-feedback>` : this.renderLines()}
-          <ion-button type="submit" ?disabled=${this.saving || !this.form.name}>${this.saving ? t5("ui.btnSaving") : this.editingId ? t5("ui.btnSave") : t5("ui.btnAdd")}</ion-button>
+          <ion-input data-testid="services-packages-discount-value" fill="outline" label-placement="floating" label=${fixed ? t5("ui.colDiscountAmount") : t5("ui.colDiscountPercent")} type="text" inputmode="decimal" .value=${this.form.discountValue} @ionInput=${(e5) => this.form = { ...this.form, discountValue: e5.target.value }}></ion-input>
+          <ion-input data-testid="services-packages-fixed-price" fill="outline" label-placement="floating" label=${t5("ui.colFixedPrice")} helper-text=${t5("ui.fixedPriceHelp")} type="text" inputmode="decimal" .value=${this.form.fixedPrice} @ionInput=${(e5) => this.form = { ...this.form, fixedPrice: e5.target.value }}></ion-input>
+          <ion-input data-testid="services-packages-validity-days" fill="outline" label-placement="floating" label=${t5("ui.colValidityDays")} helper-text=${t5("ui.validityHelp")} type="number" min="1" step="1" .value=${this.form.validityDays} @ionInput=${(e5) => this.form = { ...this.form, validityDays: e5.target.value }}></ion-input>
+          <ion-input data-testid="services-packages-max-uses" fill="outline" label-placement="floating" label=${t5("ui.colMaxUses")} helper-text=${t5("ui.maxUsesHelp")} type="number" min="1" step="1" .value=${this.form.maxUses} @ionInput=${(e5) => this.form = { ...this.form, maxUses: e5.target.value }}></ion-input>
+          ${this.editingId ? b2`<ok-inline-feedback data-testid="services-packages-lines-fixed" tone="neutral" icon="information-circle-outline">${t5("ui.packageLinesFixed")}</ok-inline-feedback>` : this.renderLines()}
+          <ion-button type="submit" data-testid="services-packages-submit" ?disabled=${this.saving || !this.form.name}>${this.saving ? t5("ui.btnSaving") : this.editingId ? t5("ui.btnSave") : t5("ui.btnAdd")}</ion-button>
         </form>
       </ok-data-table>
       ${this.renderDeleteConfirm()}
@@ -5959,13 +5959,19 @@ var ErpServicesSessionRefund = class extends i3 {
   }
   renderReason(s5) {
     const known = REASONS.includes(s5.reason);
-    return b2`<ok-inline-feedback tone="neutral" icon="information-circle-outline"
+    return b2`<ok-inline-feedback
+      data-testid="services-session-refund-reason"
+      tone="neutral"
+      icon="information-circle-outline"
       >${known ? this.t(`ui.sessionRefund.reason.${s5.reason}`) : this.t("ui.sessionRefund.reason.generic")}</ok-inline-feedback
     >`;
   }
   renderFeedback() {
     if (!this.feedback) return A;
-    return b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline"
+    return b2`<ok-inline-feedback
+      data-testid="services-session-refund-error"
+      tone="danger"
+      icon="alert-circle-outline"
       >${this.feedback}</ok-inline-feedback
     >`;
   }
@@ -5977,11 +5983,14 @@ var ErpServicesSessionRefund = class extends i3 {
     }
     if (this.loadFailed) {
       return b2`<div class="box">
-        <ok-inline-feedback tone="danger" icon="alert-circle-outline"
+        <ok-inline-feedback
+          data-testid="services-session-refund-load-error"
+          tone="danger"
+          icon="alert-circle-outline"
           >${this.t("ui.sessionRefund.loadFailed")}</ok-inline-feedback
         >
         <div class="actions">
-          <ion-button fill="clear" data-test="retry" @click=${() => this.load(true)}
+          <ion-button fill="clear" data-testid="services-session-refund-retry" @click=${() => this.load(true)}
             >${this.t("ui.sessionRefund.btnRetry")}</ion-button
           >
         </div>
@@ -5991,7 +6000,10 @@ var ErpServicesSessionRefund = class extends i3 {
     if (!s5) return A;
     if (this.refunded) {
       return b2`<div class="box">
-        <ok-inline-feedback tone="success" icon="checkmark-circle-outline"
+        <ok-inline-feedback
+          data-testid="services-session-refund-done"
+          tone="success"
+          icon="checkmark-circle-outline"
           >${this.t("ui.sessionRefund.done", { name: s5.package_name })}</ok-inline-feedback
         >
       </div>`;
@@ -6012,7 +6024,7 @@ var ErpServicesSessionRefund = class extends i3 {
              every test would still be green. The label goes INSIDE the control, which is Ionic's
              own pattern and gives the whole row as a tap target. -->
         <ion-checkbox
-          data-test="give-back"
+          data-testid="services-session-refund-give-back"
           label-placement="end"
           justify="start"
           ?checked=${this.armed}
@@ -6029,7 +6041,10 @@ var ErpServicesSessionRefund = class extends i3 {
           </div>
         </ion-checkbox>
       </div>
-      ${warning ? b2`<ok-inline-feedback tone="warning" icon="alert-circle-outline"
+      ${warning ? b2`<ok-inline-feedback
+            data-testid="services-session-refund-expiry-warning"
+            tone="warning"
+            icon="alert-circle-outline"
             >${warning}</ok-inline-feedback
           >` : A}
       ${this.renderFeedback()}
@@ -6296,9 +6311,9 @@ var ErpServicesVoucherTender = class extends i3 {
       class="option"
       role="radio"
       aria-checked=${chosen ? "true" : "false"}
-      data-test="option"
     >
       <ion-radio
+        data-testid=${`services-voucher-tender-option-${o7.grant_id}`}
         .value=${o7.grant_id}
         ?checked=${chosen}
         @click=${() => this.select(o7.grant_id)}
@@ -6321,15 +6336,22 @@ var ErpServicesVoucherTender = class extends i3 {
     const held = this.held;
     if (!held) return A;
     return b2`<div class="box">
-      <ok-inline-feedback tone="success" icon="checkmark-circle-outline">
+      <ok-inline-feedback
+        data-testid="services-voucher-tender-held"
+        tone="success"
+        icon="checkmark-circle-outline"
+      >
         ${held.remaining_after === null ? this.t("ui.tender.heldUnlimited", { name: held.package_name }) : this.t("ui.tender.held", { name: held.package_name, after: held.remaining_after })}
       </ok-inline-feedback>
-      ${this.feedback ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline"
+      ${this.feedback ? b2`<ok-inline-feedback
+            data-testid="services-voucher-tender-error"
+            tone="danger"
+            icon="alert-circle-outline"
             >${this.feedback}</ok-inline-feedback
           >` : A}
       <div class="actions">
         <ion-button
-          data-test="undo"
+          data-testid="services-voucher-tender-undo"
           fill="clear"
           ?disabled=${this.busy}
           @click=${() => this.undo()}
@@ -6346,11 +6368,15 @@ var ErpServicesVoucherTender = class extends i3 {
     if (this.loadFailed) {
       const detail = this.feedback && this.feedback !== this.t("ui.tender.loadFailed") ? this.feedback : "";
       return b2`<div class="box">
-        <ok-inline-feedback tone="danger" icon="alert-circle-outline">
+        <ok-inline-feedback
+          data-testid="services-voucher-tender-load-error"
+          tone="danger"
+          icon="alert-circle-outline"
+        >
           ${this.t("ui.tender.loadFailed")}${detail ? b2` <span class="meta">${detail}</span>` : A}
         </ok-inline-feedback>
         <div class="actions">
-          <ion-button fill="clear" data-test="retry" @click=${() => this.load()}
+          <ion-button fill="clear" data-testid="services-voucher-tender-retry" @click=${() => this.load()}
             >${this.t("ui.tender.btnRetry")}</ion-button
           >
         </div>
@@ -6358,7 +6384,10 @@ var ErpServicesVoucherTender = class extends i3 {
     }
     if (this.options.length === 0) {
       return b2`<div class="box">
-        <ok-inline-feedback tone="neutral" icon="information-circle-outline"
+        <ok-inline-feedback
+          data-testid="services-voucher-tender-none"
+          tone="neutral"
+          icon="information-circle-outline"
           >${this.t("ui.tender.none")}</ok-inline-feedback
         >
       </div>`;
@@ -6374,12 +6403,15 @@ var ErpServicesVoucherTender = class extends i3 {
       <div role="radiogroup" class="box">
         ${this.options.map((o7) => this.renderOption(o7))}
       </div>
-      ${this.feedback ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline"
+      ${this.feedback ? b2`<ok-inline-feedback
+            data-testid="services-voucher-tender-error"
+            tone="danger"
+            icon="alert-circle-outline"
             >${this.feedback}</ok-inline-feedback
           >` : A}
       ${can4("services.hold_package") ? b2`<div class="actions">
             <ion-button
-              data-test="confirm"
+              data-testid="services-voucher-tender-confirm"
               ?disabled=${this.busy || !this.selectedId}
               @click=${() => this.confirm()}
               >${this.busy ? this.t("ui.tender.btnHolding") : this.t("ui.tender.btnConfirm")}</ion-button

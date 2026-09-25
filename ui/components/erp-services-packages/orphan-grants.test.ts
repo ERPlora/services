@@ -143,13 +143,13 @@ async function mount(): Promise<Mounted> {
 describe('the rescue drawer is the only door that needs no customer', () => {
   it('is offered to whoever holds the permission', async () => {
     const el = await mount();
-    expect(el.shadowRoot.querySelector('[data-testid="open-orphans"]')).not.toBeNull();
+    expect(el.shadowRoot.querySelector('[data-testid="services-packages-open-orphans"]')).not.toBeNull();
   });
 
   it('is hidden from someone who does not', async () => {
     permission = (p: string) => p !== 'services.view_orphan_grant';
     const el = await mount();
-    expect(el.shadowRoot.querySelector('[data-testid="open-orphans"]')).toBeNull();
+    expect(el.shadowRoot.querySelector('[data-testid="services-packages-open-orphans"]')).toBeNull();
   });
 
   it('asks for the orphans WITHOUT a customer id — that is the whole point', async () => {
