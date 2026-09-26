@@ -217,6 +217,12 @@ export class ErpServicesList extends LitElement {
    *  inventory products (inventory#8). */
   @state() editingId: string | null = null;
 
+  /** pm#450: whether the table's panel HEADER already carries the editing title (OutfitKit
+   *  ≥ 0.1.94, outfitkit#150). Set only after checking the rendered dialog — never assumed — so
+   *  an older shell (hub:stable ships 0.1.73, which ignores the `title` and keeps «New») still
+   *  gets the fallback line in the form body. */
+  @state() editTitleInHeader = false;
+
   /** Service waiting for the archive confirmation (services#2). `null` = no dialog. */
   @state() archiveTarget: Service | null = null;
 
@@ -420,10 +426,35 @@ export class ErpServicesList extends LitElement {
   }
 
   // Referencia al ok-data-table para abrir/cerrar su panel lateral (el alta se proyecta dentro).
-  private dataTable(): { open(p?: 'filters' | 'create'): void; close(): void } | null {
+  private dataTable(): {
+    open(p?: 'filters' | 'create' | 'edit', opts?: { title?: string }): void;
+    close(): void;
+    updateComplete?: Promise<unknown>;
+    shadowRoot: ShadowRoot | null;
+  } | null {
     return this.renderRoot.querySelector('ok-data-table') as
-      | { open(p?: 'filters' | 'create'): void; close(): void }
+      | {
+        open(p?: 'filters' | 'create' | 'edit', opts?: { title?: string }): void;
+        close(): void;
+        updateComplete?: Promise<unknown>;
+        shadowRoot: ShadowRoot | null;
+      }
       | null;
+  }
+
+  /** pm#450: the table's «Add» emits no event and keeps our form state; after an edit it would
+   *  show the edited record under a «New» header, and the submit would UPDATE it. */
+  private onTableClick(e: Event): void {
+    if (!this.editingId) return;
+    const addId = 'services-list-table-add';
+    if (e.composedPath().some((n) => n instanceof HTMLElement && n.dataset.testid === addId)) this.cancelEdit();
+  }
+
+  /** Wired natively, not with a Lit `@click` on the tag: `<ok-data-table>` carries `testid`, not
+   *  `data-testid` (outfitkit#143), and a template binding would read as an action element that
+   *  demands one. */
+  firstUpdated(): void {
+    this.renderRoot.querySelector('ok-data-table')?.addEventListener('click', (e) => this.onTableClick(e));
   }
 
   /** Back to a clean CREATE form (services#4). */
@@ -536,7 +567,13 @@ export class ErpServicesList extends LitElement {
       this.newDuration = String(full.duration_minutes ?? '');
       this.newCategory = String(full.category_id ?? '');
       this.newTaxRateId = String(full.tax_category_key ?? '');
-      this.dataTable()?.open('create');
+      const title = `${erplora().t(CATALOG, 'ui.editingTitle')} — ${this.newName}`;
+      const table = this.dataTable();
+      table?.open('edit', { title });
+      await table?.updateComplete;
+      // OutfitKit < 0.1.94 ignores the title and keeps «New»: only drop the in-form line when the
+      // header REALLY carries it (the dialog is labelled with it).
+      this.editTitleInHeader = table?.shadowRoot?.querySelector('[role="dialog"]')?.getAttribute('aria-label') === title;
       return;
     }
     if (actionId !== 'archive' || !can('services.delete_service')) return;
@@ -624,7 +661,7 @@ export class ErpServicesList extends LitElement {
           <!-- Create form: ALWAYS projected (even with the panel shut); painted only on open, the
                toolbar «+» would slide out an empty panel. -->
           <form slot="create" class="form" data-testid="services-list-form" @submit=${(e: Event) => this.createService(e)}>
-            ${this.editingId
+            ${this.editingId && !this.editTitleInHeader
               ? html`<ok-inline-feedback data-testid="services-list-editing" tone="info" icon="create-outline">
                   <b>${t('ui.editingTitle')}</b> — ${this.newName}
                   <ion-button size="small" fill="clear" data-testid="services-list-edit-cancel" @click=${() => this.cancelEdit()}>${t('ui.editingCancel')}</ion-button>

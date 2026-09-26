@@ -102,7 +102,8 @@ describe('editing pre-fills the create form and saves through services.services.
     // services#54: the field shows the price in the hub's locale notation («12,00» in es), same
     // decimals and separator as the table next to it — not the raw `String(12)`.
     expect(el.newPrice, 'the price is shown in major units, in the hub locale (cents → «12,00»)').toBe('12,00');
-    expect(el.shadowRoot.querySelector('form[slot="create"]')?.textContent).toContain('ui.editingTitle');
+    // pm#450: «Editing service — Corte» moved to the panel header (see below); the body no longer
+    // repeats it.
   });
 
   it('the submit sends update (not create) with the id and the edited fields, price in minor units', async () => {
@@ -125,5 +126,106 @@ describe('editing pre-fills the create form and saves through services.services.
     await mount();
     expect(queryAlls).toContain('services.categories.list');
     expect(queries.map((q) => q.name)).not.toContain('services.categories.list');
+  });
+});
+
+// pm#450 (outfitkit#150): editing opened the panel with open('create'), so its header said «New»
+// while the body said «Editing service — Corte». The table knows an «edit» mode and takes the whole
+// title: the screen asks for it and drops the repeated line from the body.
+describe('editing titles the panel header, not its body (pm#450)', () => {
+  type Table = HTMLElement & { open: (panel?: unknown, opts?: { title?: string }) => void; shadowRoot: ShadowRoot };
+  const table = (el: Mounted) => el.shadowRoot.querySelector('ok-data-table') as Table;
+
+  it("opens the panel with open('edit', { title }) — «Editing service — <name>» in the header", async () => {
+    const el = await mount();
+    const calls: unknown[][] = [];
+    table(el).open = (...args: unknown[]) => void calls.push(args);
+    await edit(el);
+    await settle(el);
+    expect(calls).toEqual([['edit', { title: 'ui.editingTitle — Corte' }]]);
+  });
+
+  // The header only carries the title with OutfitKit ≥ 0.1.94 (outfitkit#150); an older shell
+  // (hub:stable 1.1.29 ships 0.1.73) ignores it and keeps «New». The body line only goes away when
+  // the table REALLY painted the title — its dialog is labelled with it — never on faith.
+  const shellTable = (el: Mounted, honoursTitle: boolean) => {
+    const t = table(el);
+    const dialog = document.createElement('aside');
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-label', 'Form');
+    const root = document.createElement('div');
+    root.appendChild(dialog);
+    Object.defineProperty(t, 'shadowRoot', { value: root, configurable: true });
+    // Like the real Lit table, open() only schedules the render: the dialog is labelled on the
+    // next microtask and `updateComplete` resolves once it is. Reading the label before awaiting
+    // it sees the old «Form» and keeps the line even when the header carries the title.
+    let rendered: Promise<void> = Promise.resolve();
+    Object.defineProperty(t, 'updateComplete', { get: () => rendered, configurable: true });
+    t.open = (_panel: unknown, opts?: { title?: string }) => {
+      rendered = Promise.resolve().then(() => {
+        if (honoursTitle && opts?.title) dialog.setAttribute('aria-label', opts.title);
+      });
+    };
+  };
+
+  it('the form body no longer repeats the editing title once the header carries it', async () => {
+    const el = await mount();
+    shellTable(el, true);
+    await edit(el);
+    await settle(el);
+    const form = el.shadowRoot.querySelector('form[slot="create"]') as HTMLElement;
+    expect(form.querySelector('[data-testid="services-list-editing"]')).toBeNull();
+    expect(form.textContent).not.toContain('ui.editingTitle');
+  });
+
+  it('with a shell whose table ignores the title (OutfitKit < 0.1.94), the body keeps the editing line', async () => {
+    const el = await mount();
+    shellTable(el, false);
+    await edit(el);
+    await settle(el);
+    const line = el.shadowRoot.querySelector('form[slot="create"] [data-testid="services-list-editing"]') as HTMLElement | null;
+    expect(line, 'the header says «New»: without this line nothing says it is an edit').toBeTruthy();
+    expect(line!.textContent).toContain('ui.editingTitle');
+    expect(line!.textContent).toContain('Corte');
+  });
+
+  it('a later «Add» (clean form) hides the fallback line again', async () => {
+    const el = await mount();
+    shellTable(el, false);
+    await edit(el);
+    await settle(el);
+    (el as unknown as { cancelEdit(): void }).cancelEdit();
+    await settle(el);
+    expect(el.shadowRoot.querySelector('form[slot="create"] [data-testid="services-list-editing"]')).toBeNull();
+  });
+
+  it('«Add» after an edit opens a CLEAN create form (the header says «New»: the form must agree)', async () => {
+    const el = await mount();
+    await edit(el);
+    await settle(el);
+    const add = table(el).shadowRoot.querySelector('[data-testid="services-list-table-add"]') as HTMLElement;
+    expect(add, 'the table paints its «Add» button').toBeTruthy();
+    add.click();
+    await settle(el);
+    expect(el.editingId, 'a submit here would UPDATE the edited service under a «New» header').toBeNull();
+    expect(el.newName).toBe('');
+  });
+
+  it('a click INSIDE the edit form (a field, a row) does not drop the edit — only «Add» does', async () => {
+    const el = await mount();
+    await edit(el);
+    await settle(el);
+    (el.shadowRoot.querySelector('[data-testid="services-list-name"]') as HTMLElement).click();
+    table(el).click();
+    await settle(el);
+    expect(el.editingId, 'the table host hears every click of the projected form').toBe('s1');
+  });
+
+  it('«Add» with no edit in progress keeps what was typed', async () => {
+    const el = await mount();
+    el.newName = 'Brushing';
+    (table(el).shadowRoot.querySelector('[data-testid="services-list-table-add"]') as HTMLElement).click();
+    await settle(el);
+    expect(el.newName).toBe('Brushing');
   });
 });

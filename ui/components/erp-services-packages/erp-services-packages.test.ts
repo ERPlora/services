@@ -211,3 +211,103 @@ describe('clicking the row opens the package (pm#155)', () => {
     expect(el.editingId, 'the row was clicked and the edit form did not take the package').toBe('p1');
   });
 });
+
+// pm#450 (outfitkit#150): the edit panel said «New» in its header and «Editing package — Bono…» in
+// its body. The screen opens it in «edit» mode with that title and drops the repeated line.
+describe('editing titles the panel header, not its body (pm#450)', () => {
+  type Table = HTMLElement & { open: (panel?: unknown, opts?: { title?: string }) => void; shadowRoot: ShadowRoot };
+  const table = (el: Mounted) => el.shadowRoot.querySelector('ok-data-table') as Table;
+
+  it("opens the panel with open('edit', { title }) — «Editing package — <name>» in the header", async () => {
+    const el = await mount();
+    const calls: unknown[][] = [];
+    table(el).open = (...args: unknown[]) => void calls.push(args);
+    await action(el, 'edit');
+    await settle(el);
+    expect(calls).toEqual([['edit', { title: 'ui.editingPackageTitle — Bono 5 cortes' }]]);
+  });
+
+  // The header only carries the title with OutfitKit ≥ 0.1.94 (outfitkit#150); an older shell
+  // (hub:stable 1.1.29 ships 0.1.73) ignores it and keeps «New». The body line only goes away when
+  // the table REALLY painted the title — its dialog is labelled with it — never on faith.
+  const shellTable = (el: Mounted, honoursTitle: boolean) => {
+    const t = table(el);
+    const dialog = document.createElement('aside');
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-label', 'Form');
+    const root = document.createElement('div');
+    root.appendChild(dialog);
+    Object.defineProperty(t, 'shadowRoot', { value: root, configurable: true });
+    // Like the real Lit table, open() only schedules the render: the dialog is labelled on the
+    // next microtask and `updateComplete` resolves once it is. Reading the label before awaiting
+    // it sees the old «Form» and keeps the line even when the header carries the title.
+    let rendered: Promise<void> = Promise.resolve();
+    Object.defineProperty(t, 'updateComplete', { get: () => rendered, configurable: true });
+    t.open = (_panel: unknown, opts?: { title?: string }) => {
+      rendered = Promise.resolve().then(() => {
+        if (honoursTitle && opts?.title) dialog.setAttribute('aria-label', opts.title);
+      });
+    };
+  };
+
+  it('the form body no longer repeats the editing title once the header carries it', async () => {
+    const el = await mount();
+    shellTable(el, true);
+    await action(el, 'edit');
+    await settle(el);
+    const form = el.shadowRoot.querySelector('form[slot="create"]') as HTMLElement;
+    expect(form.querySelector('[data-testid="services-packages-editing"]')).toBeNull();
+    expect(form.textContent).not.toContain('ui.editingPackageTitle');
+  });
+
+  it('with a shell whose table ignores the title (OutfitKit < 0.1.94), the body keeps the editing line', async () => {
+    const el = await mount();
+    shellTable(el, false);
+    await action(el, 'edit');
+    await settle(el);
+    const line = el.shadowRoot.querySelector('form[slot="create"] [data-testid="services-packages-editing"]') as HTMLElement | null;
+    expect(line, 'the header says «New»: without this line nothing says it is an edit').toBeTruthy();
+    expect(line!.textContent).toContain('ui.editingPackageTitle');
+    expect(line!.textContent).toContain('Bono 5 cortes');
+  });
+
+  it('a later «Add» (clean form) hides the fallback line again', async () => {
+    const el = await mount();
+    shellTable(el, false);
+    await action(el, 'edit');
+    await settle(el);
+    (el as unknown as { cancelEdit(): void }).cancelEdit();
+    await settle(el);
+    expect(el.shadowRoot.querySelector('form[slot="create"] [data-testid="services-packages-editing"]')).toBeNull();
+  });
+
+  it('«Add» after an edit opens a CLEAN create form (with its service lines back)', async () => {
+    const el = await mount();
+    await action(el, 'edit');
+    await settle(el);
+    const add = table(el).shadowRoot.querySelector('[data-testid="services-packages-table-add"]') as HTMLElement;
+    expect(add, 'the table paints its «Add» button').toBeTruthy();
+    add.click();
+    await settle(el);
+    expect(el.editingId, 'a submit here would UPDATE the edited package under a «New» header').toBeNull();
+    expect(el.form.name).toBe('');
+  });
+
+  it('a click INSIDE the edit form (a field, a row) does not drop the edit — only «Add» does', async () => {
+    const el = await mount();
+    await action(el, 'edit');
+    await settle(el);
+    (el.shadowRoot.querySelector('[data-testid="services-packages-name"]') as HTMLElement).click();
+    table(el).click();
+    await settle(el);
+    expect(el.editingId, 'the table host hears every click of the projected form').toBe('p1');
+  });
+
+  it('«Add» with no edit in progress keeps what was typed', async () => {
+    const el = await mount();
+    el.form = { ...el.form, name: 'Bono color' };
+    (table(el).shadowRoot.querySelector('[data-testid="services-packages-table-add"]') as HTMLElement).click();
+    await settle(el);
+    expect(el.form.name).toBe('Bono color');
+  });
+});
