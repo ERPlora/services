@@ -133,7 +133,7 @@ describe('editing pre-fills the create form and saves through services.services.
 // while the body said «Editing service — Corte». The table knows an «edit» mode and takes the whole
 // title: the screen asks for it and drops the repeated line from the body.
 describe('editing titles the panel header, not its body (pm#450)', () => {
-  type Table = HTMLElement & { open: (...args: unknown[]) => void; shadowRoot: ShadowRoot };
+  type Table = HTMLElement & { open: (panel?: unknown, opts?: { title?: string }) => void; shadowRoot: ShadowRoot };
   const table = (el: Mounted) => el.shadowRoot.querySelector('ok-data-table') as Table;
 
   it("opens the panel with open('edit', { title }) — «Editing service — <name>» in the header", async () => {
@@ -156,8 +156,15 @@ describe('editing titles the panel header, not its body (pm#450)', () => {
     const root = document.createElement('div');
     root.appendChild(dialog);
     Object.defineProperty(t, 'shadowRoot', { value: root, configurable: true });
+    // Like the real Lit table, open() only schedules the render: the dialog is labelled on the
+    // next microtask and `updateComplete` resolves once it is. Reading the label before awaiting
+    // it sees the old «Form» and keeps the line even when the header carries the title.
+    let rendered: Promise<void> = Promise.resolve();
+    Object.defineProperty(t, 'updateComplete', { get: () => rendered, configurable: true });
     t.open = (_panel: unknown, opts?: { title?: string }) => {
-      if (honoursTitle && opts?.title) dialog.setAttribute('aria-label', opts.title);
+      rendered = Promise.resolve().then(() => {
+        if (honoursTitle && opts?.title) dialog.setAttribute('aria-label', opts.title);
+      });
     };
   };
 

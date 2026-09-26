@@ -166,7 +166,7 @@ describe('clicking the row opens the category (pm#155)', () => {
 // pm#450 (outfitkit#150): the edit panel said «New» in its header and «Editing category — Color» in
 // its body. The screen opens it in «edit» mode with that title and drops the repeated line.
 describe('editing titles the panel header, not its body (pm#450)', () => {
-  type Table = HTMLElement & { open: (...args: unknown[]) => void; shadowRoot: ShadowRoot };
+  type Table = HTMLElement & { open: (panel?: unknown, opts?: { title?: string }) => void; shadowRoot: ShadowRoot };
   const table = (el: Mounted) => el.shadowRoot.querySelector('ok-data-table') as Table;
 
   it("opens the panel with open('edit', { title }) — «Editing category — <name>» in the header", async () => {
@@ -189,8 +189,15 @@ describe('editing titles the panel header, not its body (pm#450)', () => {
     const root = document.createElement('div');
     root.appendChild(dialog);
     Object.defineProperty(t, 'shadowRoot', { value: root, configurable: true });
+    // Like the real Lit table, open() only schedules the render: the dialog is labelled on the
+    // next microtask and `updateComplete` resolves once it is. Reading the label before awaiting
+    // it sees the old «Form» and keeps the line even when the header carries the title.
+    let rendered: Promise<void> = Promise.resolve();
+    Object.defineProperty(t, 'updateComplete', { get: () => rendered, configurable: true });
     t.open = (_panel: unknown, opts?: { title?: string }) => {
-      if (honoursTitle && opts?.title) dialog.setAttribute('aria-label', opts.title);
+      rendered = Promise.resolve().then(() => {
+        if (honoursTitle && opts?.title) dialog.setAttribute('aria-label', opts.title);
+      });
     };
   };
 
