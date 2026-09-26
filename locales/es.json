@@ -223,6 +223,7 @@
     "services.service_not_archived": "No se ha podido recuperar el servicio: no existe en este negocio, o ya se está ofreciendo.",
     "services.parent_category_unavailable": "Esa categoría padre no está disponible: no existe en este negocio o se ha eliminado.",
     "services.category_update_rejected": "No se ha podido actualizar la categoría: no existe en este negocio, o la categoría padre elegida no existe (o es ella misma).",
+    "services.category_name_taken": "Ya hay una categoría con ese nombre. Elige otro nombre.",
     "services.category_not_found": "Esa categoría no existe en este negocio.",
     "services.package_not_found": "Ese paquete no existe en este negocio.",
     "services.package_no_grant": "Este cliente no tiene ese bono: nadie se lo ha vendido.",

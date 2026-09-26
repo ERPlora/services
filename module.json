@@ -156,7 +156,8 @@
         "file": "migrations/postgres/016_named_gate_constraints.sql",
         "kind": "contract",
         "since": "1.5.44"
-      }
+      },
+      "migrations/postgres/017_category_name_gate.sql"
     ]
   },
   "queries": {
@@ -632,12 +633,17 @@
       "permission": "services.add_category",
       "transaction": true,
       "sql": [
-        "commands/category_create.sql"
+        "commands/category_create.sql",
+        "commands/_category_name_assert.sql"
       ],
+      "on_unique": {
+        "services_category_name_taken": "services.category_name_taken"
+      },
       "schema": "schemas/category_create.json",
       "expect_rows": {
         "op": "min",
         "n": 1,
+        "statement": "commands/category_create.sql",
         "error": "services.parent_category_unavailable",
         "message": "That parent category is not available: it does not exist in this business or it has been deleted."
       },
@@ -650,12 +656,17 @@
       "permission": "services.change_category",
       "transaction": true,
       "sql": [
-        "commands/category_update.sql"
+        "commands/category_update.sql",
+        "commands/_category_name_assert.sql"
       ],
+      "on_unique": {
+        "services_category_name_taken": "services.category_name_taken"
+      },
       "schema": "schemas/category_update.json",
       "expect_rows": {
         "op": "min",
         "n": 1,
+        "statement": "commands/category_update.sql",
         "error": "services.category_update_rejected",
         "message": "The category could not be updated: it does not exist in this business, or the parent you picked does not (or is the category itself)."
       },
