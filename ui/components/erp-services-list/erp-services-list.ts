@@ -222,6 +222,9 @@ export class ErpServicesList extends LitElement {
    *  an older shell (hub:stable ships 0.1.73, which ignores the `title` and keeps «New») still
    *  gets the fallback line in the form body. */
   @state() editTitleInHeader = false;
+  /** pm#459: generation of the last edit opening; a stale wait (row fetch, table render) of an
+   *  earlier one sees a newer number and gives up, so the LAST tap wins. */
+  private editSeq = 0;
 
   /** Service waiting for the archive confirmation (services#2). `null` = no dialog. */
   @state() archiveTarget: Service | null = null;
@@ -459,6 +462,7 @@ export class ErpServicesList extends LitElement {
 
   /** Back to a clean CREATE form (services#4). */
   cancelEdit(): void {
+    this.editSeq++;
     this.editingId = null;
     this.newName = '';
     this.newPrice = '';
@@ -553,6 +557,7 @@ export class ErpServicesList extends LitElement {
     if (actionId === 'restore') return this.restoreService(row);
     if (actionId === 'edit' && can('services.change_service')) {
       // Edit = the create panel, pre-filled from the FULL row (the list projects a subset).
+      const seq = ++this.editSeq;
       this.formError = '';
       let full: Record<string, unknown> = row;
       try {
@@ -561,6 +566,7 @@ export class ErpServicesList extends LitElement {
       } catch {
         /* the row of the list is enough to pre-fill what this form edits */
       }
+      if (seq !== this.editSeq) return;
       this.editingId = String(row.id);
       this.newName = String(full.name ?? '');
       this.newPrice = toMajorText(full.price);
@@ -571,6 +577,7 @@ export class ErpServicesList extends LitElement {
       const table = this.dataTable();
       table?.open('edit', { title });
       await table?.updateComplete;
+      if (seq !== this.editSeq) return;
       // OutfitKit < 0.1.94 ignores the title and keeps «New»: only drop the in-form line when the
       // header REALLY carries it (the dialog is labelled with it).
       this.editTitleInHeader = table?.shadowRoot?.querySelector('[role="dialog"]')?.getAttribute('aria-label') === title;

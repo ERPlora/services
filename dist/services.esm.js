@@ -4682,6 +4682,9 @@ var ErpServicesList = class extends i3 {
     this.showingArchived = false;
     this.editingId = null;
     this.editTitleInHeader = false;
+    /** pm#459: generation of the last edit opening; a stale wait (row fetch, table render) of an
+     *  earlier one sees a newer number and gives up, so the LAST tap wins. */
+    this.editSeq = 0;
     this.archiveTarget = null;
     this.archiveActive = null;
     // TODO-LIT: componentWillLoad → connectedCallback. Recuerda: connectedCallback se dispara
@@ -4879,6 +4882,7 @@ var ErpServicesList = class extends i3 {
   }
   /** Back to a clean CREATE form (services#4). */
   cancelEdit() {
+    this.editSeq++;
     this.editingId = null;
     this.newName = "";
     this.newPrice = "";
@@ -4965,6 +4969,7 @@ var ErpServicesList = class extends i3 {
     const { actionId, row } = ev.detail;
     if (actionId === "restore") return this.restoreService(row);
     if (actionId === "edit" && can2("services.change_service")) {
+      const seq = ++this.editSeq;
       this.formError = "";
       let full = row;
       try {
@@ -4972,6 +4977,7 @@ var ErpServicesList = class extends i3 {
         if (Array.isArray(rows) && rows[0]) full = rows[0];
       } catch {
       }
+      if (seq !== this.editSeq) return;
       this.editingId = String(row.id);
       this.newName = String(full.name ?? "");
       this.newPrice = toMajorText(full.price);
@@ -4982,6 +4988,7 @@ var ErpServicesList = class extends i3 {
       const table = this.dataTable();
       table?.open("edit", { title });
       await table?.updateComplete;
+      if (seq !== this.editSeq) return;
       this.editTitleInHeader = table?.shadowRoot?.querySelector('[role="dialog"]')?.getAttribute("aria-label") === title;
       return;
     }
