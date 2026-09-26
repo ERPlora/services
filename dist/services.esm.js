@@ -5421,9 +5421,10 @@ var ErpServicesPackages = class extends i3 {
   /** pm#450: the table's «Add» emits no event and keeps our form state; after an edit it would
    *  show the edited record under a «New» header, and the submit would UPDATE it. */
   onTableClick(e5) {
-    if (!this.editingId) return;
     const addId = "services-packages-table-add";
-    if (e5.composedPath().some((n6) => n6 instanceof HTMLElement && n6.dataset.testid === addId)) this.cancelEdit();
+    if (!e5.composedPath().some((n6) => n6 instanceof HTMLElement && n6.dataset.testid === addId)) return;
+    if (this.editingId) this.cancelEdit();
+    else this.editSeq++;
   }
   /** Wired natively, not with a Lit `@click` on the tag: `<ok-data-table>` carries `testid`, not
    *  `data-testid` (outfitkit#143), and a template binding would read as an action element that

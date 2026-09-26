@@ -326,9 +326,12 @@ export class ErpServicesPackages extends LitElement {
   /** pm#450: the table's «Add» emits no event and keeps our form state; after an edit it would
    *  show the edited record under a «New» header, and the submit would UPDATE it. */
   private onTableClick(e: Event): void {
-    if (!this.editingId) return;
     const addId = 'services-packages-table-add';
-    if (e.composedPath().some((n) => n instanceof HTMLElement && n.dataset.testid === addId)) this.cancelEdit();
+    if (!e.composedPath().some((n) => n instanceof HTMLElement && n.dataset.testid === addId)) return;
+    if (this.editingId) this.cancelEdit();
+    // pm#459: an edit still waiting for its package has no `editingId` yet; the tap on «Add» must
+    // outrank that reply all the same. Nothing is being edited, so the draft stays.
+    else this.editSeq++;
   }
 
   /** Wired natively, not with a Lit `@click` on the tag: `<ok-data-table>` carries `testid`, not

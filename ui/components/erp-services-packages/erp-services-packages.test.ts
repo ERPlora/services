@@ -369,6 +369,34 @@ describe('two «edit» in a row: the last opening wins (pm#459)', () => {
     expect(panels).toEqual([]);
   });
 
+  it("the table's «Add» button tapped while an edit is still loading keeps the create form (and its draft)", async () => {
+    const el = await mount();
+    let releaseFirst: () => void = () => {};
+    const firstHeld = new Promise<void>((r) => (releaseFirst = r));
+    sdk.query = async (name: string) => {
+      if (name !== 'services.packages.get') return [];
+      await firstHeld;
+      return [FULL];
+    };
+    const panels: unknown[] = [];
+    const t = table(el);
+    t.open = (panel?: unknown) => void panels.push(panel);
+    el.form = { ...el.form, name: 'Bono nuevo' };
+    const first = action(el, 'edit');
+    // The reply has not arrived, so there is no `editingId` yet when the cashier taps the table's
+    // real «Add» button (the path a hand takes, not a direct cancelEdit()).
+    const add = t.shadowRoot.querySelector('[data-testid="services-packages-table-add"]') as HTMLElement;
+    expect(add, 'the table paints its «Add» button').toBeTruthy();
+    add.click();
+    await settle(el);
+    releaseFirst();
+    await first;
+    await settle(el);
+    expect(el.editingId, 'the header says «New»: a late reply must not turn it into an edit').toBeNull();
+    expect(el.form.name, 'the draft typed before is not dropped: nothing was being edited').toBe('Bono nuevo');
+    expect(panels, "no stale open('edit') retitles the panel the cashier just opened as «New»").toEqual([]);
+  });
+
   it('when the FIRST render settles last, the body does not bring the editing line back', async () => {
     const el = await mount();
     sdk.query = async (name: string, params?: Record<string, unknown>) =>
