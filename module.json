@@ -993,6 +993,14 @@
         "commands/grant_orphan_stamp.sql"
       ]
     },
+    "services._on_customer_merged": {
+      "permission": "services.change_package",
+      "transaction": true,
+      "sql": [
+        "commands/customer_merge_redemptions.sql",
+        "commands/customer_merge_grants.sql"
+      ]
+    },
     "services.packages.expire_holds": {
       "permission": "services.hold_package",
       "transaction": true,
@@ -1050,6 +1058,9 @@
       },
       "customer.anonymized": {
         "command": "services._on_customer_deleted"
+      },
+      "customer.merged": {
+        "command": "services._on_customer_merged"
       }
     },
     "emits": [
