@@ -248,6 +248,16 @@ describe('editing titles the panel header, not its body (pm#450)', () => {
     expect(el.form.name).toBe('');
   });
 
+  it('a click INSIDE the edit form (a field, a row) does not drop the edit — only «Add» does', async () => {
+    const el = await mount();
+    await action(el, 'edit');
+    await settle(el);
+    (el.shadowRoot.querySelector('[data-testid="services-packages-name"]') as HTMLElement).click();
+    table(el).click();
+    await settle(el);
+    expect(el.editingId, 'the table host hears every click of the projected form').toBe('p1');
+  });
+
   it('«Add» with no edit in progress keeps what was typed', async () => {
     const el = await mount();
     el.form = { ...el.form, name: 'Bono color' };

@@ -199,6 +199,16 @@ describe('editing titles the panel header, not its body (pm#450)', () => {
     expect(el.newName).toBe('');
   });
 
+  it('a click INSIDE the edit form (a field, a row) does not drop the edit — only «Add» does', async () => {
+    const el = await mount();
+    await action(el, 'edit', ROWS[1]);
+    await settle(el);
+    (el.shadowRoot.querySelector('[data-testid="services-categories-name"]') as HTMLElement).click();
+    table(el).click();
+    await settle(el);
+    expect(el.editingId, 'the table host hears every click of the projected form').toBe('c2');
+  });
+
   it('«Add» with no edit in progress keeps what was typed', async () => {
     const el = await mount();
     el.newName = 'Estética';
