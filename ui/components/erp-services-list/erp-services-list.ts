@@ -457,7 +457,12 @@ export class ErpServicesList extends LitElement {
    *  `data-testid` (outfitkit#143), and a template binding would read as an action element that
    *  demands one. */
   firstUpdated(): void {
-    this.renderRoot.querySelector('ok-data-table')?.addEventListener('click', (e) => this.onTableClick(e));
+    const table = this.renderRoot.querySelector('ok-data-table');
+    table?.addEventListener('click', (e) => this.onTableClick(e));
+    // services#110: closing the panel (X, backdrop, Escape — outfitkit#195, ≥0.1.97) retires the
+    // edit still loading, so its late reply neither reopens the panel nor fills the form. Older
+    // shells never emit it and keep today's behaviour.
+    table?.addEventListener('panelClose', () => this.editSeq++);
   }
 
   /** Back to a clean CREATE form (services#4). */
