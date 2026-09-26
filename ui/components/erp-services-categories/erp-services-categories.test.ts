@@ -262,3 +262,70 @@ describe('editing titles the panel header, not its body (pm#450)', () => {
     expect(el.newName).toBe('Estética');
   });
 });
+
+// pm#459: two «edit» taps in a row. This screen fills the form from the list row BEFORE its only
+// wait (the table render, updateComplete), so a late first render can never bring the first row's
+// data back. What it can bring back is its header check: measured against the FIRST title while the
+// header already carries the second, it would repaint the fallback «Editing…» line.
+describe('two «edit» in a row: the last opening wins (pm#459)', () => {
+  type Table = HTMLElement & { open: (panel?: unknown, opts?: { title?: string }) => void; shadowRoot: ShadowRoot };
+  const table = (el: Mounted) => el.shadowRoot.querySelector('ok-data-table') as Table;
+
+  /** A shell that titles the header (OutfitKit ≥ 0.1.94) whose FIRST render resolves last. */
+  const heldShell = (el: Mounted) => {
+    const t = table(el);
+    const dialog = document.createElement('aside');
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-label', 'Form');
+    const root = document.createElement('div');
+    root.appendChild(dialog);
+    Object.defineProperty(t, 'shadowRoot', { value: root, configurable: true });
+    let releaseFirst: () => void = () => {};
+    const firstHeld = new Promise<void>((r) => (releaseFirst = r));
+    const titles: (string | undefined)[] = [];
+    let rendered: Promise<void> = Promise.resolve();
+    Object.defineProperty(t, 'updateComplete', { get: () => rendered, configurable: true });
+    t.open = (_panel: unknown, opts?: { title?: string }) => {
+      titles.push(opts?.title);
+      const label = Promise.resolve().then(() => {
+        if (opts?.title) dialog.setAttribute('aria-label', opts.title);
+      });
+      rendered = titles.length === 1 ? label.then(() => firstHeld) : label;
+    };
+    return { dialog, titles, releaseFirst: () => releaseFirst() };
+  };
+
+  it('a first render that settles last does not bring the first row back into the form', async () => {
+    const el = await mount();
+    const shell = heldShell(el);
+    const first = action(el, 'edit', ROWS[0]);
+    const second = action(el, 'edit', ROWS[1]);
+    await second;
+    shell.releaseFirst();
+    await first;
+    await settle(el);
+    expect(el.editingId, 'a submit here would UPDATE the first category').toBe('c2');
+    expect(el.newName).toBe('Color');
+    expect(el.newParent).toBe('c1');
+    expect(shell.titles.at(-1), 'the header names the row last tapped').toBe('ui.editingCategoryTitle — Color');
+  });
+
+  it('when the FIRST render settles last, the body does not bring the editing line back', async () => {
+    const el = await mount();
+    const shell = heldShell(el);
+    // The first opening reaches its render (header «Peluquería», held) before the second tap.
+    const first = action(el, 'edit', ROWS[0]);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(shell.titles).toHaveLength(1);
+    const second = action(el, 'edit', ROWS[1]);
+    await second;
+    shell.releaseFirst();
+    await first;
+    await settle(el);
+    expect(shell.dialog.getAttribute('aria-label')).toBe('ui.editingCategoryTitle — Color');
+    expect(
+      el.shadowRoot.querySelector('[data-testid="services-categories-editing"]'),
+      'the header carries «Color»: a stale check against «Peluquería» must not repaint the line',
+    ).toBeNull();
+  });
+});

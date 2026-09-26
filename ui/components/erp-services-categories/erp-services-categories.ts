@@ -75,6 +75,9 @@ export class ErpServicesCategories extends LitElement {
    *  an older shell (hub:stable ships 0.1.73, which ignores the `title` and keeps «New») still
    *  gets the fallback line in the form body. */
   @state() editTitleInHeader = false;
+  /** pm#459: generation of the last edit opening; the header check of an earlier one (its table
+   *  render settling late) sees a newer number and gives up, so the LAST tap wins. */
+  private editSeq = 0;
   /** Category waiting for the delete confirmation. */
   @state() deleteTarget: Category | null = null;
   /** All categories of the hub, for the parent selector (`queryAll`: never a truncated page). */
@@ -173,6 +176,7 @@ export class ErpServicesCategories extends LitElement {
     const { actionId, row } = ev.detail;
     const c = row as unknown as Category;
     if (actionId === 'edit' && can('services.change_category')) {
+      const seq = ++this.editSeq;
       this.editingId = c.id;
       this.newName = c.name ?? '';
       this.newParent = c.parent_id ?? '';
@@ -182,6 +186,7 @@ export class ErpServicesCategories extends LitElement {
       const table = this.dataTable();
       table?.open('edit', { title });
       await table?.updateComplete;
+      if (seq !== this.editSeq) return;
       // OutfitKit < 0.1.94 ignores the title and keeps «New»: only drop the in-form line when the
       // header REALLY carries it (the dialog is labelled with it).
       this.editTitleInHeader = table?.shadowRoot?.querySelector('[role="dialog"]')?.getAttribute('aria-label') === title;

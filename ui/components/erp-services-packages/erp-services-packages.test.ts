@@ -311,3 +311,103 @@ describe('editing titles the panel header, not its body (pm#450)', () => {
     expect(el.form.name).toBe('Bono color');
   });
 });
+
+// pm#459: two «edit» taps in a row. Each opening awaits the full package (services.packages.get)
+// and then the table render (updateComplete); the two waits can resolve in the opposite order. The
+// LAST opening wins: form, id and header belong to the second row, never to a stale first reply.
+describe('two «edit» in a row: the last opening wins (pm#459)', () => {
+  type Table = HTMLElement & { open: (panel?: unknown, opts?: { title?: string }) => void; shadowRoot: ShadowRoot };
+  const table = (el: Mounted) => el.shadowRoot.querySelector('ok-data-table') as Table;
+  const ROW_B = { ...ROWS[0], id: 'p2', name: 'Bono color', discount_type: 'fixed', discount_percent_bp: 0, discount_amount_cents: 500 };
+  const FULL_B = { ...FULL, ...ROW_B, validity_days: 30, max_uses: 3 };
+
+  it('a slow reply for the FIRST row does not overwrite the form of the second', async () => {
+    const el = await mount();
+    let releaseFirst: () => void = () => {};
+    const firstHeld = new Promise<void>((r) => (releaseFirst = r));
+    sdk.query = async (name: string, params?: Record<string, unknown>) => {
+      if (name !== 'services.packages.get') return [];
+      if (params?.package_id === 'p1') {
+        await firstHeld;
+        return [FULL];
+      }
+      return [FULL_B];
+    };
+    const titles: (string | undefined)[] = [];
+    table(el).open = (_panel?: unknown, opts?: { title?: string }) => void titles.push(opts?.title);
+    const first = action(el, 'edit');
+    const second = action(el, 'edit', ROW_B);
+    await second;
+    releaseFirst();
+    await first;
+    await settle(el);
+    expect(el.editingId, 'a submit here would UPDATE the first package').toBe('p2');
+    expect(el.form.name).toBe('Bono color');
+    expect(el.form.discountType).toBe('fixed');
+    expect(el.form.maxUses).toBe('3');
+    expect(titles.at(-1), 'the header names the row last tapped').toBe('ui.editingPackageTitle — Bono color');
+  });
+
+  it('«Add» while an edit is still loading keeps the clean create form', async () => {
+    const el = await mount();
+    let releaseFirst: () => void = () => {};
+    const firstHeld = new Promise<void>((r) => (releaseFirst = r));
+    sdk.query = async (name: string) => {
+      if (name !== 'services.packages.get') return [];
+      await firstHeld;
+      return [FULL];
+    };
+    const panels: unknown[] = [];
+    table(el).open = (panel?: unknown) => void panels.push(panel);
+    const first = action(el, 'edit');
+    (el as unknown as { cancelEdit(): void }).cancelEdit();
+    releaseFirst();
+    await first;
+    await settle(el);
+    expect(el.editingId, 'the header says «New»: a late reply must not turn it into an edit').toBeNull();
+    expect(el.form.name).toBe('');
+    expect(panels).toEqual([]);
+  });
+
+  it('when the FIRST render settles last, the body does not bring the editing line back', async () => {
+    const el = await mount();
+    sdk.query = async (name: string, params?: Record<string, unknown>) =>
+      name === 'services.packages.get' ? [params?.package_id === 'p2' ? FULL_B : FULL] : [];
+    const t = table(el);
+    const dialog = document.createElement('aside');
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-label', 'Form');
+    const root = document.createElement('div');
+    root.appendChild(dialog);
+    Object.defineProperty(t, 'shadowRoot', { value: root, configurable: true });
+    // The shell titles the header (OutfitKit ≥ 0.1.94); the first open's render is held and
+    // resolves AFTER the second one.
+    let releaseFirst: () => void = () => {};
+    const firstHeld = new Promise<void>((r) => (releaseFirst = r));
+    let opens = 0;
+    let rendered: Promise<void> = Promise.resolve();
+    Object.defineProperty(t, 'updateComplete', { get: () => rendered, configurable: true });
+    t.open = (_panel: unknown, opts?: { title?: string }) => {
+      const n = ++opens;
+      const label = Promise.resolve().then(() => {
+        if (opts?.title) dialog.setAttribute('aria-label', opts.title);
+      });
+      rendered = n === 1 ? label.then(() => firstHeld) : label;
+    };
+    // The first opening reaches its render (header «Bono 5 cortes», held) before the second tap.
+    const first = action(el, 'edit');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(opens).toBe(1);
+    const second = action(el, 'edit', ROW_B);
+    await second;
+    releaseFirst();
+    await first;
+    await settle(el);
+    expect(dialog.getAttribute('aria-label')).toBe('ui.editingPackageTitle — Bono color');
+    expect(el.editingId).toBe('p2');
+    expect(
+      el.shadowRoot.querySelector('[data-testid="services-packages-editing"]'),
+      'the header carries «Bono color»: a stale check against the first title must not repaint the line',
+    ).toBeNull();
+  });
+});
