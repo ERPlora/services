@@ -3940,6 +3940,7 @@ var es_default = {
     errorRestore: "No se pudo restaurar el servicio",
     actionEdit: "Editar",
     editingTitle: "Editando servicio",
+    editingCancel: "Cancelar edici\xF3n",
     btnSave: "Guardar cambios",
     errorUpdate: "No se pudo actualizar el servicio",
     colParent: "Categor\xEDa padre",
@@ -4182,6 +4183,7 @@ var en_default = {
     errorRestore: "Could not restore the service",
     actionEdit: "Edit",
     editingTitle: "Editing service",
+    editingCancel: "Cancel edit",
     btnSave: "Save changes",
     errorUpdate: "Could not update the service",
     colParent: "Parent category",
@@ -4391,6 +4393,7 @@ var ErpServicesCategories = class extends i3 {
     this.saving = false;
     this.formError = "";
     this.editingId = null;
+    this.editTitleInHeader = false;
     this.deleteTarget = null;
     this.allCategories = [];
     this.onLocaleChange = () => this.requestUpdate();
@@ -4479,7 +4482,11 @@ var ErpServicesCategories = class extends i3 {
       this.newParent = c5.parent_id ?? "";
       this.newSortOrder = String(c5.sort_order ?? 0);
       this.formError = "";
-      this.dataTable()?.open("edit", { title: `${erplora().t(CATALOG, "ui.editingCategoryTitle")} \u2014 ${this.newName}` });
+      const title = `${erplora().t(CATALOG, "ui.editingCategoryTitle")} \u2014 ${this.newName}`;
+      const table = this.dataTable();
+      table?.open("edit", { title });
+      await table?.updateComplete;
+      this.editTitleInHeader = table?.shadowRoot?.querySelector('[role="dialog"]')?.getAttribute("aria-label") === title;
     } else if (actionId === "delete" && can("services.delete_category")) {
       this.deleteTarget = c5;
     }
@@ -4567,6 +4574,10 @@ var ErpServicesCategories = class extends i3 {
       <ok-data-table testid="services-categories-table" .serverSide=${true} .fill=${true} .views=${true} .addable=${can("services.add_category")} .cardTitle=${(row) => String(row.name ?? "")} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "asc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchCategoryPlaceholder")} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.emptyCategories")} @rowAction=${(e5) => this.onRowAction(e5)} @rowClick=${(e5) => this.onRowAction({ detail: { actionId: "edit", row: e5.detail.row } })}
  @pageChange=${(e5) => this.ctrl.setPage(e5.detail)} @pageSizeChange=${(e5) => this.ctrl.setPageSize(e5.detail)} @sortChange=${(e5) => this.ctrl.setSort(e5.detail.sort, e5.detail.dir)} @searchChange=${(e5) => this.ctrl.setSearch(e5.detail)} @filterChange=${(e5) => this.ctrl.setFilter(e5.detail.col, e5.detail.value)}>
         <form slot="create" class="form" data-testid="services-categories-form" @submit=${(e5) => this.save(e5)}>
+          ${this.editingId && !this.editTitleInHeader ? b2`<ok-inline-feedback data-testid="services-categories-editing" tone="info" icon="create-outline">
+                <b>${t5("ui.editingCategoryTitle")}</b> — ${this.newName}
+                <ion-button size="small" fill="clear" data-testid="services-categories-edit-cancel" @click=${() => this.cancelEdit()}>${t5("ui.editingCancel")}</ion-button>
+              </ok-inline-feedback>` : A}
           <ion-input data-testid="services-categories-name" fill="outline" label-placement="floating" label=${t5("ui.colName")} .value=${this.newName} @ionInput=${(e5) => this.newName = e5.target.value}></ion-input>
           <ion-select data-testid="services-categories-parent" fill="outline" label-placement="floating" label=${t5("ui.colParent")} placeholder=${t5("ui.placeholderParent")} .value=${this.newParent} @ionChange=${(e5) => this.newParent = e5.target.value}>
             <ion-select-option value="">${t5("ui.optionNoParent")}</ion-select-option>
@@ -4598,6 +4609,9 @@ __decorateClass([
 __decorateClass([
   r5()
 ], ErpServicesCategories.prototype, "editingId", 2);
+__decorateClass([
+  r5()
+], ErpServicesCategories.prototype, "editTitleInHeader", 2);
 __decorateClass([
   r5()
 ], ErpServicesCategories.prototype, "deleteTarget", 2);
@@ -4667,6 +4681,7 @@ var ErpServicesList = class extends i3 {
     this.tick = 0;
     this.showingArchived = false;
     this.editingId = null;
+    this.editTitleInHeader = false;
     this.archiveTarget = null;
     this.archiveActive = null;
     // TODO-LIT: componentWillLoad → connectedCallback. Recuerda: connectedCallback se dispara
@@ -4963,7 +4978,11 @@ var ErpServicesList = class extends i3 {
       this.newDuration = String(full.duration_minutes ?? "");
       this.newCategory = String(full.category_id ?? "");
       this.newTaxRateId = String(full.tax_category_key ?? "");
-      this.dataTable()?.open("edit", { title: `${erplora2().t(CATALOG2, "ui.editingTitle")} \u2014 ${this.newName}` });
+      const title = `${erplora2().t(CATALOG2, "ui.editingTitle")} \u2014 ${this.newName}`;
+      const table = this.dataTable();
+      table?.open("edit", { title });
+      await table?.updateComplete;
+      this.editTitleInHeader = table?.shadowRoot?.querySelector('[role="dialog"]')?.getAttribute("aria-label") === title;
       return;
     }
     if (actionId !== "archive" || !can2("services.delete_service")) return;
@@ -5040,6 +5059,10 @@ var ErpServicesList = class extends i3 {
           <!-- Create form: ALWAYS projected (even with the panel shut); painted only on open, the
                toolbar «+» would slide out an empty panel. -->
           <form slot="create" class="form" data-testid="services-list-form" @submit=${(e5) => this.createService(e5)}>
+            ${this.editingId && !this.editTitleInHeader ? b2`<ok-inline-feedback data-testid="services-list-editing" tone="info" icon="create-outline">
+                  <b>${t5("ui.editingTitle")}</b> — ${this.newName}
+                  <ion-button size="small" fill="clear" data-testid="services-list-edit-cancel" @click=${() => this.cancelEdit()}>${t5("ui.editingCancel")}</ion-button>
+                </ok-inline-feedback>` : A}
             <ion-input data-testid="services-list-name" fill="outline" label-placement="floating" label=${t5("ui.colName")} .value=${this.newName} @ionInput=${(e5) => this.newName = e5.target.value}></ion-input>
             <ion-input data-testid="services-list-price" fill="outline" label-placement="floating" label=${t5("ui.colPrice")} type="text" inputmode="decimal" .value=${this.newPrice} @ionInput=${(e5) => this.newPrice = e5.target.value}></ion-input>
             <ion-input data-testid="services-list-duration" fill="outline" label-placement="floating" label=${t5("ui.colDuration")} type="number" step="1" .value=${this.newDuration} @ionInput=${(e5) => this.newDuration = e5.target.value}></ion-input>
@@ -5101,6 +5124,9 @@ __decorateClass([
 __decorateClass([
   r5()
 ], ErpServicesList.prototype, "editingId", 2);
+__decorateClass([
+  r5()
+], ErpServicesList.prototype, "editTitleInHeader", 2);
 __decorateClass([
   r5()
 ], ErpServicesList.prototype, "archiveTarget", 2);
@@ -5273,6 +5299,7 @@ var ErpServicesPackages = class extends i3 {
     this.saving = false;
     this.formError = "";
     this.editingId = null;
+    this.editTitleInHeader = false;
     this.deleteTarget = null;
     this.movementsOf = null;
     this.movements = [];
@@ -5420,7 +5447,11 @@ var ErpServicesPackages = class extends i3 {
         validityDays: full.validity_days == null ? "" : String(full.validity_days),
         maxUses: full.max_uses == null ? "" : String(full.max_uses)
       };
-      this.dataTable()?.open("edit", { title: `${erplora3().t(CATALOG3, "ui.editingPackageTitle")} \u2014 ${this.form.name}` });
+      const title = `${erplora3().t(CATALOG3, "ui.editingPackageTitle")} \u2014 ${this.form.name}`;
+      const table = this.dataTable();
+      table?.open("edit", { title });
+      await table?.updateComplete;
+      this.editTitleInHeader = table?.shadowRoot?.querySelector('[role="dialog"]')?.getAttribute("aria-label") === title;
     } else if (actionId === "movements" && can3("services.view_package_balance")) {
       await this.openMovements(p4);
     } else if (actionId === "delete" && can3("services.delete_package")) {
@@ -5729,6 +5760,10 @@ var ErpServicesPackages = class extends i3 {
       <ok-data-table testid="services-packages-table" .serverSide=${true} .fill=${true} .views=${true} .addable=${can3("services.add_package")} .cardTitle=${(row) => String(row.name ?? "")} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "asc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchPackagePlaceholder")} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.emptyPackages")} @rowAction=${(e5) => this.onRowAction(e5)} @rowClick=${(e5) => this.onRowAction({ detail: { actionId: "edit", row: e5.detail.row } })}
  @pageChange=${(e5) => this.ctrl.setPage(e5.detail)} @pageSizeChange=${(e5) => this.ctrl.setPageSize(e5.detail)} @sortChange=${(e5) => this.ctrl.setSort(e5.detail.sort, e5.detail.dir)} @searchChange=${(e5) => this.ctrl.setSearch(e5.detail)} @filterChange=${(e5) => this.ctrl.setFilter(e5.detail.col, e5.detail.value)}>
         <form slot="create" class="form" data-testid="services-packages-form" @submit=${(e5) => this.save(e5)}>
+          ${this.editingId && !this.editTitleInHeader ? b2`<ok-inline-feedback data-testid="services-packages-editing" tone="info" icon="create-outline">
+                <b>${t5("ui.editingPackageTitle")}</b> — ${this.form.name}
+                <ion-button size="small" fill="clear" data-testid="services-packages-edit-cancel" @click=${() => this.cancelEdit()}>${t5("ui.editingCancel")}</ion-button>
+              </ok-inline-feedback>` : A}
           <ion-input data-testid="services-packages-name" fill="outline" label-placement="floating" label=${t5("ui.colName")} .value=${this.form.name} @ionInput=${(e5) => this.form = { ...this.form, name: e5.target.value }}></ion-input>
           <ion-select data-testid="services-packages-discount-type" fill="outline" label-placement="floating" label=${t5("ui.colDiscountType")} .value=${this.form.discountType} @ionChange=${(e5) => this.form = { ...this.form, discountType: e5.target.value }}>
             <ion-select-option value="percentage">${t5("ui.discountType.percentage")}</ion-select-option>
@@ -5766,6 +5801,9 @@ __decorateClass([
 __decorateClass([
   r5()
 ], ErpServicesPackages.prototype, "editingId", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "editTitleInHeader", 2);
 __decorateClass([
   r5()
 ], ErpServicesPackages.prototype, "deleteTarget", 2);
