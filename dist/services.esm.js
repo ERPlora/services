@@ -4394,6 +4394,9 @@ var ErpServicesCategories = class extends i3 {
     this.formError = "";
     this.editingId = null;
     this.editTitleInHeader = false;
+    /** pm#459: generation of the last edit opening; the header check of an earlier one (its table
+     *  render settling late) sees a newer number and gives up, so the LAST tap wins. */
+    this.editSeq = 0;
     this.deleteTarget = null;
     this.allCategories = [];
     this.onLocaleChange = () => this.requestUpdate();
@@ -4477,6 +4480,7 @@ var ErpServicesCategories = class extends i3 {
     const { actionId, row } = ev.detail;
     const c5 = row;
     if (actionId === "edit" && can("services.change_category")) {
+      const seq = ++this.editSeq;
       this.editingId = c5.id;
       this.newName = c5.name ?? "";
       this.newParent = c5.parent_id ?? "";
@@ -4486,6 +4490,7 @@ var ErpServicesCategories = class extends i3 {
       const table = this.dataTable();
       table?.open("edit", { title });
       await table?.updateComplete;
+      if (seq !== this.editSeq) return;
       this.editTitleInHeader = table?.shadowRoot?.querySelector('[role="dialog"]')?.getAttribute("aria-label") === title;
     } else if (actionId === "delete" && can("services.delete_category")) {
       this.deleteTarget = c5;
@@ -5307,6 +5312,9 @@ var ErpServicesPackages = class extends i3 {
     this.formError = "";
     this.editingId = null;
     this.editTitleInHeader = false;
+    /** pm#459: generation of the last edit opening; a stale wait (package fetch, table render) of an
+     *  earlier one sees a newer number and gives up, so the LAST tap wins. */
+    this.editSeq = 0;
     this.deleteTarget = null;
     this.movementsOf = null;
     this.movements = [];
@@ -5413,9 +5421,10 @@ var ErpServicesPackages = class extends i3 {
   /** pm#450: the table's «Add» emits no event and keeps our form state; after an edit it would
    *  show the edited record under a «New» header, and the submit would UPDATE it. */
   onTableClick(e5) {
-    if (!this.editingId) return;
     const addId = "services-packages-table-add";
-    if (e5.composedPath().some((n6) => n6 instanceof HTMLElement && n6.dataset.testid === addId)) this.cancelEdit();
+    if (!e5.composedPath().some((n6) => n6 instanceof HTMLElement && n6.dataset.testid === addId)) return;
+    if (this.editingId) this.cancelEdit();
+    else this.editSeq++;
   }
   /** Wired natively, not with a Lit `@click` on the tag: `<ok-data-table>` carries `testid`, not
    *  `data-testid` (outfitkit#143), and a template binding would read as an action element that
@@ -5437,6 +5446,7 @@ var ErpServicesPackages = class extends i3 {
     const { actionId, row } = ev.detail;
     const p4 = row;
     if (actionId === "edit" && can3("services.change_package")) {
+      const seq = ++this.editSeq;
       this.formError = "";
       let full = row;
       try {
@@ -5444,6 +5454,7 @@ var ErpServicesPackages = class extends i3 {
         if (Array.isArray(rows) && rows[0]) full = rows[0];
       } catch {
       }
+      if (seq !== this.editSeq) return;
       const type = String(full.discount_type ?? "percentage");
       this.editingId = p4.id;
       this.form = {
@@ -5458,6 +5469,7 @@ var ErpServicesPackages = class extends i3 {
       const table = this.dataTable();
       table?.open("edit", { title });
       await table?.updateComplete;
+      if (seq !== this.editSeq) return;
       this.editTitleInHeader = table?.shadowRoot?.querySelector('[role="dialog"]')?.getAttribute("aria-label") === title;
     } else if (actionId === "movements" && can3("services.view_package_balance")) {
       await this.openMovements(p4);
@@ -5500,13 +5512,14 @@ var ErpServicesPackages = class extends i3 {
         offset: this.movements.length,
         params: { package_id: target.id }
       });
-      if (this.movementsOf?.id !== target.id) return;
+      if (this.movementsOf !== target) return;
       this.movements = [...this.movements, ...page?.rows ?? []];
       this.movementsTotal = page?.total ?? this.movements.length;
     } catch (e5) {
+      if (this.movementsOf !== target) return;
       this.movementsError = domainMessage(e5, erplora3().locale, erplora3().t(CATALOG3, "ui.errorMovements"));
     } finally {
-      this.movementsLoading = false;
+      if (this.movementsOf === target) this.movementsLoading = false;
     }
   }
   /**
@@ -5546,6 +5559,7 @@ var ErpServicesPackages = class extends i3 {
   }
   /** Back to a clean CREATE form. */
   cancelEdit() {
+    this.editSeq++;
     this.editingId = null;
     this.form = { ...EMPTY_FORM };
     this.items = [{ serviceId: "", sessions: "1" }];

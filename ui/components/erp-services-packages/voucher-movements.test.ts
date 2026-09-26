@@ -286,3 +286,50 @@ describe('the ledger arrives a page at a time', () => {
     expect(asked[asked.length - 1].params.offset).toBe(0);
   });
 });
+
+// pm#459 (customers#91 finding): a late reply of the FIRST voucher must not land on the sheet of
+// the second — neither its rows (already guarded) nor its FAILURE, nor its end of loading.
+describe('two vouchers opened in a row: the last one owns the sheet (pm#459)', () => {
+  const ROW_B = { ...ROWS[0], id: 'p2', name: 'Bono color' };
+  const openRow = (el: Mounted, row: Record<string, unknown>) =>
+    el.onRowAction(new CustomEvent('rowAction', { detail: { actionId: 'movements', row } }));
+
+  it("a late FAILURE of the first voucher's page does not paint an error on the second's sheet", async () => {
+    let failFirst: (e: Error) => void = () => {};
+    let releaseSecond: (p: { rows: unknown[]; total: number }) => void = () => {};
+    answer = (params) =>
+      (params.params as Record<string, unknown>)?.package_id === 'p1'
+        ? new Promise((_, reject) => (failFirst = reject))
+        : new Promise((r) => (releaseSecond = r));
+    const el = await mount();
+    const first = openRow(el, ROWS[0]);
+    const second = openRow(el, ROW_B);
+    failFirst(new Error('db: connection refused'));
+    await first;
+    await el.updateComplete;
+    expect(el.movementsOf?.id).toBe('p2');
+    expect(el.movementsError, "the first voucher's failure is not the second's").toBe('');
+    expect(el.movementsLoading, "the second voucher's page is still on its way").toBe(true);
+    releaseSecond({ rows: MOVEMENTS, total: MOVEMENTS.length });
+    await second;
+    await el.updateComplete;
+    expect(el.movements.map((m) => m.redemption_id)).toEqual(['r3', 'r2']);
+    expect(el.movementsLoading).toBe(false);
+  });
+
+  it("closing and reopening the SAME voucher: the page of the first opening is not stacked on the new one", async () => {
+    const releases: ((p: { rows: unknown[]; total: number }) => void)[] = [];
+    answer = () => new Promise((r) => releases.push(r));
+    const el = await mount();
+    const first = openRow(el, ROWS[0]);
+    el.movementsOf = null; // the cashier closes the sheet while the page is on its way
+    await el.updateComplete;
+    const second = openRow(el, ROWS[0]);
+    releases[1]({ rows: MOVEMENTS, total: MOVEMENTS.length });
+    await second;
+    releases[0]({ rows: MOVEMENTS, total: MOVEMENTS.length });
+    await first;
+    await el.updateComplete;
+    expect(el.movements.map((m) => m.redemption_id), "one ledger, not two copies of it").toEqual(["r3", "r2"]);
+  });
+});

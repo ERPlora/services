@@ -207,6 +207,9 @@ export class ErpServicesPackages extends LitElement {
    *  an older shell (hub:stable ships 0.1.73, which ignores the `title` and keeps «New») still
    *  gets the fallback line in the form body. */
   @state() editTitleInHeader = false;
+  /** pm#459: generation of the last edit opening; a stale wait (package fetch, table render) of an
+   *  earlier one sees a newer number and gives up, so the LAST tap wins. */
+  private editSeq = 0;
   @state() deleteTarget: Package | null = null;
   /** Voucher whose ledger is open; `null` = the sheet is closed. */
   @state() movementsOf: { id: string; name: string } | null = null;
@@ -323,9 +326,12 @@ export class ErpServicesPackages extends LitElement {
   /** pm#450: the table's «Add» emits no event and keeps our form state; after an edit it would
    *  show the edited record under a «New» header, and the submit would UPDATE it. */
   private onTableClick(e: Event): void {
-    if (!this.editingId) return;
     const addId = 'services-packages-table-add';
-    if (e.composedPath().some((n) => n instanceof HTMLElement && n.dataset.testid === addId)) this.cancelEdit();
+    if (!e.composedPath().some((n) => n instanceof HTMLElement && n.dataset.testid === addId)) return;
+    if (this.editingId) this.cancelEdit();
+    // pm#459: an edit still waiting for its package has no `editingId` yet; the tap on «Add» must
+    // outrank that reply all the same. Nothing is being edited, so the draft stays.
+    else this.editSeq++;
   }
 
   /** Wired natively, not with a Lit `@click` on the tag: `<ok-data-table>` carries `testid`, not
@@ -352,6 +358,7 @@ export class ErpServicesPackages extends LitElement {
     const { actionId, row } = ev.detail;
     const p = row as unknown as Package;
     if (actionId === 'edit' && can('services.change_package')) {
+      const seq = ++this.editSeq;
       this.formError = '';
       let full: Record<string, unknown> = row;
       try {
@@ -360,6 +367,7 @@ export class ErpServicesPackages extends LitElement {
       } catch {
         /* the list row is enough for what the header form shows */
       }
+      if (seq !== this.editSeq) return;
       const type = String(full.discount_type ?? 'percentage');
       this.editingId = p.id;
       this.form = {
@@ -376,6 +384,7 @@ export class ErpServicesPackages extends LitElement {
       const table = this.dataTable();
       table?.open('edit', { title });
       await table?.updateComplete;
+      if (seq !== this.editSeq) return;
       // OutfitKit < 0.1.94 ignores the title and keeps «New»: only drop the in-form line when the
       // header REALLY carries it (the dialog is labelled with it).
       this.editTitleInHeader = table?.shadowRoot?.querySelector('[role="dialog"]')?.getAttribute('aria-label') === title;
@@ -423,15 +432,16 @@ export class ErpServicesPackages extends LitElement {
         offset: this.movements.length,
         params: { package_id: target.id },
       });
-      // The sheet may have been closed (or moved to another voucher) while the page was in
-      // flight; painting it then would stack one voucher's ledger under another's name.
-      if (this.movementsOf?.id !== target.id) return;
+      // The sheet may have been closed, moved to another voucher or REOPENED (a new opening object,
+      // pm#459) while the page was in flight; painting it then would stack a stale ledger on it.
+      if (this.movementsOf !== target) return;
       this.movements = [...this.movements, ...(page?.rows ?? [])];
       this.movementsTotal = page?.total ?? this.movements.length;
     } catch (e) {
+      if (this.movementsOf !== target) return; // pm#459: another opening owns the sheet now
       this.movementsError = domainMessage(e, erplora().locale, erplora().t(CATALOG, 'ui.errorMovements'));
     } finally {
-      this.movementsLoading = false;
+      if (this.movementsOf === target) this.movementsLoading = false;
     }
   }
 
@@ -477,6 +487,7 @@ export class ErpServicesPackages extends LitElement {
 
   /** Back to a clean CREATE form. */
   cancelEdit(): void {
+    this.editSeq++;
     this.editingId = null;
     this.form = { ...EMPTY_FORM };
     this.items = [{ serviceId: '', sessions: '1' }];
