@@ -229,3 +229,103 @@ describe('editing titles the panel header, not its body (pm#450)', () => {
     expect(el.newName).toBe('Brushing');
   });
 });
+
+// pm#459: two «edit» taps in a row. Each opening awaits the full row (services.services.get) and
+// then the table render (updateComplete); the two waits can resolve in the opposite order. The
+// LAST opening wins: form, id and header belong to the second row, never to a stale first reply.
+describe('two «edit» in a row: the last opening wins (pm#459)', () => {
+  type Table = HTMLElement & { open: (panel?: unknown, opts?: { title?: string }) => void; shadowRoot: ShadowRoot };
+  const table = (el: Mounted) => el.shadowRoot.querySelector('ok-data-table') as Table;
+  const ROW_B = { ...ROW, id: 's2', name: 'Tinte', price: '3000' };
+  const editRow = (el: Mounted, row: Record<string, unknown>) =>
+    el.onRowAction(new CustomEvent('rowAction', { detail: { actionId: 'edit', row } }));
+
+  it('a slow reply for the FIRST row does not overwrite the form of the second', async () => {
+    const el = await mount();
+    let releaseFirst: () => void = () => {};
+    const firstHeld = new Promise<void>((r) => (releaseFirst = r));
+    sdk.query = async (name: string, params?: Record<string, unknown>) => {
+      if (name !== 'services.services.get') return [];
+      if (params?.service_id === 's1') {
+        await firstHeld;
+        return [FULL];
+      }
+      return [{ ...FULL, ...ROW_B }];
+    };
+    const titles: (string | undefined)[] = [];
+    table(el).open = (_panel?: unknown, opts?: { title?: string }) => void titles.push(opts?.title);
+    const first = editRow(el, ROW);
+    const second = editRow(el, ROW_B);
+    await second;
+    releaseFirst();
+    await first;
+    await settle(el);
+    expect(el.editingId, 'a submit here would UPDATE the first service').toBe('s2');
+    expect(el.newName).toBe('Tinte');
+    expect(el.newPrice).toBe('30,00');
+    expect(titles.at(-1), 'the header names the row last tapped').toBe('ui.editingTitle — Tinte');
+  });
+
+  it('«Add» while an edit is still loading keeps the clean create form', async () => {
+    const el = await mount();
+    let releaseFirst: () => void = () => {};
+    const firstHeld = new Promise<void>((r) => (releaseFirst = r));
+    sdk.query = async (name: string) => {
+      if (name !== 'services.services.get') return [];
+      await firstHeld;
+      return [FULL];
+    };
+    const panels: unknown[] = [];
+    table(el).open = (panel?: unknown) => void panels.push(panel);
+    const first = editRow(el, ROW);
+    (el as unknown as { cancelEdit(): void }).cancelEdit();
+    releaseFirst();
+    await first;
+    await settle(el);
+    expect(el.editingId, 'the header says «New»: a late reply must not turn it into an edit').toBeNull();
+    expect(el.newName).toBe('');
+    expect(panels).toEqual([]);
+  });
+
+  it('when the FIRST render settles last, the body does not bring the editing line back', async () => {
+    const el = await mount();
+    sdk.query = async (name: string, params?: Record<string, unknown>) =>
+      name === 'services.services.get' ? [params?.service_id === 's2' ? { ...FULL, ...ROW_B } : FULL] : [];
+    const t = table(el);
+    const dialog = document.createElement('aside');
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-label', 'Form');
+    const root = document.createElement('div');
+    root.appendChild(dialog);
+    Object.defineProperty(t, 'shadowRoot', { value: root, configurable: true });
+    // The shell titles the header (OutfitKit ≥ 0.1.94); the first open's render is held and
+    // resolves AFTER the second one.
+    let releaseFirst: () => void = () => {};
+    const firstHeld = new Promise<void>((r) => (releaseFirst = r));
+    let opens = 0;
+    let rendered: Promise<void> = Promise.resolve();
+    Object.defineProperty(t, 'updateComplete', { get: () => rendered, configurable: true });
+    t.open = (_panel: unknown, opts?: { title?: string }) => {
+      const n = ++opens;
+      const label = Promise.resolve().then(() => {
+        if (opts?.title) dialog.setAttribute('aria-label', opts.title);
+      });
+      rendered = n === 1 ? label.then(() => firstHeld) : label;
+    };
+    // The first opening reaches its render (header «Corte», held) before the second tap.
+    const first = editRow(el, ROW);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(opens).toBe(1);
+    const second = editRow(el, ROW_B);
+    await second;
+    releaseFirst();
+    await first;
+    await settle(el);
+    expect(dialog.getAttribute('aria-label')).toBe('ui.editingTitle — Tinte');
+    expect(el.editingId).toBe('s2');
+    expect(
+      el.shadowRoot.querySelector('form[slot="create"] [data-testid="services-list-editing"]'),
+      'the header carries «Tinte»: a stale check against «Corte» must not repaint the line',
+    ).toBeNull();
+  });
+});
