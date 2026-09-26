@@ -92,7 +92,6 @@
     "errorRestore": "Could not restore the service",
     "actionEdit": "Edit",
     "editingTitle": "Editing service",
-    "editingCancel": "Cancel edit",
     "btnSave": "Save changes",
     "errorUpdate": "Could not update the service",
     "colParent": "Parent category",

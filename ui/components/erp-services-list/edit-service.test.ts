@@ -102,7 +102,8 @@ describe('editing pre-fills the create form and saves through services.services.
     // services#54: the field shows the price in the hub's locale notation («12,00» in es), same
     // decimals and separator as the table next to it — not the raw `String(12)`.
     expect(el.newPrice, 'the price is shown in major units, in the hub locale (cents → «12,00»)').toBe('12,00');
-    expect(el.shadowRoot.querySelector('form[slot="create"]')?.textContent).toContain('ui.editingTitle');
+    // pm#450: «Editing service — Corte» moved to the panel header (see below); the body no longer
+    // repeats it.
   });
 
   it('the submit sends update (not create) with the id and the edited fields, price in minor units', async () => {
@@ -125,5 +126,51 @@ describe('editing pre-fills the create form and saves through services.services.
     await mount();
     expect(queryAlls).toContain('services.categories.list');
     expect(queries.map((q) => q.name)).not.toContain('services.categories.list');
+  });
+});
+
+// pm#450 (outfitkit#150): editing opened the panel with open('create'), so its header said «New»
+// while the body said «Editing service — Corte». The table knows an «edit» mode and takes the whole
+// title: the screen asks for it and drops the repeated line from the body.
+describe('editing titles the panel header, not its body (pm#450)', () => {
+  type Table = HTMLElement & { open: (...args: unknown[]) => void; shadowRoot: ShadowRoot };
+  const table = (el: Mounted) => el.shadowRoot.querySelector('ok-data-table') as Table;
+
+  it("opens the panel with open('edit', { title }) — «Editing service — <name>» in the header", async () => {
+    const el = await mount();
+    const calls: unknown[][] = [];
+    table(el).open = (...args: unknown[]) => void calls.push(args);
+    await edit(el);
+    await settle(el);
+    expect(calls).toEqual([['edit', { title: 'ui.editingTitle — Corte' }]]);
+  });
+
+  it('the form body no longer repeats the editing title', async () => {
+    const el = await mount();
+    await edit(el);
+    await settle(el);
+    const form = el.shadowRoot.querySelector('form[slot="create"]') as HTMLElement;
+    expect(form.querySelector('[data-testid="services-list-editing"]')).toBeNull();
+    expect(form.textContent).not.toContain('ui.editingTitle');
+  });
+
+  it('«Add» after an edit opens a CLEAN create form (the header says «New»: the form must agree)', async () => {
+    const el = await mount();
+    await edit(el);
+    await settle(el);
+    const add = table(el).shadowRoot.querySelector('[data-testid="services-list-table-add"]') as HTMLElement;
+    expect(add, 'the table paints its «Add» button').toBeTruthy();
+    add.click();
+    await settle(el);
+    expect(el.editingId, 'a submit here would UPDATE the edited service under a «New» header').toBeNull();
+    expect(el.newName).toBe('');
+  });
+
+  it('«Add» with no edit in progress keeps what was typed', async () => {
+    const el = await mount();
+    el.newName = 'Brushing';
+    (table(el).shadowRoot.querySelector('[data-testid="services-list-table-add"]') as HTMLElement).click();
+    await settle(el);
+    expect(el.newName).toBe('Brushing');
   });
 });

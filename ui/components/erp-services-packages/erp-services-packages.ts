@@ -298,8 +298,25 @@ export class ErpServicesPackages extends LitElement {
     }
   }
 
-  private dataTable(): { open(p?: 'filters' | 'create'): void; close(): void } | null {
-    return this.renderRoot.querySelector('ok-data-table') as { open(p?: 'filters' | 'create'): void; close(): void } | null;
+  private dataTable(): { open(p?: 'filters' | 'create' | 'edit', opts?: { title?: string }): void; close(): void } | null {
+    return this.renderRoot.querySelector('ok-data-table') as
+      | { open(p?: 'filters' | 'create' | 'edit', opts?: { title?: string }): void; close(): void }
+      | null;
+  }
+
+  /** pm#450: the table's «Add» emits no event and keeps our form state; after an edit it would
+   *  show the edited record under a «New» header, and the submit would UPDATE it. */
+  private onTableClick(e: Event): void {
+    if (!this.editingId) return;
+    const addId = 'services-packages-table-add';
+    if (e.composedPath().some((n) => n instanceof HTMLElement && n.dataset.testid === addId)) this.cancelEdit();
+  }
+
+  /** Wired natively, not with a Lit `@click` on the tag: `<ok-data-table>` carries `testid`, not
+   *  `data-testid` (outfitkit#143), and a template binding would read as an action element that
+   *  demands one. */
+  firstUpdated(): void {
+    this.renderRoot.querySelector('ok-data-table')?.addEventListener('click', (e) => this.onTableClick(e));
   }
 
   addItem(): void {
@@ -339,7 +356,7 @@ export class ErpServicesPackages extends LitElement {
         validityDays: full.validity_days == null ? '' : String(full.validity_days),
         maxUses: full.max_uses == null ? '' : String(full.max_uses),
       };
-      this.dataTable()?.open('create');
+      this.dataTable()?.open('edit', { title: `${erplora().t(CATALOG, 'ui.editingPackageTitle')} — ${this.form.name}` });
     } else if (actionId === 'movements' && can('services.view_package_balance')) {
       await this.openMovements(p);
     } else if (actionId === 'delete' && can('services.delete_package')) {
@@ -705,12 +722,6 @@ export class ErpServicesPackages extends LitElement {
       <ok-data-table testid="services-packages-table" .serverSide=${true} .fill=${true} .views=${true} .addable=${can('services.add_package')} .cardTitle=${(row: Record<string, unknown>) => String(row.name ?? '')} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? 'asc'} .searchable=${true} .searchPlaceholder=${t('ui.searchPackagePlaceholder')} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t('ui.loading') : t('ui.emptyPackages')} @rowAction=${(e: CustomEvent<{ actionId: string; row: Record<string, unknown> }>) => this.onRowAction(e)} @rowClick=${(e: CustomEvent<{ row: Record<string, unknown> }>) => this.onRowAction({ detail: { actionId: 'edit', row: e.detail.row } } as CustomEvent<{ actionId: string; row: Record<string, unknown> }>)}
  @pageChange=${(e: CustomEvent<number>) => this.ctrl.setPage(e.detail)} @pageSizeChange=${(e: CustomEvent<number>) => this.ctrl.setPageSize(e.detail)} @sortChange=${(e: CustomEvent<{ sort: string; dir: 'asc' | 'desc' }>) => this.ctrl.setSort(e.detail.sort, e.detail.dir)} @searchChange=${(e: CustomEvent<string>) => this.ctrl.setSearch(e.detail)} @filterChange=${(e: CustomEvent<{ col: string; value: unknown }>) => this.ctrl.setFilter(e.detail.col, e.detail.value)}>
         <form slot="create" class="form" data-testid="services-packages-form" @submit=${(e: Event) => this.save(e)}>
-          ${this.editingId
-            ? html`<ok-inline-feedback data-testid="services-packages-editing" tone="info" icon="create-outline">
-                <b>${t('ui.editingPackageTitle')}</b> — ${this.form.name}
-                <ion-button size="small" fill="clear" data-testid="services-packages-edit-cancel" @click=${() => this.cancelEdit()}>${t('ui.editingCancel')}</ion-button>
-              </ok-inline-feedback>`
-            : nothing}
           <ion-input data-testid="services-packages-name" fill="outline" label-placement="floating" label=${t('ui.colName')} .value=${this.form.name} @ionInput=${(e: any) => (this.form = { ...this.form, name: e.target.value })}></ion-input>
           <ion-select data-testid="services-packages-discount-type" fill="outline" label-placement="floating" label=${t('ui.colDiscountType')} .value=${this.form.discountType} @ionChange=${(e: any) => (this.form = { ...this.form, discountType: e.target.value })}>
             <ion-select-option value="percentage">${t('ui.discountType.percentage')}</ion-select-option>
