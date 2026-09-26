@@ -69,6 +69,12 @@ export class ErpServicesCategories extends LitElement {
   @state() formError = '';
   /** Category being edited; `null` = create mode. The submit decides create vs update. */
   @state() editingId: string | null = null;
+
+  /** pm#450: whether the table's panel HEADER already carries the editing title (OutfitKit
+   *  ≥ 0.1.94, outfitkit#150). Set only after checking the rendered dialog — never assumed — so
+   *  an older shell (hub:stable ships 0.1.73, which ignores the `title` and keeps «New») still
+   *  gets the fallback line in the form body. */
+  @state() editTitleInHeader = false;
   /** Category waiting for the delete confirmation. */
   @state() deleteTarget: Category | null = null;
   /** All categories of the hub, for the parent selector (`queryAll`: never a truncated page). */
@@ -132,9 +138,19 @@ export class ErpServicesCategories extends LitElement {
     }
   }
 
-  private dataTable(): { open(p?: 'filters' | 'create' | 'edit', opts?: { title?: string }): void; close(): void } | null {
+  private dataTable(): {
+    open(p?: 'filters' | 'create' | 'edit', opts?: { title?: string }): void;
+    close(): void;
+    updateComplete?: Promise<unknown>;
+    shadowRoot: ShadowRoot | null;
+  } | null {
     return this.renderRoot.querySelector('ok-data-table') as
-      | { open(p?: 'filters' | 'create' | 'edit', opts?: { title?: string }): void; close(): void }
+      | {
+        open(p?: 'filters' | 'create' | 'edit', opts?: { title?: string }): void;
+        close(): void;
+        updateComplete?: Promise<unknown>;
+        shadowRoot: ShadowRoot | null;
+      }
       | null;
   }
 
@@ -162,7 +178,13 @@ export class ErpServicesCategories extends LitElement {
       this.newParent = c.parent_id ?? '';
       this.newSortOrder = String(c.sort_order ?? 0);
       this.formError = '';
-      this.dataTable()?.open('edit', { title: `${erplora().t(CATALOG, 'ui.editingCategoryTitle')} — ${this.newName}` });
+      const title = `${erplora().t(CATALOG, 'ui.editingCategoryTitle')} — ${this.newName}`;
+      const table = this.dataTable();
+      table?.open('edit', { title });
+      await table?.updateComplete;
+      // OutfitKit < 0.1.94 ignores the title and keeps «New»: only drop the in-form line when the
+      // header REALLY carries it (the dialog is labelled with it).
+      this.editTitleInHeader = table?.shadowRoot?.querySelector('[role="dialog"]')?.getAttribute('aria-label') === title;
     } else if (actionId === 'delete' && can('services.delete_category')) {
       // Never on the first tap: confirm and say the impact (services left without a category —
       // they keep existing, they just lose the grouping; the market's «unlink» policy).
@@ -260,6 +282,12 @@ export class ErpServicesCategories extends LitElement {
       <ok-data-table testid="services-categories-table" .serverSide=${true} .fill=${true} .views=${true} .addable=${can('services.add_category')} .cardTitle=${(row: Record<string, unknown>) => String(row.name ?? '')} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? 'asc'} .searchable=${true} .searchPlaceholder=${t('ui.searchCategoryPlaceholder')} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t('ui.loading') : t('ui.emptyCategories')} @rowAction=${(e: CustomEvent<{ actionId: string; row: Record<string, unknown> }>) => this.onRowAction(e)} @rowClick=${(e: CustomEvent<{ row: Record<string, unknown> }>) => this.onRowAction({ detail: { actionId: 'edit', row: e.detail.row } } as CustomEvent<{ actionId: string; row: Record<string, unknown> }>)}
  @pageChange=${(e: CustomEvent<number>) => this.ctrl.setPage(e.detail)} @pageSizeChange=${(e: CustomEvent<number>) => this.ctrl.setPageSize(e.detail)} @sortChange=${(e: CustomEvent<{ sort: string; dir: 'asc' | 'desc' }>) => this.ctrl.setSort(e.detail.sort, e.detail.dir)} @searchChange=${(e: CustomEvent<string>) => this.ctrl.setSearch(e.detail)} @filterChange=${(e: CustomEvent<{ col: string; value: unknown }>) => this.ctrl.setFilter(e.detail.col, e.detail.value)}>
         <form slot="create" class="form" data-testid="services-categories-form" @submit=${(e: Event) => this.save(e)}>
+          ${this.editingId && !this.editTitleInHeader
+            ? html`<ok-inline-feedback data-testid="services-categories-editing" tone="info" icon="create-outline">
+                <b>${t('ui.editingCategoryTitle')}</b> — ${this.newName}
+                <ion-button size="small" fill="clear" data-testid="services-categories-edit-cancel" @click=${() => this.cancelEdit()}>${t('ui.editingCancel')}</ion-button>
+              </ok-inline-feedback>`
+            : nothing}
           <ion-input data-testid="services-categories-name" fill="outline" label-placement="floating" label=${t('ui.colName')} .value=${this.newName} @ionInput=${(e: any) => (this.newName = e.target.value)}></ion-input>
           <ion-select data-testid="services-categories-parent" fill="outline" label-placement="floating" label=${t('ui.colParent')} placeholder=${t('ui.placeholderParent')} .value=${this.newParent} @ionChange=${(e: any) => (this.newParent = e.target.value)}>
             <ion-select-option value="">${t('ui.optionNoParent')}</ion-select-option>

@@ -217,6 +217,12 @@ export class ErpServicesList extends LitElement {
    *  inventory products (inventory#8). */
   @state() editingId: string | null = null;
 
+  /** pm#450: whether the table's panel HEADER already carries the editing title (OutfitKit
+   *  ≥ 0.1.94, outfitkit#150). Set only after checking the rendered dialog — never assumed — so
+   *  an older shell (hub:stable ships 0.1.73, which ignores the `title` and keeps «New») still
+   *  gets the fallback line in the form body. */
+  @state() editTitleInHeader = false;
+
   /** Service waiting for the archive confirmation (services#2). `null` = no dialog. */
   @state() archiveTarget: Service | null = null;
 
@@ -420,9 +426,19 @@ export class ErpServicesList extends LitElement {
   }
 
   // Referencia al ok-data-table para abrir/cerrar su panel lateral (el alta se proyecta dentro).
-  private dataTable(): { open(p?: 'filters' | 'create' | 'edit', opts?: { title?: string }): void; close(): void } | null {
+  private dataTable(): {
+    open(p?: 'filters' | 'create' | 'edit', opts?: { title?: string }): void;
+    close(): void;
+    updateComplete?: Promise<unknown>;
+    shadowRoot: ShadowRoot | null;
+  } | null {
     return this.renderRoot.querySelector('ok-data-table') as
-      | { open(p?: 'filters' | 'create' | 'edit', opts?: { title?: string }): void; close(): void }
+      | {
+        open(p?: 'filters' | 'create' | 'edit', opts?: { title?: string }): void;
+        close(): void;
+        updateComplete?: Promise<unknown>;
+        shadowRoot: ShadowRoot | null;
+      }
       | null;
   }
 
@@ -551,7 +567,13 @@ export class ErpServicesList extends LitElement {
       this.newDuration = String(full.duration_minutes ?? '');
       this.newCategory = String(full.category_id ?? '');
       this.newTaxRateId = String(full.tax_category_key ?? '');
-      this.dataTable()?.open('edit', { title: `${erplora().t(CATALOG, 'ui.editingTitle')} — ${this.newName}` });
+      const title = `${erplora().t(CATALOG, 'ui.editingTitle')} — ${this.newName}`;
+      const table = this.dataTable();
+      table?.open('edit', { title });
+      await table?.updateComplete;
+      // OutfitKit < 0.1.94 ignores the title and keeps «New»: only drop the in-form line when the
+      // header REALLY carries it (the dialog is labelled with it).
+      this.editTitleInHeader = table?.shadowRoot?.querySelector('[role="dialog"]')?.getAttribute('aria-label') === title;
       return;
     }
     if (actionId !== 'archive' || !can('services.delete_service')) return;
@@ -639,6 +661,12 @@ export class ErpServicesList extends LitElement {
           <!-- Create form: ALWAYS projected (even with the panel shut); painted only on open, the
                toolbar «+» would slide out an empty panel. -->
           <form slot="create" class="form" data-testid="services-list-form" @submit=${(e: Event) => this.createService(e)}>
+            ${this.editingId && !this.editTitleInHeader
+              ? html`<ok-inline-feedback data-testid="services-list-editing" tone="info" icon="create-outline">
+                  <b>${t('ui.editingTitle')}</b> — ${this.newName}
+                  <ion-button size="small" fill="clear" data-testid="services-list-edit-cancel" @click=${() => this.cancelEdit()}>${t('ui.editingCancel')}</ion-button>
+                </ok-inline-feedback>`
+              : nothing}
             <ion-input data-testid="services-list-name" fill="outline" label-placement="floating" label=${t('ui.colName')} .value=${this.newName} @ionInput=${(e: any) => (this.newName = e.target.value)}></ion-input>
             <ion-input data-testid="services-list-price" fill="outline" label-placement="floating" label=${t('ui.colPrice')} type="text" inputmode="decimal" .value=${this.newPrice} @ionInput=${(e: any) => (this.newPrice = e.target.value)}></ion-input>
             <ion-input data-testid="services-list-duration" fill="outline" label-placement="floating" label=${t('ui.colDuration')} type="number" step="1" .value=${this.newDuration} @ionInput=${(e: any) => (this.newDuration = e.target.value)}></ion-input>

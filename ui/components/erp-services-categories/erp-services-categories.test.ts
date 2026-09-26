@@ -178,13 +178,51 @@ describe('editing titles the panel header, not its body (pm#450)', () => {
     expect(calls).toEqual([['edit', { title: 'ui.editingCategoryTitle — Color' }]]);
   });
 
-  it('the form body no longer repeats the editing title', async () => {
+  // The header only carries the title with OutfitKit ≥ 0.1.94 (outfitkit#150); an older shell
+  // (hub:stable 1.1.29 ships 0.1.73) ignores it and keeps «New». The body line only goes away when
+  // the table REALLY painted the title — its dialog is labelled with it — never on faith.
+  const shellTable = (el: Mounted, honoursTitle: boolean) => {
+    const t = table(el);
+    const dialog = document.createElement('aside');
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-label', 'Form');
+    const root = document.createElement('div');
+    root.appendChild(dialog);
+    Object.defineProperty(t, 'shadowRoot', { value: root, configurable: true });
+    t.open = (_panel: unknown, opts?: { title?: string }) => {
+      if (honoursTitle && opts?.title) dialog.setAttribute('aria-label', opts.title);
+    };
+  };
+
+  it('the form body no longer repeats the editing title once the header carries it', async () => {
     const el = await mount();
+    shellTable(el, true);
     await action(el, 'edit', ROWS[1]);
     await settle(el);
     const form = el.shadowRoot.querySelector('form[slot="create"]') as HTMLElement;
     expect(form.querySelector('[data-testid="services-categories-editing"]')).toBeNull();
     expect(form.textContent).not.toContain('ui.editingCategoryTitle');
+  });
+
+  it('with a shell whose table ignores the title (OutfitKit < 0.1.94), the body keeps the editing line', async () => {
+    const el = await mount();
+    shellTable(el, false);
+    await action(el, 'edit', ROWS[1]);
+    await settle(el);
+    const line = el.shadowRoot.querySelector('form[slot="create"] [data-testid="services-categories-editing"]') as HTMLElement | null;
+    expect(line, 'the header says «New»: without this line nothing says it is an edit').toBeTruthy();
+    expect(line!.textContent).toContain('ui.editingCategoryTitle');
+    expect(line!.textContent).toContain('Color');
+  });
+
+  it('a later «Add» (clean form) hides the fallback line again', async () => {
+    const el = await mount();
+    shellTable(el, false);
+    await action(el, 'edit', ROWS[1]);
+    await settle(el);
+    (el as unknown as { cancelEdit(): void }).cancelEdit();
+    await settle(el);
+    expect(el.shadowRoot.querySelector('form[slot="create"] [data-testid="services-categories-editing"]')).toBeNull();
   });
 
   it('«Add» after an edit opens a CLEAN create form', async () => {

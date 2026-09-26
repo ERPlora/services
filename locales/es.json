@@ -93,6 +93,7 @@
     "errorRestore": "No se pudo restaurar el servicio",
     "actionEdit": "Editar",
     "editingTitle": "Editando servicio",
+    "editingCancel": "Cancelar edición",
     "btnSave": "Guardar cambios",
     "errorUpdate": "No se pudo actualizar el servicio",
     "colParent": "Categoría padre",
