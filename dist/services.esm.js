@@ -4883,7 +4883,9 @@ var ErpServicesList = class extends i3 {
    *  `data-testid` (outfitkit#143), and a template binding would read as an action element that
    *  demands one. */
   firstUpdated() {
-    this.renderRoot.querySelector("ok-data-table")?.addEventListener("click", (e5) => this.onTableClick(e5));
+    const table = this.renderRoot.querySelector("ok-data-table");
+    table?.addEventListener("click", (e5) => this.onTableClick(e5));
+    table?.addEventListener("panelClose", () => this.editSeq++);
   }
   /** Back to a clean CREATE form (services#4). */
   cancelEdit() {
@@ -5430,7 +5432,9 @@ var ErpServicesPackages = class extends i3 {
    *  `data-testid` (outfitkit#143), and a template binding would read as an action element that
    *  demands one. */
   firstUpdated() {
-    this.renderRoot.querySelector("ok-data-table")?.addEventListener("click", (e5) => this.onTableClick(e5));
+    const table = this.renderRoot.querySelector("ok-data-table");
+    table?.addEventListener("click", (e5) => this.onTableClick(e5));
+    table?.addEventListener("panelClose", () => this.editSeq++);
   }
   addItem() {
     this.items = [...this.items, { serviceId: "", sessions: "1" }];
