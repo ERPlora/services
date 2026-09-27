@@ -1,4 +1,5 @@
 import { LitElement, html, css, nothing } from 'lit';
+import type { PropertyValues } from 'lit';
 import { state } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
 import { define } from '@erplora/outfitkit/define';
@@ -68,6 +69,9 @@ export class ErpServicesCategories extends LitElement {
   @state() newSortOrder = '';
   @state() saving = false;
   @state() formError = '';
+  /** What went wrong in a ROW action (delete, confirmed on the page): no panel is open then, so it
+   *  is painted on the page. `formError` is only what the panel's form was refused (pm#478). */
+  @state() pageError = '';
   /** services#107: a refusal that belongs to the Name field (`services.category_name_taken`) is
    *  shown UNDER it, not in the banner, so the owner sees which field to fix. The invalid marks go
    *  through `classMap`: a plain `class=` binding would wipe the classes Ionic writes on the host
@@ -201,6 +205,7 @@ export class ErpServicesCategories extends LitElement {
       // Never on the first tap: confirm and say the impact (services left without a category —
       // they keep existing, they just lose the grouping; the market's «unlink» policy).
       this.deleteTarget = c;
+      this.pageError = '';
     }
   }
 
@@ -223,6 +228,7 @@ export class ErpServicesCategories extends LitElement {
     this.saving = true;
     this.formError = '';
     this.nameError = '';
+    this.pageError = ''; // a save is the next thing the person did: an older row refusal is stale
     try {
       const fields = {
         name: this.newName.trim(),
@@ -255,7 +261,7 @@ export class ErpServicesCategories extends LitElement {
       this.deleteTarget = null;
       await Promise.all([this.ctrl.load(), this.loadAll()]);
     } catch (e) {
-      this.formError = domainMessage(e, erplora().locale, erplora().t(CATALOG, 'ui.errorDeleteCategory'));
+      this.pageError = domainMessage(e, erplora().locale, erplora().t(CATALOG, 'ui.errorDeleteCategory'));
       this.deleteTarget = null;
     } finally {
       this.saving = false;
@@ -288,12 +294,28 @@ export class ErpServicesCategories extends LitElement {
     </ion-modal>`;
   }
 
+  /** pm#478: the refusal appears ABOVE the button that was pressed, at the foot of the form — on a
+   *  phone that can leave it off the sheet. Bring it into view once it has painted itself: scrolled
+   *  before, the banner still measures 0 px and ends up under the tab bar. */
+  updated(changed: PropertyValues<this>): void {
+    super.updated(changed);
+    if (changed.has('formError') && this.formError) void this.revealFormError();
+  }
+
+  private async revealFormError(): Promise<void> {
+    const banner = this.renderRoot.querySelector('[data-testid="services-categories-form-error"]') as
+      | (HTMLElement & { updateComplete?: Promise<unknown> })
+      | null;
+    await banner?.updateComplete;
+    banner?.scrollIntoView?.({ block: 'center' });
+  }
+
   render() {
     const t = (k: string): string => erplora().t(CATALOG, k);
     // A category cannot be its own parent (the server refuses it: `category_update_rejected`).
     const parentOptions = this.allCategories.filter((c) => c.id !== this.editingId);
     return html`<div class="page">
-      ${this.formError ? html`<ok-inline-feedback data-testid="services-categories-form-error" tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : nothing}
+      ${this.pageError ? html`<ok-inline-feedback data-testid="services-categories-page-error" tone="danger" icon="alert-circle-outline">${this.pageError}</ok-inline-feedback>` : nothing}
       ${this.ctrl?.error ? html`<ok-inline-feedback data-testid="services-categories-load-error" tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : nothing}
       <ok-data-table testid="services-categories-table" .serverSide=${true} .fill=${true} .views=${true} .addable=${can('services.add_category')} .cardTitle=${(row: Record<string, unknown>) => String(row.name ?? '')} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? 'asc'} .searchable=${true} .searchPlaceholder=${t('ui.searchCategoryPlaceholder')} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t('ui.loading') : t('ui.emptyCategories')} @rowAction=${(e: CustomEvent<{ actionId: string; row: Record<string, unknown> }>) => this.onRowAction(e)} @rowClick=${(e: CustomEvent<{ row: Record<string, unknown> }>) => this.onRowAction({ detail: { actionId: 'edit', row: e.detail.row } } as CustomEvent<{ actionId: string; row: Record<string, unknown> }>)}
  @pageChange=${(e: CustomEvent<number>) => this.ctrl.setPage(e.detail)} @pageSizeChange=${(e: CustomEvent<number>) => this.ctrl.setPageSize(e.detail)} @sortChange=${(e: CustomEvent<{ sort: string; dir: 'asc' | 'desc' }>) => this.ctrl.setSort(e.detail.sort, e.detail.dir)} @searchChange=${(e: CustomEvent<string>) => this.ctrl.setSearch(e.detail)} @filterChange=${(e: CustomEvent<{ col: string; value: unknown }>) => this.ctrl.setFilter(e.detail.col, e.detail.value)}>
@@ -310,6 +332,9 @@ export class ErpServicesCategories extends LitElement {
             ${parentOptions.map((c) => html`<ion-select-option .value=${c.id}>${c.name}</ion-select-option>`)}
           </ion-select>
           <ion-input data-testid="services-categories-sort-order" fill="outline" label-placement="floating" label=${t('ui.colSortOrder')} type="number" step="1" .value=${this.newSortOrder} @ionInput=${(e: any) => (this.newSortOrder = e.target.value)}></ion-input>
+          <!-- pm#478: the refusal travels WITH the form — on a phone the panel is a full-screen
+               sheet and a banner on the page underneath it is never seen. -->
+          ${this.formError ? html`<ok-inline-feedback data-testid="services-categories-form-error" tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : nothing}
           <ion-button type="submit" data-testid="services-categories-submit" ?disabled=${this.saving || !this.newName}>${this.saving ? t('ui.btnSaving') : this.editingId ? t('ui.btnSave') : t('ui.btnAdd')}</ion-button>
         </form>
       </ok-data-table>

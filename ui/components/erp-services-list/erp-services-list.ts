@@ -1,4 +1,5 @@
 import { LitElement, html, css, nothing } from 'lit';
+import type { PropertyValues } from 'lit';
 import { state } from 'lit/decorators.js';
 import { define } from '@erplora/outfitkit/define';
 import '@erplora/outfitkit/ok-inline-feedback';
@@ -219,7 +220,12 @@ export class ErpServicesList extends LitElement {
 
   @state() taxRates: TaxCategory[] = [];
 
+  /** What the panel's form was refused (create/edit). Painted INSIDE the form (pm#478). */
   @state() formError = '';
+
+  /** What went wrong in a ROW action (archive, restore — confirmed on the page): no panel is open
+   *  then, so it is painted on the page (pm#478). */
+  @state() pageError = '';
 
   @state() newName = '';
 
@@ -369,13 +375,13 @@ export class ErpServicesList extends LitElement {
    *  destructive —it undoes one— and the market does not ask for one either. */
   private async restoreService(row: Record<string, unknown>) {
     if (!can('services.change_service')) return;
-    this.formError = '';
+    this.pageError = '';
     this.saving = true;
     try {
       await erplora().command('services.services.restore', { service_id: String(row.id) });
       await this.ctrl.load();
     } catch (e) {
-      this.formError = domainMessage(e, erplora().locale, erplora().t(CATALOG, 'ui.errorRestore'));
+      this.pageError = domainMessage(e, erplora().locale, erplora().t(CATALOG, 'ui.errorRestore'));
     } finally {
       this.saving = false;
     }
@@ -522,6 +528,7 @@ export class ErpServicesList extends LitElement {
     }
     this.saving = true;
     this.formError = '';
+    this.pageError = ''; // a save is the next thing the person did: an older row refusal is stale
     try {
       await erplora().command('services.services.create', {
         name: this.newName.trim(),
@@ -567,6 +574,7 @@ export class ErpServicesList extends LitElement {
     }
     this.saving = true;
     this.formError = '';
+    this.pageError = ''; // a save is the next thing the person did: an older row refusal is stale
     try {
       await erplora().command('services.services.update', {
         service_id: this.editingId,
@@ -618,7 +626,7 @@ export class ErpServicesList extends LitElement {
       return;
     }
     if (actionId !== 'archive' || !can('services.delete_service')) return;
-    this.formError = '';
+    this.pageError = '';
     // Never on the first tap: confirm, and say what it touches. The count comes from a PUBLIC
     // query of `appointments` (services cannot look at its table, and cannot `reads` it either:
     // appointments depends on services, so the reverse dependency would be a cycle). It is an
@@ -645,14 +653,13 @@ export class ErpServicesList extends LitElement {
     const target = this.archiveTarget;
     if (!target || !can('services.delete_service')) return;
     this.saving = true;
-    this.formError = '';
     try {
       await erplora().command('services.services.delete', { service_id: target.id });
       this.archiveTarget = null;
       this.archiveActive = null;
       await this.ctrl.load();
     } catch (e) {
-      this.formError = domainMessage(e, erplora().locale, erplora().t(CATALOG, 'ui.errorArchive'));
+      this.pageError = domainMessage(e, erplora().locale, erplora().t(CATALOG, 'ui.errorArchive'));
       this.archiveTarget = null;
     } finally {
       this.saving = false;
@@ -691,11 +698,27 @@ export class ErpServicesList extends LitElement {
     </ion-modal>`;
   }
 
+  /** pm#478: the refusal appears ABOVE the button that was pressed, at the foot of the form — on a
+   *  phone that can leave it off the sheet. Bring it into view once it has painted itself: scrolled
+   *  before, the banner still measures 0 px and ends up under the tab bar. */
+  updated(changed: PropertyValues<this>): void {
+    super.updated(changed);
+    if (changed.has('formError') && this.formError) void this.revealFormError();
+  }
+
+  private async revealFormError(): Promise<void> {
+    const banner = this.renderRoot.querySelector('[data-testid="services-list-form-error"]') as
+      | (HTMLElement & { updateComplete?: Promise<unknown> })
+      | null;
+    await banner?.updateComplete;
+    banner?.scrollIntoView?.({ block: 'center' });
+  }
+
   // The view title is painted by the shell topbar: repeating it here showed it twice on screen.
   render() {
     const t = (k: string): string => erplora().t(CATALOG, k);
     return html`<div class="page">
-        ${this.formError ? html`<ok-inline-feedback data-testid="services-list-form-error" tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : nothing}
+        ${this.pageError ? html`<ok-inline-feedback data-testid="services-list-page-error" tone="danger" icon="alert-circle-outline">${this.pageError}</ok-inline-feedback>` : nothing}
         ${this.ctrl?.error ? html`<ok-inline-feedback data-testid="services-list-load-error" tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : nothing}
         <ok-data-table testid="services-list-table" .serverSide=${true} .fill=${true} .addable=${true} .views=${true} .cardTitle=${(row: Record<string, unknown>) => String(row.name ?? '')} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? 'asc'} .searchable=${true} .searchPlaceholder=${t('ui.searchPlaceholder')} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t('ui.loading') : t('ui.empty')} @rowAction=${(e: CustomEvent) => this.onRowAction(e)} @rowClick=${(e: CustomEvent<{ row: Record<string, unknown> }>) => this.onRowAction({ detail: { actionId: 'edit', row: e.detail.row } } as CustomEvent<{ actionId: string; row: Record<string, unknown> }>)}
  @pageChange=${(e: CustomEvent<number>) => this.ctrl.setPage(e.detail)} @pageSizeChange=${(e: CustomEvent<number>) => this.ctrl.setPageSize(e.detail)} @sortChange=${(e: CustomEvent<{ sort: string; dir: 'asc' | 'desc' }>) => this.ctrl.setSort(e.detail.sort, e.detail.dir)} @searchChange=${(e: CustomEvent<string>) => this.ctrl.setSearch(e.detail)} @filterChange=${(e: CustomEvent<{ col: string; value: unknown }>) => this.onFilterChange(e.detail.col, e.detail.value)}>
@@ -728,6 +751,9 @@ export class ErpServicesList extends LitElement {
             ${this.taxRates.length === 0
               ? html`<ok-inline-feedback data-testid="services-list-tax-missing" tone="warning" icon="alert-circle-outline">${t('ui.taxCategoriesMissing')}</ok-inline-feedback>`
               : nothing}
+            <!-- pm#478: the refusal travels WITH the form — on a phone the panel is a full-screen
+                 sheet and a banner on the page underneath it is never seen. -->
+            ${this.formError ? html`<ok-inline-feedback data-testid="services-list-form-error" tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : nothing}
             <ion-button type="submit" data-testid="services-list-submit" ?disabled=${this.saving || !this.newName || !this.newTaxRateId}>${this.saving ? t('ui.btnSaving') : this.editingId ? t('ui.btnSave') : t('ui.btnAdd')}</ion-button>
           </form>
         </ok-data-table>
