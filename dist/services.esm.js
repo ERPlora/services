@@ -680,16 +680,16 @@ var e = t.ShadowRoot && (void 0 === t.ShadyCSS || t.ShadyCSS.nativeShadow) && "a
 var s = Symbol();
 var o = /* @__PURE__ */ new WeakMap();
 var n = class {
-  constructor(t5, e5, o7) {
+  constructor(t5, e6, o7) {
     if (this._$cssResult$ = true, o7 !== s) throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");
-    this.cssText = t5, this.t = e5;
+    this.cssText = t5, this.t = e6;
   }
   get styleSheet() {
     let t5 = this.o;
     const s5 = this.t;
     if (e && void 0 === t5) {
-      const e5 = void 0 !== s5 && 1 === s5.length;
-      e5 && (t5 = o.get(s5)), void 0 === t5 && ((this.o = t5 = new CSSStyleSheet()).replaceSync(this.cssText), e5 && o.set(s5, t5));
+      const e6 = void 0 !== s5 && 1 === s5.length;
+      e6 && (t5 = o.get(s5)), void 0 === t5 && ((this.o = t5 = new CSSStyleSheet()).replaceSync(this.cssText), e6 && o.set(s5, t5));
     }
     return t5;
   }
@@ -698,8 +698,8 @@ var n = class {
   }
 };
 var r = (t5) => new n("string" == typeof t5 ? t5 : t5 + "", void 0, s);
-var i = (t5, ...e5) => {
-  const o7 = 1 === t5.length ? t5[0] : e5.reduce((e6, s5, o8) => e6 + ((t6) => {
+var i = (t5, ...e6) => {
+  const o7 = 1 === t5.length ? t5[0] : e6.reduce((e7, s5, o8) => e7 + ((t6) => {
     if (true === t6._$cssResult$) return t6.cssText;
     if ("number" == typeof t6) return t6;
     throw Error("Value passed to 'css' function must be a 'css' function result: " + t6 + ". Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.");
@@ -708,15 +708,15 @@ var i = (t5, ...e5) => {
 };
 var S = (s5, o7) => {
   if (e) s5.adoptedStyleSheets = o7.map((t5) => t5 instanceof CSSStyleSheet ? t5 : t5.styleSheet);
-  else for (const e5 of o7) {
+  else for (const e6 of o7) {
     const o8 = document.createElement("style"), n6 = t.litNonce;
-    void 0 !== n6 && o8.setAttribute("nonce", n6), o8.textContent = e5.cssText, s5.appendChild(o8);
+    void 0 !== n6 && o8.setAttribute("nonce", n6), o8.textContent = e6.cssText, s5.appendChild(o8);
   }
 };
 var c = e || void 0 === t.CSSStyleSheet ? (t5) => t5 : (t5) => t5 instanceof CSSStyleSheet ? ((t6) => {
-  let e5 = "";
-  for (const s5 of t6.cssRules) e5 += s5.cssText;
-  return r(e5);
+  let e6 = "";
+  for (const s5 of t6.cssRules) e6 += s5.cssText;
+  return r(e6);
 })(t5) : t5;
 
 // @lit/reactive-element/node/reactive-element.js
@@ -768,18 +768,18 @@ var g = class extends (globalThis.HTMLElement ?? HTMLElementShimWithRealType) {
   }
   static createProperty(t5, s5 = y) {
     if (s5.state && (s5.attribute = false), this._$Ei(), this.prototype.hasOwnProperty(t5) && ((s5 = Object.create(s5)).wrapped = true), this.elementProperties.set(t5, s5), !s5.noAccessor) {
-      const i7 = Symbol(), e5 = this.getPropertyDescriptor(t5, i7, s5);
-      void 0 !== e5 && r2(this.prototype, t5, e5);
+      const i7 = Symbol(), e6 = this.getPropertyDescriptor(t5, i7, s5);
+      void 0 !== e6 && r2(this.prototype, t5, e6);
     }
   }
   static getPropertyDescriptor(t5, s5, i7) {
-    const { get: e5, set: h4 } = o2(this.prototype, t5) ?? { get() {
+    const { get: e6, set: h4 } = o2(this.prototype, t5) ?? { get() {
       return this[s5];
     }, set(t6) {
       this[s5] = t6;
     } };
-    return { get: e5, set(s6) {
-      const r6 = e5?.call(this);
+    return { get: e6, set(s6) {
+      const r6 = e6?.call(this);
       h4?.call(this, s6), this.requestUpdate(t5, r6, i7);
     }, configurable: true, enumerable: true };
   }
@@ -812,8 +812,8 @@ var g = class extends (globalThis.HTMLElement ?? HTMLElementShimWithRealType) {
   static finalizeStyles(t5) {
     const s5 = [];
     if (Array.isArray(t5)) {
-      const e5 = new Set(t5.flat(1 / 0).reverse());
-      for (const t6 of e5) s5.unshift(c(t6));
+      const e6 = new Set(t5.flat(1 / 0).reverse());
+      for (const t6 of e6) s5.unshift(c(t6));
     } else void 0 !== t5 && s5.push(c(t5));
     return s5;
   }
@@ -854,31 +854,31 @@ var g = class extends (globalThis.HTMLElement ?? HTMLElementShimWithRealType) {
     this._$AK(t5, i7);
   }
   _$ET(t5, s5) {
-    const i7 = this.constructor.elementProperties.get(t5), e5 = this.constructor._$Eu(t5, i7);
-    if (void 0 !== e5 && true === i7.reflect) {
+    const i7 = this.constructor.elementProperties.get(t5), e6 = this.constructor._$Eu(t5, i7);
+    if (void 0 !== e6 && true === i7.reflect) {
       const h4 = (void 0 !== i7.converter?.toAttribute ? i7.converter : b).toAttribute(s5, i7.type);
-      this._$Em = t5, null == h4 ? this.removeAttribute(e5) : this.setAttribute(e5, h4), this._$Em = null;
+      this._$Em = t5, null == h4 ? this.removeAttribute(e6) : this.setAttribute(e6, h4), this._$Em = null;
     }
   }
   _$AK(t5, s5) {
-    const i7 = this.constructor, e5 = i7._$Eh.get(t5);
-    if (void 0 !== e5 && this._$Em !== e5) {
-      const t6 = i7.getPropertyOptions(e5), h4 = "function" == typeof t6.converter ? { fromAttribute: t6.converter } : void 0 !== t6.converter?.fromAttribute ? t6.converter : b;
-      this._$Em = e5;
+    const i7 = this.constructor, e6 = i7._$Eh.get(t5);
+    if (void 0 !== e6 && this._$Em !== e6) {
+      const t6 = i7.getPropertyOptions(e6), h4 = "function" == typeof t6.converter ? { fromAttribute: t6.converter } : void 0 !== t6.converter?.fromAttribute ? t6.converter : b;
+      this._$Em = e6;
       const r6 = h4.fromAttribute(s5, t6.type);
-      this[e5] = r6 ?? this._$Ej?.get(e5) ?? r6, this._$Em = null;
+      this[e6] = r6 ?? this._$Ej?.get(e6) ?? r6, this._$Em = null;
     }
   }
-  requestUpdate(t5, s5, i7, e5 = false, h4) {
+  requestUpdate(t5, s5, i7, e6 = false, h4) {
     if (void 0 !== t5) {
       const r6 = this.constructor;
-      if (false === e5 && (h4 = this[t5]), i7 ??= r6.getPropertyOptions(t5), !((i7.hasChanged ?? m)(h4, s5) || i7.useDefault && i7.reflect && h4 === this._$Ej?.get(t5) && !this.hasAttribute(r6._$Eu(t5, i7)))) return;
+      if (false === e6 && (h4 = this[t5]), i7 ??= r6.getPropertyOptions(t5), !((i7.hasChanged ?? m)(h4, s5) || i7.useDefault && i7.reflect && h4 === this._$Ej?.get(t5) && !this.hasAttribute(r6._$Eu(t5, i7)))) return;
       this.C(t5, s5, i7);
     }
     false === this.isUpdatePending && (this._$ES = this._$EP());
   }
-  C(t5, s5, { useDefault: i7, reflect: e5, wrapped: h4 }, r6) {
-    i7 && !(this._$Ej ??= /* @__PURE__ */ new Map()).has(t5) && (this._$Ej.set(t5, r6 ?? s5 ?? this[t5]), true !== h4 || void 0 !== r6) || (this._$AL.has(t5) || (this.hasUpdated || i7 || (s5 = void 0), this._$AL.set(t5, s5)), true === e5 && this._$Em !== t5 && (this._$Eq ??= /* @__PURE__ */ new Set()).add(t5));
+  C(t5, s5, { useDefault: i7, reflect: e6, wrapped: h4 }, r6) {
+    i7 && !(this._$Ej ??= /* @__PURE__ */ new Map()).has(t5) && (this._$Ej.set(t5, r6 ?? s5 ?? this[t5]), true !== h4 || void 0 !== r6) || (this._$AL.has(t5) || (this.hasUpdated || i7 || (s5 = void 0), this._$AL.set(t5, s5)), true === e6 && this._$Em !== t5 && (this._$Eq ??= /* @__PURE__ */ new Set()).add(t5));
   }
   async _$EP() {
     this.isUpdatePending = true;
@@ -902,8 +902,8 @@ var g = class extends (globalThis.HTMLElement ?? HTMLElementShimWithRealType) {
       }
       const t6 = this.constructor.elementProperties;
       if (t6.size > 0) for (const [s6, i7] of t6) {
-        const { wrapped: t7 } = i7, e5 = this[s6];
-        true !== t7 || this._$AL.has(s6) || void 0 === e5 || this.C(s6, void 0, i7, e5);
+        const { wrapped: t7 } = i7, e6 = this[s6];
+        true !== t7 || this._$AL.has(s6) || void 0 === e6 || this.C(s6, void 0, i7, e6);
       }
     }
     let t5 = false;
@@ -978,32 +978,32 @@ function V(t5, i7) {
   return void 0 !== e2 ? e2.createHTML(i7) : i7;
 }
 var N = (t5, i7) => {
-  const s5 = t5.length - 1, e5 = [];
+  const s5 = t5.length - 1, e6 = [];
   let n6, l3 = 2 === i7 ? "<svg>" : 3 === i7 ? "<math>" : "", c5 = v;
   for (let i8 = 0; i8 < s5; i8++) {
     const s6 = t5[i8];
     let a3, u5, d3 = -1, f3 = 0;
     for (; f3 < s6.length && (c5.lastIndex = f3, u5 = c5.exec(s6), null !== u5); ) f3 = c5.lastIndex, c5 === v ? "!--" === u5[1] ? c5 = _ : void 0 !== u5[1] ? c5 = m2 : void 0 !== u5[2] ? (y2.test(u5[2]) && (n6 = RegExp("</" + u5[2], "g")), c5 = p2) : void 0 !== u5[3] && (c5 = p2) : c5 === p2 ? ">" === u5[0] ? (c5 = n6 ?? v, d3 = -1) : void 0 === u5[1] ? d3 = -2 : (d3 = c5.lastIndex - u5[2].length, a3 = u5[1], c5 = void 0 === u5[3] ? p2 : '"' === u5[3] ? $ : g2) : c5 === $ || c5 === g2 ? c5 = p2 : c5 === _ || c5 === m2 ? c5 = v : (c5 = p2, n6 = void 0);
     const x2 = c5 === p2 && t5[i8 + 1].startsWith("/>") ? " " : "";
-    l3 += c5 === v ? s6 + r3 : d3 >= 0 ? (e5.push(a3), s6.slice(0, d3) + h2 + s6.slice(d3) + o3 + x2) : s6 + o3 + (-2 === d3 ? i8 : x2);
+    l3 += c5 === v ? s6 + r3 : d3 >= 0 ? (e6.push(a3), s6.slice(0, d3) + h2 + s6.slice(d3) + o3 + x2) : s6 + o3 + (-2 === d3 ? i8 : x2);
   }
-  return [V(t5, l3 + (t5[s5] || "<?>") + (2 === i7 ? "</svg>" : 3 === i7 ? "</math>" : "")), e5];
+  return [V(t5, l3 + (t5[s5] || "<?>") + (2 === i7 ? "</svg>" : 3 === i7 ? "</math>" : "")), e6];
 };
 var S2 = class _S {
-  constructor({ strings: t5, _$litType$: i7 }, e5) {
+  constructor({ strings: t5, _$litType$: i7 }, e6) {
     let r6;
     this.parts = [];
     let l3 = 0, a3 = 0;
     const u5 = t5.length - 1, d3 = this.parts, [f3, v3] = N(t5, i7);
-    if (this.el = _S.createElement(f3, e5), P.currentNode = this.el.content, 2 === i7 || 3 === i7) {
+    if (this.el = _S.createElement(f3, e6), P.currentNode = this.el.content, 2 === i7 || 3 === i7) {
       const t6 = this.el.content.firstChild;
       t6.replaceWith(...t6.childNodes);
     }
     for (; null !== (r6 = P.nextNode()) && d3.length < u5; ) {
       if (1 === r6.nodeType) {
         if (r6.hasAttributes()) for (const t6 of r6.getAttributeNames()) if (t6.endsWith(h2)) {
-          const i8 = v3[a3++], s5 = r6.getAttribute(t6).split(o3), e6 = /([.?@])?(.*)/.exec(i8);
-          d3.push({ type: 1, index: l3, name: e6[2], strings: s5, ctor: "." === e6[1] ? I : "?" === e6[1] ? L : "@" === e6[1] ? z : H }), r6.removeAttribute(t6);
+          const i8 = v3[a3++], s5 = r6.getAttribute(t6).split(o3), e7 = /([.?@])?(.*)/.exec(i8);
+          d3.push({ type: 1, index: l3, name: e7[2], strings: s5, ctor: "." === e7[1] ? I : "?" === e7[1] ? L : "@" === e7[1] ? z : H }), r6.removeAttribute(t6);
         } else t6.startsWith(o3) && (d3.push({ type: 6, index: l3 }), r6.removeAttribute(t6));
         if (y2.test(r6.tagName)) {
           const t6 = r6.textContent.split(o3), i8 = t6.length - 1;
@@ -1026,11 +1026,11 @@ var S2 = class _S {
     return s5.innerHTML = t5, s5;
   }
 };
-function M(t5, i7, s5 = t5, e5) {
+function M(t5, i7, s5 = t5, e6) {
   if (i7 === E) return i7;
-  let h4 = void 0 !== e5 ? s5._$Co?.[e5] : s5._$Cl;
+  let h4 = void 0 !== e6 ? s5._$Co?.[e6] : s5._$Cl;
   const o7 = a2(i7) ? void 0 : i7._$litDirective$;
-  return h4?.constructor !== o7 && (h4?._$AO?.(false), void 0 === o7 ? h4 = void 0 : (h4 = new o7(t5), h4._$AT(t5, s5, e5)), void 0 !== e5 ? (s5._$Co ??= [])[e5] = h4 : s5._$Cl = h4), void 0 !== h4 && (i7 = M(t5, h4._$AS(t5, i7.values), h4, e5)), i7;
+  return h4?.constructor !== o7 && (h4?._$AO?.(false), void 0 === o7 ? h4 = void 0 : (h4 = new o7(t5), h4._$AT(t5, s5, e6)), void 0 !== e6 ? (s5._$Co ??= [])[e6] = h4 : s5._$Cl = h4), void 0 !== h4 && (i7 = M(t5, h4._$AS(t5, i7.values), h4, e6)), i7;
 }
 var R = class {
   constructor(t5, i7) {
@@ -1043,8 +1043,8 @@ var R = class {
     return this._$AM._$AU;
   }
   u(t5) {
-    const { el: { content: i7 }, parts: s5 } = this._$AD, e5 = (t5?.creationScope ?? l2).importNode(i7, true);
-    P.currentNode = e5;
+    const { el: { content: i7 }, parts: s5 } = this._$AD, e6 = (t5?.creationScope ?? l2).importNode(i7, true);
+    P.currentNode = e6;
     let h4 = P.nextNode(), o7 = 0, n6 = 0, r6 = s5[0];
     for (; void 0 !== r6; ) {
       if (o7 === r6.index) {
@@ -1053,7 +1053,7 @@ var R = class {
       }
       o7 !== r6?.index && (h4 = P.nextNode(), o7++);
     }
-    return P.currentNode = l2, e5;
+    return P.currentNode = l2, e6;
   }
   p(t5) {
     let i7 = 0;
@@ -1064,8 +1064,8 @@ var k = class _k {
   get _$AU() {
     return this._$AM?._$AU ?? this._$Cv;
   }
-  constructor(t5, i7, s5, e5) {
-    this.type = 2, this._$AH = A, this._$AN = void 0, this._$AA = t5, this._$AB = i7, this._$AM = s5, this.options = e5, this._$Cv = e5?.isConnected ?? true;
+  constructor(t5, i7, s5, e6) {
+    this.type = 2, this._$AH = A, this._$AN = void 0, this._$AA = t5, this._$AB = i7, this._$AM = s5, this.options = e6, this._$Cv = e6?.isConnected ?? true;
   }
   get parentNode() {
     let t5 = this._$AA.parentNode;
@@ -1091,10 +1091,10 @@ var k = class _k {
     this._$AH !== A && a2(this._$AH) ? this._$AA.nextSibling.data = t5 : this.T(l2.createTextNode(t5)), this._$AH = t5;
   }
   $(t5) {
-    const { values: i7, _$litType$: s5 } = t5, e5 = "number" == typeof s5 ? this._$AC(t5) : (void 0 === s5.el && (s5.el = S2.createElement(V(s5.h, s5.h[0]), this.options)), s5);
-    if (this._$AH?._$AD === e5) this._$AH.p(i7);
+    const { values: i7, _$litType$: s5 } = t5, e6 = "number" == typeof s5 ? this._$AC(t5) : (void 0 === s5.el && (s5.el = S2.createElement(V(s5.h, s5.h[0]), this.options)), s5);
+    if (this._$AH?._$AD === e6) this._$AH.p(i7);
     else {
-      const t6 = new R(e5, this), s6 = t6.u(this.options);
+      const t6 = new R(e6, this), s6 = t6.u(this.options);
       t6.p(i7), this.T(s6), this._$AH = t6;
     }
   }
@@ -1105,9 +1105,9 @@ var k = class _k {
   k(t5) {
     u2(this._$AH) || (this._$AH = [], this._$AR());
     const i7 = this._$AH;
-    let s5, e5 = 0;
-    for (const h4 of t5) e5 === i7.length ? i7.push(s5 = new _k(this.O(c3()), this.O(c3()), this, this.options)) : s5 = i7[e5], s5._$AI(h4), e5++;
-    e5 < i7.length && (this._$AR(s5 && s5._$AB.nextSibling, e5), i7.length = e5);
+    let s5, e6 = 0;
+    for (const h4 of t5) e6 === i7.length ? i7.push(s5 = new _k(this.O(c3()), this.O(c3()), this, this.options)) : s5 = i7[e6], s5._$AI(h4), e6++;
+    e6 < i7.length && (this._$AR(s5 && s5._$AB.nextSibling, e6), i7.length = e6);
   }
   _$AR(t5 = this._$AA.nextSibling, s5) {
     for (this._$AP?.(false, true, s5); t5 !== this._$AB; ) {
@@ -1126,19 +1126,19 @@ var H = class {
   get _$AU() {
     return this._$AM._$AU;
   }
-  constructor(t5, i7, s5, e5, h4) {
-    this.type = 1, this._$AH = A, this._$AN = void 0, this.element = t5, this.name = i7, this._$AM = e5, this.options = h4, s5.length > 2 || "" !== s5[0] || "" !== s5[1] ? (this._$AH = Array(s5.length - 1).fill(new String()), this.strings = s5) : this._$AH = A;
+  constructor(t5, i7, s5, e6, h4) {
+    this.type = 1, this._$AH = A, this._$AN = void 0, this.element = t5, this.name = i7, this._$AM = e6, this.options = h4, s5.length > 2 || "" !== s5[0] || "" !== s5[1] ? (this._$AH = Array(s5.length - 1).fill(new String()), this.strings = s5) : this._$AH = A;
   }
-  _$AI(t5, i7 = this, s5, e5) {
+  _$AI(t5, i7 = this, s5, e6) {
     const h4 = this.strings;
     let o7 = false;
     if (void 0 === h4) t5 = M(this, t5, i7, 0), o7 = !a2(t5) || t5 !== this._$AH && t5 !== E, o7 && (this._$AH = t5);
     else {
-      const e6 = t5;
+      const e7 = t5;
       let n6, r6;
-      for (t5 = h4[0], n6 = 0; n6 < h4.length - 1; n6++) r6 = M(this, e6[s5 + n6], i7, n6), r6 === E && (r6 = this._$AH[n6]), o7 ||= !a2(r6) || r6 !== this._$AH[n6], r6 === A ? t5 = A : t5 !== A && (t5 += (r6 ?? "") + h4[n6 + 1]), this._$AH[n6] = r6;
+      for (t5 = h4[0], n6 = 0; n6 < h4.length - 1; n6++) r6 = M(this, e7[s5 + n6], i7, n6), r6 === E && (r6 = this._$AH[n6]), o7 ||= !a2(r6) || r6 !== this._$AH[n6], r6 === A ? t5 = A : t5 !== A && (t5 += (r6 ?? "") + h4[n6 + 1]), this._$AH[n6] = r6;
     }
-    o7 && !e5 && this.j(t5);
+    o7 && !e6 && this.j(t5);
   }
   j(t5) {
     t5 === A ? this.element.removeAttribute(this.name) : this.element.setAttribute(this.name, t5 ?? "");
@@ -1161,13 +1161,13 @@ var L = class extends H {
   }
 };
 var z = class extends H {
-  constructor(t5, i7, s5, e5, h4) {
-    super(t5, i7, s5, e5, h4), this.type = 5;
+  constructor(t5, i7, s5, e6, h4) {
+    super(t5, i7, s5, e6, h4), this.type = 5;
   }
   _$AI(t5, i7 = this) {
     if ((t5 = M(this, t5, i7, 0) ?? A) === E) return;
-    const s5 = this._$AH, e5 = t5 === A && s5 !== A || t5.capture !== s5.capture || t5.once !== s5.once || t5.passive !== s5.passive, h4 = t5 !== A && (s5 === A || e5);
-    e5 && this.element.removeEventListener(this.name, this, s5), h4 && this.element.addEventListener(this.name, this, t5), this._$AH = t5;
+    const s5 = this._$AH, e6 = t5 === A && s5 !== A || t5.capture !== s5.capture || t5.once !== s5.once || t5.passive !== s5.passive, h4 = t5 !== A && (s5 === A || e6);
+    e6 && this.element.removeEventListener(this.name, this, s5), h4 && this.element.addEventListener(this.name, this, t5), this._$AH = t5;
   }
   handleEvent(t5) {
     "function" == typeof this._$AH ? this._$AH.call(this.options?.host ?? this.element, t5) : this._$AH.handleEvent(t5);
@@ -1188,11 +1188,11 @@ var j = { M: h2, P: o3, A: n3, C: 1, L: N, R, D: d2, V: M, I: k, H, N: L, U: z, 
 var B = t2.litHtmlPolyfillSupport;
 B?.(S2, k), (t2.litHtmlVersions ??= []).push("3.3.3");
 var D = (t5, i7, s5) => {
-  const e5 = s5?.renderBefore ?? i7;
-  let h4 = e5._$litPart$;
+  const e6 = s5?.renderBefore ?? i7;
+  let h4 = e6._$litPart$;
   if (void 0 === h4) {
     const t6 = s5?.renderBefore ?? null;
-    e5._$litPart$ = h4 = new k(i7.insertBefore(c3(), t6), t6, void 0, s5 ?? {});
+    e6._$litPart$ = h4 = new k(i7.insertBefore(c3(), t6), t6, void 0, s5 ?? {});
   }
   return h4._$AI(t5), h4;
 };
@@ -1228,38 +1228,82 @@ o4?.({ LitElement: i3 });
 
 // @lit/reactive-element/node/decorators/property.js
 var o5 = { attribute: true, type: String, converter: b, reflect: false, hasChanged: m };
-var r4 = (t5 = o5, e5, r6) => {
+var r4 = (t5 = o5, e6, r6) => {
   const { kind: n6, metadata: i7 } = r6;
   let s5 = globalThis.litPropertyMetadata.get(i7);
   if (void 0 === s5 && globalThis.litPropertyMetadata.set(i7, s5 = /* @__PURE__ */ new Map()), "setter" === n6 && ((t5 = Object.create(t5)).wrapped = true), s5.set(r6.name, t5), "accessor" === n6) {
     const { name: o7 } = r6;
     return { set(r7) {
-      const n7 = e5.get.call(this);
-      e5.set.call(this, r7), this.requestUpdate(o7, n7, t5, true, r7);
-    }, init(e6) {
-      return void 0 !== e6 && this.C(o7, void 0, t5, e6), e6;
+      const n7 = e6.get.call(this);
+      e6.set.call(this, r7), this.requestUpdate(o7, n7, t5, true, r7);
+    }, init(e7) {
+      return void 0 !== e7 && this.C(o7, void 0, t5, e7), e7;
     } };
   }
   if ("setter" === n6) {
     const { name: o7 } = r6;
     return function(r7) {
       const n7 = this[o7];
-      e5.call(this, r7), this.requestUpdate(o7, n7, t5, true, r7);
+      e6.call(this, r7), this.requestUpdate(o7, n7, t5, true, r7);
     };
   }
   throw Error("Unsupported decorator location: " + n6);
 };
 function n4(t5) {
-  return (e5, o7) => "object" == typeof o7 ? r4(t5, e5, o7) : ((t6, e6, o8) => {
-    const r6 = e6.hasOwnProperty(o8);
-    return e6.constructor.createProperty(o8, t6), r6 ? Object.getOwnPropertyDescriptor(e6, o8) : void 0;
-  })(t5, e5, o7);
+  return (e6, o7) => "object" == typeof o7 ? r4(t5, e6, o7) : ((t6, e7, o8) => {
+    const r6 = e7.hasOwnProperty(o8);
+    return e7.constructor.createProperty(o8, t6), r6 ? Object.getOwnPropertyDescriptor(e7, o8) : void 0;
+  })(t5, e6, o7);
 }
 
 // @lit/reactive-element/node/decorators/state.js
 function r5(r6) {
   return n4({ ...r6, state: true, attribute: false });
 }
+
+// lit-html/directive.js
+var t3 = { ATTRIBUTE: 1, CHILD: 2, PROPERTY: 3, BOOLEAN_ATTRIBUTE: 4, EVENT: 5, ELEMENT: 6 };
+var e4 = (t5) => (...e6) => ({ _$litDirective$: t5, values: e6 });
+var i4 = class {
+  constructor(t5) {
+  }
+  get _$AU() {
+    return this._$AM._$AU;
+  }
+  _$AT(t5, e6, i7) {
+    this._$Ct = t5, this._$AM = e6, this._$Ci = i7;
+  }
+  _$AS(t5, e6) {
+    return this.update(t5, e6);
+  }
+  update(t5, e6) {
+    return this.render(...e6);
+  }
+};
+
+// lit-html/directives/class-map.js
+var e5 = e4(class extends i4 {
+  constructor(t5) {
+    if (super(t5), t5.type !== t3.ATTRIBUTE || "class" !== t5.name || t5.strings?.length > 2) throw Error("`classMap()` can only be used in the `class` attribute and must be the only part in the attribute.");
+  }
+  render(t5) {
+    return " " + Object.keys(t5).filter((s5) => t5[s5]).join(" ") + " ";
+  }
+  update(s5, [i7]) {
+    if (void 0 === this.st) {
+      this.st = /* @__PURE__ */ new Set(), void 0 !== s5.strings && (this.nt = new Set(s5.strings.join(" ").split(/\s/).filter((t5) => "" !== t5)));
+      for (const t5 in i7) i7[t5] && !this.nt?.has(t5) && this.st.add(t5);
+      return this.render(i7);
+    }
+    const r6 = s5.element.classList;
+    for (const t5 of this.st) t5 in i7 || (r6.remove(t5), this.st.delete(t5));
+    for (const t5 in i7) {
+      const s6 = !!i7[t5];
+      s6 === this.st.has(t5) || this.nt?.has(t5) || (s6 ? (r6.add(t5), this.st.add(t5)) : (r6.remove(t5), this.st.delete(t5)));
+    }
+    return E;
+  }
+});
 
 // @erplora/outfitkit/dist/define.js
 function define(tag, ctor) {
@@ -1440,8 +1484,8 @@ var OkInlineFeedback = class extends i3 {
     this.hidden = false;
     this.labels = {};
     this.hasActions = false;
-    this.onActionsSlotChange = (e5) => {
-      const slot = e5.target;
+    this.onActionsSlotChange = (e6) => {
+      const slot = e6.target;
       this.hasActions = slot.assignedNodes({ flatten: true }).length > 0;
     };
   }
@@ -1636,50 +1680,30 @@ __decorateClass2([
 ], OkInlineFeedback.prototype, "hasActions");
 define("ok-inline-feedback", OkInlineFeedback);
 
-// lit-html/directive.js
-var t3 = { ATTRIBUTE: 1, CHILD: 2, PROPERTY: 3, BOOLEAN_ATTRIBUTE: 4, EVENT: 5, ELEMENT: 6 };
-var e4 = (t5) => (...e5) => ({ _$litDirective$: t5, values: e5 });
-var i4 = class {
-  constructor(t5) {
-  }
-  get _$AU() {
-    return this._$AM._$AU;
-  }
-  _$AT(t5, e5, i7) {
-    this._$Ct = t5, this._$AM = e5, this._$Ci = i7;
-  }
-  _$AS(t5, e5) {
-    return this.update(t5, e5);
-  }
-  update(t5, e5) {
-    return this.render(...e5);
-  }
-};
-
 // lit-html/directive-helpers.js
 var { I: t4 } = j;
 var i5 = (o7) => o7;
 var s4 = () => document.createComment("");
-var v2 = (o7, n6, e5) => {
+var v2 = (o7, n6, e6) => {
   const l3 = o7._$AA.parentNode, d3 = void 0 === n6 ? o7._$AB : n6._$AA;
-  if (void 0 === e5) {
+  if (void 0 === e6) {
     const i7 = l3.insertBefore(s4(), d3), n7 = l3.insertBefore(s4(), d3);
-    e5 = new t4(i7, n7, o7, o7.options);
+    e6 = new t4(i7, n7, o7, o7.options);
   } else {
-    const t5 = e5._$AB.nextSibling, n7 = e5._$AM, c5 = n7 !== o7;
+    const t5 = e6._$AB.nextSibling, n7 = e6._$AM, c5 = n7 !== o7;
     if (c5) {
       let t6;
-      e5._$AQ?.(o7), e5._$AM = o7, void 0 !== e5._$AP && (t6 = o7._$AU) !== n7._$AU && e5._$AP(t6);
+      e6._$AQ?.(o7), e6._$AM = o7, void 0 !== e6._$AP && (t6 = o7._$AU) !== n7._$AU && e6._$AP(t6);
     }
     if (t5 !== d3 || c5) {
-      let o8 = e5._$AA;
+      let o8 = e6._$AA;
       for (; o8 !== t5; ) {
         const t6 = i5(o8).nextSibling;
         i5(l3).insertBefore(o8, d3), o8 = t6;
       }
     }
   }
-  return e5;
+  return e6;
 };
 var u3 = (o7, t5, i7 = o7) => (o7._$AI(t5, i7), o7);
 var m3 = {};
@@ -1690,25 +1714,25 @@ var h3 = (o7) => {
 };
 
 // lit-html/directives/repeat.js
-var u4 = (e5, s5, t5) => {
+var u4 = (e6, s5, t5) => {
   const r6 = /* @__PURE__ */ new Map();
-  for (let l3 = s5; l3 <= t5; l3++) r6.set(e5[l3], l3);
+  for (let l3 = s5; l3 <= t5; l3++) r6.set(e6[l3], l3);
   return r6;
 };
 var c4 = e4(class extends i4 {
-  constructor(e5) {
-    if (super(e5), e5.type !== t3.CHILD) throw Error("repeat() can only be used in text expressions");
+  constructor(e6) {
+    if (super(e6), e6.type !== t3.CHILD) throw Error("repeat() can only be used in text expressions");
   }
-  dt(e5, s5, t5) {
+  dt(e6, s5, t5) {
     let r6;
     void 0 === t5 ? t5 = s5 : void 0 !== s5 && (r6 = s5);
     const l3 = [], o7 = [];
     let i7 = 0;
-    for (const s6 of e5) l3[i7] = r6 ? r6(s6, i7) : i7, o7[i7] = t5(s6, i7), i7++;
+    for (const s6 of e6) l3[i7] = r6 ? r6(s6, i7) : i7, o7[i7] = t5(s6, i7), i7++;
     return { values: o7, keys: l3 };
   }
-  render(e5, s5, t5) {
-    return this.dt(e5, s5, t5).values;
+  render(e6, s5, t5) {
+    return this.dt(e6, s5, t5).values;
   }
   update(s5, [t5, r6, c5]) {
     const d3 = M2(s5), { values: p4, keys: a3 } = this.dt(t5, r6, c5);
@@ -1722,21 +1746,21 @@ var c4 = e4(class extends i4 {
     else if (h4[x2] === a3[w2]) v3[w2] = u3(d3[x2], p4[w2]), v2(s5, v3[w2 + 1], d3[x2]), x2++, w2--;
     else if (h4[j2] === a3[k2]) v3[k2] = u3(d3[j2], p4[k2]), v2(s5, d3[x2], d3[j2]), j2--, k2++;
     else if (void 0 === m4 && (m4 = u4(a3, k2, w2), y3 = u4(h4, x2, j2)), m4.has(h4[x2])) if (m4.has(h4[j2])) {
-      const e5 = y3.get(a3[k2]), t6 = void 0 !== e5 ? d3[e5] : null;
+      const e6 = y3.get(a3[k2]), t6 = void 0 !== e6 ? d3[e6] : null;
       if (null === t6) {
-        const e6 = v2(s5, d3[x2]);
-        u3(e6, p4[k2]), v3[k2] = e6;
-      } else v3[k2] = u3(t6, p4[k2]), v2(s5, d3[x2], t6), d3[e5] = null;
+        const e7 = v2(s5, d3[x2]);
+        u3(e7, p4[k2]), v3[k2] = e7;
+      } else v3[k2] = u3(t6, p4[k2]), v2(s5, d3[x2], t6), d3[e6] = null;
       k2++;
     } else h3(d3[j2]), j2--;
     else h3(d3[x2]), x2++;
     for (; k2 <= w2; ) {
-      const e5 = v2(s5, v3[w2 + 1]);
-      u3(e5, p4[k2]), v3[k2++] = e5;
+      const e6 = v2(s5, v3[w2 + 1]);
+      u3(e6, p4[k2]), v3[k2++] = e6;
     }
     for (; x2 <= j2; ) {
-      const e5 = d3[x2++];
-      null !== e5 && h3(e5);
+      const e6 = d3[x2++];
+      null !== e6 && h3(e6);
     }
     return this.ut = a3, p3(s5, v3), E;
   }
@@ -1750,21 +1774,21 @@ var o6 = e4(class extends i4 {
     if (super(t5), t5.type !== t3.ATTRIBUTE || "style" !== t5.name || t5.strings?.length > 2) throw Error("The `styleMap` directive must be used in the `style` attribute and must be the only part in the attribute.");
   }
   render(t5) {
-    return Object.keys(t5).reduce((e5, r6) => {
+    return Object.keys(t5).reduce((e6, r6) => {
       const s5 = t5[r6];
-      return null == s5 ? e5 : e5 + `${r6 = r6.includes("-") ? r6 : r6.replace(/(?:^(webkit|moz|ms|o)|)(?=[A-Z])/g, "-$&").toLowerCase()}:${s5};`;
+      return null == s5 ? e6 : e6 + `${r6 = r6.includes("-") ? r6 : r6.replace(/(?:^(webkit|moz|ms|o)|)(?=[A-Z])/g, "-$&").toLowerCase()}:${s5};`;
     }, "");
   }
-  update(e5, [r6]) {
-    const { style: s5 } = e5.element;
+  update(e6, [r6]) {
+    const { style: s5 } = e6.element;
     if (void 0 === this.ft) return this.ft = new Set(Object.keys(r6)), this.render(r6);
     for (const t5 of this.ft) null == r6[t5] && (this.ft.delete(t5), t5.includes("-") ? s5.removeProperty(t5) : s5[t5] = null);
     for (const t5 in r6) {
-      const e6 = r6[t5];
-      if (null != e6) {
+      const e7 = r6[t5];
+      if (null != e7) {
         this.ft.add(t5);
-        const r7 = "string" == typeof e6 && e6.endsWith(i6);
-        t5.includes("-") || r7 ? s5.setProperty(t5, r7 ? e6.slice(0, -11) : e6, r7 ? n5 : "") : s5[t5] = e6;
+        const r7 = "string" == typeof e7 && e7.endsWith(i6);
+        t5.includes("-") || r7 ? s5.setProperty(t5, r7 ? e7.slice(0, -11) : e7, r7 ? n5 : "") : s5[t5] = e7;
       }
     }
     return E;
@@ -2337,8 +2361,8 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
     if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
       this.mq = window.matchMedia(`(max-width: ${_OkDataTable2.MOBILE_BREAKPOINT}px)`);
       this.isMobile = this.mq.matches;
-      const handler = (e5) => {
-        const matches = "matches" in e5 ? e5.matches : this.mq?.matches ?? false;
+      const handler = (e6) => {
+        const matches = "matches" in e6 ? e6.matches : this.mq?.matches ?? false;
         if (this.isMobile === matches) return;
         this.isMobile = matches;
         if (matches && this.cardViewEnabled) this.viewMode = "cards";
@@ -2977,7 +3001,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
           .interfaceOptions=${{ cssClass: "ok-overlay" }}
           placeholder=${this.t.select}
           .value=${current}
-          @ionChange=${(e5) => this.onFilterSelect(col, e5.detail.value, multi)}
+          @ionChange=${(e6) => this.onFilterSelect(col, e6.detail.value, multi)}
         >
           ${multi ? A : b2`<ion-select-option value="">${this.t.select}</ion-select-option>`}
           ${opts.map((o7) => b2`<ion-select-option value=${o7.value}>${o7.label}</ion-select-option>`)}
@@ -2993,10 +3017,10 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
           <div class="frange">
             <ion-input type=${t5} fill="outline" mode="md" placeholder=${type === "daterange" ? this.t.from : this.t.gte}
               .value=${f3?.from ?? ""}
-              @ionInput=${(e5) => onEdge(col, "from", e5)}></ion-input>
+              @ionInput=${(e6) => onEdge(col, "from", e6)}></ion-input>
             <ion-input type=${t5} fill="outline" mode="md" placeholder=${type === "daterange" ? this.t.to : this.t.lte}
               .value=${f3?.to ?? ""}
-              @ionInput=${(e5) => onEdge(col, "to", e5)}></ion-input>
+              @ionInput=${(e6) => onEdge(col, "to", e6)}></ion-input>
           </div>
         </div>
       `;
@@ -3010,7 +3034,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
         label-placement="stacked"
         placeholder=${this.t.filterPlaceholder}
         .value=${this.selectValue(f3, false)}
-        @ionInput=${(e5) => this.onFilterInput(col, e5)}
+        @ionInput=${(e6) => this.onFilterInput(col, e6)}
       ></ion-input>
     `;
   }
@@ -3048,7 +3072,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
           aria-label=${col.header}
           placeholder=${col.header}
           .value=${current}
-          @ionChange=${(e5) => this.onFilterSelect(col, e5.detail.value, multi)}
+          @ionChange=${(e6) => this.onFilterSelect(col, e6.detail.value, multi)}
         >
           ${multi ? A : b2`<ion-select-option value="">${col.header}</ion-select-option>`}
           ${opts.map((o7) => b2`<ion-select-option value=${o7.value}>${o7.label}</ion-select-option>`)}
@@ -3058,9 +3082,9 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
     return b2`
       <span class="tk-daterange" role="group" aria-label=${col.header}>
         <ion-icon .icon=${iconCalendarOutline}></ion-icon>
-        <ion-input type="date" aria-label=${this.t.fromOf.replace("{label}", col.header)} .value=${f3?.from ?? ""} @ionChange=${(e5) => this.onInlineRange(col, "from", e5)}></ion-input>
+        <ion-input type="date" aria-label=${this.t.fromOf.replace("{label}", col.header)} .value=${f3?.from ?? ""} @ionChange=${(e6) => this.onInlineRange(col, "from", e6)}></ion-input>
         <span class="arr">→</span>
-        <ion-input type="date" aria-label=${this.t.toOf.replace("{label}", col.header)} .value=${f3?.to ?? ""} @ionChange=${(e5) => this.onInlineRange(col, "to", e5)}></ion-input>
+        <ion-input type="date" aria-label=${this.t.toOf.replace("{label}", col.header)} .value=${f3?.to ?? ""} @ionChange=${(e6) => this.onInlineRange(col, "to", e6)}></ion-input>
       </span>
     `;
   }
@@ -3068,7 +3092,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
   renderOverflowMenu() {
     if (!this.menuActions.length) return A;
     return b2`
-      <ion-button class="toolbtn" fill="clear" aria-label=${this.t.moreActions} @click=${(e5) => this.openMenu(e5)}>
+      <ion-button class="toolbtn" fill="clear" aria-label=${this.t.moreActions} @click=${(e6) => this.openMenu(e6)}>
         <ion-icon slot="icon-only" .icon=${iconEllipsisVertical}></ion-icon>
       </ion-button>
       <ion-popover
@@ -3120,7 +3144,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
             aria-label=${this.t.moreActions}
             title=${this.t.moreActions}
             aria-haspopup="menu"
-            @click=${(e5) => this.openRowMenu(e5, row)}
+            @click=${(e6) => this.openRowMenu(e6, row)}
           >
             <ion-icon slot="icon-only" .icon=${okIcon(iconEllipsisVertical)}></ion-icon>
           </ion-button>
@@ -3259,7 +3283,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
                             aria-label=${this.t.columnsVisible}
                             .value=${this.visibleColumns.map((c5) => c5.key)}
                             .selectedText=${this.t.columns}
-                            @ionChange=${(e5) => this.setVisibleColumns(e5.detail.value)}
+                            @ionChange=${(e6) => this.setVisibleColumns(e6.detail.value)}
                           >
                             ${this.columns.map((c5) => b2`<ion-select-option value=${c5.key}>${c5.header}</ion-select-option>`)}
                           </ion-select>
@@ -3270,7 +3294,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
                             interface="popover"
                             aria-label=${this.t.rowsPerPage}
                             .value=${ps}
-                            @ionChange=${(e5) => setPageSize(Number(e5.detail.value))}
+                            @ionChange=${(e6) => setPageSize(Number(e6.detail.value))}
                           >
                             ${this.effPageSizes.map((n6) => b2`<ion-select-option .value=${n6}>${n6}</ion-select-option>`)}
                           </ion-select>
@@ -3289,7 +3313,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
                                the button's native dialog from a test. Same criterion as
                                «GrantFilePicker.vue» in the Hub (the hook goes on the control, not
                                on its disguise). -->
-                          <input class="tk-file" data-testid=${this.tid("csv-import")} type="file" accept=".csv,text/csv" hidden @change=${(e5) => this.onImportFile(e5)} />
+                          <input class="tk-file" data-testid=${this.tid("csv-import")} type="file" accept=".csv,text/csv" hidden @change=${(e6) => this.onImportFile(e6)} />
                         ` : A}
                     ${this.effExport ? this.toolButton("download-outline", false, () => this.exportCsv(), this.t.exportCsv, void 0, this.tid("csv-export")) : A}
                     <!-- #113 — Mismo botón en los dos viewports: la acción principal de la pantalla
@@ -3335,7 +3359,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
                     <span class="strong">${count}</span> ${count === 1 ? this.t.recordSingular : this.t.recordPlural}
                   </span>
                   ${!showTopbar && this.effPageSizes.length ? b2`
-                        <select class="psize" @change=${(e5) => setPageSize(Number(e5.target.value))}>
+                        <select class="psize" @change=${(e6) => setPageSize(Number(e6.target.value))}>
                           ${this.effPageSizes.map((n6) => b2`<option value=${n6} ?selected=${n6 === ps}>${this.t.perPageShort.replace("{n}", String(n6))}</option>`)}
                         </select>
                       ` : A}
@@ -3388,8 +3412,8 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
         <div class="fblock">
           <span class="flabel">${label}</span>
           <div class="daterange">
-            <ion-input type="date" label=${this.t.from} label-placement="stacked" fill="outline" mode="md" .value=${f3.from ?? ""} @ionChange=${(e5) => this.setFilterRange(col.key, "from", e5.detail.value ?? "")}></ion-input>
-            <ion-input type="date" label=${this.t.to} label-placement="stacked" fill="outline" mode="md" .value=${f3.to ?? ""} @ionChange=${(e5) => this.setFilterRange(col.key, "to", e5.detail.value ?? "")}></ion-input>
+            <ion-input type="date" label=${this.t.from} label-placement="stacked" fill="outline" mode="md" .value=${f3.from ?? ""} @ionChange=${(e6) => this.setFilterRange(col.key, "from", e6.detail.value ?? "")}></ion-input>
+            <ion-input type="date" label=${this.t.to} label-placement="stacked" fill="outline" mode="md" .value=${f3.to ?? ""} @ionChange=${(e6) => this.setFilterRange(col.key, "to", e6.detail.value ?? "")}></ion-input>
           </div>
         </div>
       `;
@@ -3407,7 +3431,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
           .interfaceOptions=${{ cssClass: "ok-overlay" }}
           placeholder=${this.t.select}
           .value=${selected}
-          @ionChange=${(e5) => this.setFilterValues(col.key, e5.detail.value ?? [])}
+          @ionChange=${(e6) => this.setFilterValues(col.key, e6.detail.value ?? [])}
         >
           ${opts.length === 0 ? b2`<ion-select-option .disabled=${true} value="">${this.t.noValues}</ion-select-option>` : opts.map((o7) => b2`<ion-select-option value=${o7.value}>${o7.label}</ion-select-option>`)}
         </ion-select>
@@ -3416,9 +3440,9 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
   }
   /** #67 — Enter/Espacio activan la fila clicable (y, desde #74, la tarjeta): si se llega con el
    *  tabulador, el ratón no puede ser el único camino. Espacio además NO debe desplazar la página. */
-  onRowKeydown(e5, row) {
-    if (e5.key !== "Enter" && e5.key !== " " && e5.key !== "Spacebar") return;
-    e5.preventDefault();
+  onRowKeydown(e6, row) {
+    if (e6.key !== "Enter" && e6.key !== " " && e6.key !== "Spacebar") return;
+    e6.preventDefault();
     this.emit("rowClick", { row });
   }
   emptyState() {
@@ -3478,13 +3502,13 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
                   style=${o6(tpl)}
                   tabindex=${this.rowClickable ? "0" : A}
                   @click=${this.rowClickable ? () => this.emit("rowClick", { row }) : A}
-                  @keydown=${this.rowClickable ? (e5) => this.onRowKeydown(e5, row) : A}
+                  @keydown=${this.rowClickable ? (e6) => this.onRowKeydown(e6, row) : A}
                 >
-                  ${this.selectable ? b2`<span class="selcb" @click=${(e5) => e5.stopPropagation()}><ion-checkbox .checked=${selected} aria-label=${this.t.selectRow} @ionChange=${() => this.toggleRow(key)}></ion-checkbox></span>` : A}
+                  ${this.selectable ? b2`<span class="selcb" @click=${(e6) => e6.stopPropagation()}><ion-checkbox .checked=${selected} aria-label=${this.t.selectRow} @ionChange=${() => this.toggleRow(key)}></ion-checkbox></span>` : A}
                   ${cols.map(
           (c5) => b2`<div class=${`gcell ${alignCls(c5.align)}${c5.pinned === "end" ? " actions-col" : ""}`} role="cell">${c5.render ? c5.render(row) : b2`<span>${this.cell(c5, row)}</span>`}</div>`
         )}
-                  ${this.actions.length ? b2`<div class="gcell right actions-col" role="cell" @click=${(e5) => e5.stopPropagation()}>${this.actionButtons(row, true)}</div>` : A}
+                  ${this.actions.length ? b2`<div class="gcell right actions-col" role="cell" @click=${(e6) => e6.stopPropagation()}>${this.actionButtons(row, true)}</div>` : A}
                 </div>
               `;
       }
@@ -3513,13 +3537,13 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
                 role=${this.rowClickable ? "button" : A}
                 tabindex=${this.rowClickable ? "0" : A}
                 @click=${this.rowClickable ? () => this.emit("rowClick", { row }) : A}
-                @keydown=${this.rowClickable ? (e5) => this.onRowKeydown(e5, row) : A}
+                @keydown=${this.rowClickable ? (e6) => this.onRowKeydown(e6, row) : A}
               >
                 ${hasHead ? b2`
                       <ion-card-header class="rcard-head">
                         ${icon != null && icon !== "" ? b2`<span class="rc-icon">${typeof icon === "string" ? b2`<ion-icon .icon=${okIcon(icon)}></ion-icon>` : icon}</span>` : A}
                         <span class="rc-title">${this.cardTitle ? this.cardTitle(row) : A}</span>
-                        ${this.selectable ? b2`<ion-checkbox .checked=${selected} aria-label=${this.t.select} @click=${(e5) => e5.stopPropagation()} @ionChange=${() => this.toggleRow(key)}></ion-checkbox>` : A}
+                        ${this.selectable ? b2`<ion-checkbox .checked=${selected} aria-label=${this.t.select} @click=${(e6) => e6.stopPropagation()} @ionChange=${() => this.toggleRow(key)}></ion-checkbox>` : A}
                       </ion-card-header>
                     ` : A}
                 <ion-card-content class="rcard-body">
@@ -3527,7 +3551,7 @@ var _OkDataTable = class _OkDataTable2 extends i3 {
           (c5) => b2`<div class="rrow"><span class="rk">${c5.header}</span><span class="rv">${c5.render ? c5.render(row) : this.cell(c5, row)}</span></div>`
         )}
                 </ion-card-content>
-                ${this.actions.length ? b2`<div class="ractions" @click=${(e5) => e5.stopPropagation()}>${this.actionButtons(row)}</div>` : A}
+                ${this.actions.length ? b2`<div class="ractions" @click=${(e6) => e6.stopPropagation()}>${this.actionButtons(row)}</div>` : A}
               </ion-card>
             `;
       }
@@ -3769,11 +3793,11 @@ var ListController = class {
       if (mySeq !== this.seq) return;
       this.rows = page.rows ?? [];
       this.total = page.total ?? this.rows.length;
-    } catch (e5) {
+    } catch (e6) {
       if (mySeq !== this.seq) return;
       this.rows = [];
       this.total = 0;
-      this.error = e5 instanceof Error ? e5.message : "Error cargando datos";
+      this.error = e6 instanceof Error ? e6.message : "Error cargando datos";
     } finally {
       if (mySeq === this.seq) {
         this.loading = false;
@@ -4070,6 +4094,7 @@ var es_default = {
     "services.service_not_archived": "No se ha podido recuperar el servicio: no existe en este negocio, o ya se est\xE1 ofreciendo.",
     "services.parent_category_unavailable": "Esa categor\xEDa padre no est\xE1 disponible: no existe en este negocio o se ha eliminado.",
     "services.category_update_rejected": "No se ha podido actualizar la categor\xEDa: no existe en este negocio, o la categor\xEDa padre elegida no existe (o es ella misma).",
+    "services.category_name_taken": "Ya hay una categor\xEDa con ese nombre. Elige otro nombre.",
     "services.category_not_found": "Esa categor\xEDa no existe en este negocio.",
     "services.package_not_found": "Ese paquete no existe en este negocio.",
     "services.package_no_grant": "Este cliente no tiene ese bono: nadie se lo ha vendido.",
@@ -4313,6 +4338,7 @@ var en_default = {
     "services.service_not_archived": "That service could not be brought back: it does not exist in this business, or it is already being offered.",
     "services.parent_category_unavailable": "That parent category is not available: it does not exist in this business or it has been deleted.",
     "services.category_update_rejected": "The category could not be updated: it does not exist in this business, or the parent you picked does not (or is the category itself).",
+    "services.category_name_taken": "There is already a category with that name. Pick another name.",
     "services.category_not_found": "That category does not exist in this business.",
     "services.package_not_found": "That package does not exist in this business.",
     "services.package_no_grant": "This customer does not have that voucher: nobody has sold it to them.",
@@ -4341,13 +4367,13 @@ function presentable(text) {
   const t5 = text.trim().toLowerCase();
   return t5.length > 0 && !INTERNALS.some((mark) => t5.includes(mark));
 }
-function domainMessage(e5, lang, fallback) {
-  const code = typeof e5 === "object" && e5 !== null ? e5.code : void 0;
+function domainMessage(e6, lang, fallback) {
+  const code = typeof e6 === "object" && e6 !== null ? e6.code : void 0;
   if (typeof code === "string") {
     const translated = ERRORS[lang]?.[code] ?? ERRORS.en[code];
     if (translated) return translated;
   }
-  const message = e5 instanceof Error ? e5.message : "";
+  const message = e6 instanceof Error ? e6.message : "";
   return presentable(message) ? message : fallback;
 }
 
@@ -4392,6 +4418,7 @@ var ErpServicesCategories = class extends i3 {
     this.newSortOrder = "";
     this.saving = false;
     this.formError = "";
+    this.nameError = "";
     this.editingId = null;
     this.editTitleInHeader = false;
     /** pm#459: generation of the last edit opening; the header check of an earlier one (its table
@@ -4465,16 +4492,16 @@ var ErpServicesCategories = class extends i3 {
   }
   /** pm#450: the table's «Add» emits no event and keeps our form state; after an edit it would
    *  show the edited record under a «New» header, and the submit would UPDATE it. */
-  onTableClick(e5) {
+  onTableClick(e6) {
     if (!this.editingId) return;
     const addId = "services-categories-table-add";
-    if (e5.composedPath().some((n6) => n6 instanceof HTMLElement && n6.dataset.testid === addId)) this.cancelEdit();
+    if (e6.composedPath().some((n6) => n6 instanceof HTMLElement && n6.dataset.testid === addId)) this.cancelEdit();
   }
   /** Wired natively, not with a Lit `@click` on the tag: `<ok-data-table>` carries `testid`, not
    *  `data-testid` (outfitkit#143), and a template binding would read as an action element that
    *  demands one. */
   firstUpdated() {
-    this.renderRoot.querySelector("ok-data-table")?.addEventListener("click", (e5) => this.onTableClick(e5));
+    this.renderRoot.querySelector("ok-data-table")?.addEventListener("click", (e6) => this.onTableClick(e6));
   }
   async onRowAction(ev) {
     const { actionId, row } = ev.detail;
@@ -4486,6 +4513,7 @@ var ErpServicesCategories = class extends i3 {
       this.newParent = c5.parent_id ?? "";
       this.newSortOrder = String(c5.sort_order ?? 0);
       this.formError = "";
+      this.nameError = "";
       const title = `${erplora().t(CATALOG, "ui.editingCategoryTitle")} \u2014 ${this.newName}`;
       const table = this.dataTable();
       table?.open("edit", { title });
@@ -4503,6 +4531,7 @@ var ErpServicesCategories = class extends i3 {
     this.newParent = "";
     this.newSortOrder = "";
     this.formError = "";
+    this.nameError = "";
   }
   /** Submit: create OR update by `editingId`. The update goes through the PARTIAL door
    *  (`records.category.patch`, hub#632): id + edited fields; the runtime completes slug/is_active. */
@@ -4512,6 +4541,7 @@ var ErpServicesCategories = class extends i3 {
     if (!can(required) || !this.newName.trim()) return;
     this.saving = true;
     this.formError = "";
+    this.nameError = "";
     try {
       const fields = {
         name: this.newName.trim(),
@@ -4526,8 +4556,10 @@ var ErpServicesCategories = class extends i3 {
       this.cancelEdit();
       this.dataTable()?.close();
       await Promise.all([this.ctrl.load(), this.loadAll()]);
-    } catch (e5) {
-      this.formError = domainMessage(e5, erplora().locale, erplora().t(CATALOG, "ui.errorSaveCategory"));
+    } catch (e6) {
+      const message = domainMessage(e6, erplora().locale, erplora().t(CATALOG, "ui.errorSaveCategory"));
+      if (e6?.code === "services.category_name_taken") this.nameError = message;
+      else this.formError = message;
     } finally {
       this.saving = false;
     }
@@ -4540,8 +4572,8 @@ var ErpServicesCategories = class extends i3 {
       await erplora().command("services.categories.delete", { category_id: target.id });
       this.deleteTarget = null;
       await Promise.all([this.ctrl.load(), this.loadAll()]);
-    } catch (e5) {
-      this.formError = domainMessage(e5, erplora().locale, erplora().t(CATALOG, "ui.errorDeleteCategory"));
+    } catch (e6) {
+      this.formError = domainMessage(e6, erplora().locale, erplora().t(CATALOG, "ui.errorDeleteCategory"));
       this.deleteTarget = null;
     } finally {
       this.saving = false;
@@ -4576,19 +4608,22 @@ var ErpServicesCategories = class extends i3 {
     return b2`<div class="page">
       ${this.formError ? b2`<ok-inline-feedback data-testid="services-categories-form-error" tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : A}
       ${this.ctrl?.error ? b2`<ok-inline-feedback data-testid="services-categories-load-error" tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : A}
-      <ok-data-table testid="services-categories-table" .serverSide=${true} .fill=${true} .views=${true} .addable=${can("services.add_category")} .cardTitle=${(row) => String(row.name ?? "")} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "asc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchCategoryPlaceholder")} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.emptyCategories")} @rowAction=${(e5) => this.onRowAction(e5)} @rowClick=${(e5) => this.onRowAction({ detail: { actionId: "edit", row: e5.detail.row } })}
- @pageChange=${(e5) => this.ctrl.setPage(e5.detail)} @pageSizeChange=${(e5) => this.ctrl.setPageSize(e5.detail)} @sortChange=${(e5) => this.ctrl.setSort(e5.detail.sort, e5.detail.dir)} @searchChange=${(e5) => this.ctrl.setSearch(e5.detail)} @filterChange=${(e5) => this.ctrl.setFilter(e5.detail.col, e5.detail.value)}>
-        <form slot="create" class="form" data-testid="services-categories-form" @submit=${(e5) => this.save(e5)}>
+      <ok-data-table testid="services-categories-table" .serverSide=${true} .fill=${true} .views=${true} .addable=${can("services.add_category")} .cardTitle=${(row) => String(row.name ?? "")} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "asc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchCategoryPlaceholder")} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.emptyCategories")} @rowAction=${(e6) => this.onRowAction(e6)} @rowClick=${(e6) => this.onRowAction({ detail: { actionId: "edit", row: e6.detail.row } })}
+ @pageChange=${(e6) => this.ctrl.setPage(e6.detail)} @pageSizeChange=${(e6) => this.ctrl.setPageSize(e6.detail)} @sortChange=${(e6) => this.ctrl.setSort(e6.detail.sort, e6.detail.dir)} @searchChange=${(e6) => this.ctrl.setSearch(e6.detail)} @filterChange=${(e6) => this.ctrl.setFilter(e6.detail.col, e6.detail.value)}>
+        <form slot="create" class="form" data-testid="services-categories-form" @submit=${(e6) => this.save(e6)}>
           ${this.editingId && !this.editTitleInHeader ? b2`<ok-inline-feedback data-testid="services-categories-editing" tone="info" icon="create-outline">
                 <b>${t5("ui.editingCategoryTitle")}</b> — ${this.newName}
                 <ion-button size="small" fill="clear" data-testid="services-categories-edit-cancel" @click=${() => this.cancelEdit()}>${t5("ui.editingCancel")}</ion-button>
               </ok-inline-feedback>` : A}
-          <ion-input data-testid="services-categories-name" fill="outline" label-placement="floating" label=${t5("ui.colName")} .value=${this.newName} @ionInput=${(e5) => this.newName = e5.target.value}></ion-input>
-          <ion-select data-testid="services-categories-parent" fill="outline" label-placement="floating" label=${t5("ui.colParent")} placeholder=${t5("ui.placeholderParent")} .value=${this.newParent} @ionChange=${(e5) => this.newParent = e5.target.value}>
+          <ion-input data-testid="services-categories-name" fill="outline" label-placement="floating" label=${t5("ui.colName")} class=${e5({ "ion-invalid": !!this.nameError, "ion-touched": !!this.nameError })} error-text=${this.nameError || A} .value=${this.newName} @ionInput=${(e6) => {
+      this.newName = e6.target.value;
+      this.nameError = "";
+    }}></ion-input>
+          <ion-select data-testid="services-categories-parent" fill="outline" label-placement="floating" label=${t5("ui.colParent")} placeholder=${t5("ui.placeholderParent")} .value=${this.newParent} @ionChange=${(e6) => this.newParent = e6.target.value}>
             <ion-select-option value="">${t5("ui.optionNoParent")}</ion-select-option>
             ${parentOptions.map((c5) => b2`<ion-select-option .value=${c5.id}>${c5.name}</ion-select-option>`)}
           </ion-select>
-          <ion-input data-testid="services-categories-sort-order" fill="outline" label-placement="floating" label=${t5("ui.colSortOrder")} type="number" step="1" .value=${this.newSortOrder} @ionInput=${(e5) => this.newSortOrder = e5.target.value}></ion-input>
+          <ion-input data-testid="services-categories-sort-order" fill="outline" label-placement="floating" label=${t5("ui.colSortOrder")} type="number" step="1" .value=${this.newSortOrder} @ionInput=${(e6) => this.newSortOrder = e6.target.value}></ion-input>
           <ion-button type="submit" data-testid="services-categories-submit" ?disabled=${this.saving || !this.newName}>${this.saving ? t5("ui.btnSaving") : this.editingId ? t5("ui.btnSave") : t5("ui.btnAdd")}</ion-button>
         </form>
       </ok-data-table>
@@ -4611,6 +4646,9 @@ __decorateClass([
 __decorateClass([
   r5()
 ], ErpServicesCategories.prototype, "formError", 2);
+__decorateClass([
+  r5()
+], ErpServicesCategories.prototype, "nameError", 2);
 __decorateClass([
   r5()
 ], ErpServicesCategories.prototype, "editingId", 2);
@@ -4812,8 +4850,8 @@ var ErpServicesList = class extends i3 {
     try {
       await erplora2().command("services.services.restore", { service_id: String(row.id) });
       await this.ctrl.load();
-    } catch (e5) {
-      this.formError = domainMessage(e5, erplora2().locale, erplora2().t(CATALOG2, "ui.errorRestore"));
+    } catch (e6) {
+      this.formError = domainMessage(e6, erplora2().locale, erplora2().t(CATALOG2, "ui.errorRestore"));
     } finally {
       this.saving = false;
     }
@@ -4874,17 +4912,17 @@ var ErpServicesList = class extends i3 {
   }
   /** pm#450: the table's «Add» emits no event and keeps our form state; after an edit it would
    *  show the edited record under a «New» header, and the submit would UPDATE it. */
-  onTableClick(e5) {
+  onTableClick(e6) {
     if (!this.editingId) return;
     const addId = "services-list-table-add";
-    if (e5.composedPath().some((n6) => n6 instanceof HTMLElement && n6.dataset.testid === addId)) this.cancelEdit();
+    if (e6.composedPath().some((n6) => n6 instanceof HTMLElement && n6.dataset.testid === addId)) this.cancelEdit();
   }
   /** Wired natively, not with a Lit `@click` on the tag: `<ok-data-table>` carries `testid`, not
    *  `data-testid` (outfitkit#143), and a template binding would read as an action element that
    *  demands one. */
   firstUpdated() {
     const table = this.renderRoot.querySelector("ok-data-table");
-    table?.addEventListener("click", (e5) => this.onTableClick(e5));
+    table?.addEventListener("click", (e6) => this.onTableClick(e6));
     table?.addEventListener("panelClose", () => this.editSeq++);
   }
   /** Back to a clean CREATE form (services#4). */
@@ -4937,8 +4975,8 @@ var ErpServicesList = class extends i3 {
       this.cancelEdit();
       this.dataTable()?.close();
       await this.ctrl.load();
-    } catch (e5) {
-      this.formError = domainMessage(e5, erplora2().locale, erplora2().t(CATALOG2, "ui.errorCreate"));
+    } catch (e6) {
+      this.formError = domainMessage(e6, erplora2().locale, erplora2().t(CATALOG2, "ui.errorCreate"));
     } finally {
       this.saving = false;
     }
@@ -4966,8 +5004,8 @@ var ErpServicesList = class extends i3 {
       this.cancelEdit();
       this.dataTable()?.close();
       await this.ctrl.load();
-    } catch (e5) {
-      this.formError = domainMessage(e5, erplora2().locale, erplora2().t(CATALOG2, "ui.errorUpdate"));
+    } catch (e6) {
+      this.formError = domainMessage(e6, erplora2().locale, erplora2().t(CATALOG2, "ui.errorUpdate"));
     } finally {
       this.saving = false;
     }
@@ -5010,8 +5048,8 @@ var ErpServicesList = class extends i3 {
       );
       const first = Array.isArray(rows) ? rows[0] : null;
       if (first && this.archiveTarget?.id === row.id) this.archiveActive = first;
-    } catch (e5) {
-      console.warn("[services] appointments.appointments.count_active_for_service failed; archiving without the warning line", e5);
+    } catch (e6) {
+      console.warn("[services] appointments.appointments.count_active_for_service failed; archiving without the warning line", e6);
       this.archiveActive = null;
     }
   }
@@ -5026,8 +5064,8 @@ var ErpServicesList = class extends i3 {
       this.archiveTarget = null;
       this.archiveActive = null;
       await this.ctrl.load();
-    } catch (e5) {
-      this.formError = domainMessage(e5, erplora2().locale, erplora2().t(CATALOG2, "ui.errorArchive"));
+    } catch (e6) {
+      this.formError = domainMessage(e6, erplora2().locale, erplora2().t(CATALOG2, "ui.errorArchive"));
       this.archiveTarget = null;
     } finally {
       this.saving = false;
@@ -5068,28 +5106,28 @@ var ErpServicesList = class extends i3 {
     return b2`<div class="page">
         ${this.formError ? b2`<ok-inline-feedback data-testid="services-list-form-error" tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : A}
         ${this.ctrl?.error ? b2`<ok-inline-feedback data-testid="services-list-load-error" tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : A}
-        <ok-data-table testid="services-list-table" .serverSide=${true} .fill=${true} .addable=${true} .views=${true} .cardTitle=${(row) => String(row.name ?? "")} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "asc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchPlaceholder")} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.empty")} @rowAction=${(e5) => this.onRowAction(e5)} @rowClick=${(e5) => this.onRowAction({ detail: { actionId: "edit", row: e5.detail.row } })}
- @pageChange=${(e5) => this.ctrl.setPage(e5.detail)} @pageSizeChange=${(e5) => this.ctrl.setPageSize(e5.detail)} @sortChange=${(e5) => this.ctrl.setSort(e5.detail.sort, e5.detail.dir)} @searchChange=${(e5) => this.ctrl.setSearch(e5.detail)} @filterChange=${(e5) => this.onFilterChange(e5.detail.col, e5.detail.value)}>
+        <ok-data-table testid="services-list-table" .serverSide=${true} .fill=${true} .addable=${true} .views=${true} .cardTitle=${(row) => String(row.name ?? "")} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "asc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchPlaceholder")} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.empty")} @rowAction=${(e6) => this.onRowAction(e6)} @rowClick=${(e6) => this.onRowAction({ detail: { actionId: "edit", row: e6.detail.row } })}
+ @pageChange=${(e6) => this.ctrl.setPage(e6.detail)} @pageSizeChange=${(e6) => this.ctrl.setPageSize(e6.detail)} @sortChange=${(e6) => this.ctrl.setSort(e6.detail.sort, e6.detail.dir)} @searchChange=${(e6) => this.ctrl.setSearch(e6.detail)} @filterChange=${(e6) => this.onFilterChange(e6.detail.col, e6.detail.value)}>
           <!-- Create form: ALWAYS projected (even with the panel shut); painted only on open, the
                toolbar «+» would slide out an empty panel. -->
-          <form slot="create" class="form" data-testid="services-list-form" @submit=${(e5) => this.createService(e5)}>
+          <form slot="create" class="form" data-testid="services-list-form" @submit=${(e6) => this.createService(e6)}>
             ${this.editingId && !this.editTitleInHeader ? b2`<ok-inline-feedback data-testid="services-list-editing" tone="info" icon="create-outline">
                   <b>${t5("ui.editingTitle")}</b> — ${this.newName}
                   <ion-button size="small" fill="clear" data-testid="services-list-edit-cancel" @click=${() => this.cancelEdit()}>${t5("ui.editingCancel")}</ion-button>
                 </ok-inline-feedback>` : A}
-            <ion-input data-testid="services-list-name" fill="outline" label-placement="floating" label=${t5("ui.colName")} .value=${this.newName} @ionInput=${(e5) => this.newName = e5.target.value}></ion-input>
-            <ion-input data-testid="services-list-price" fill="outline" label-placement="floating" label=${t5("ui.colPrice")} type="text" inputmode="decimal" .value=${this.newPrice} @ionInput=${(e5) => this.newPrice = e5.target.value}></ion-input>
-            <ion-input data-testid="services-list-duration" fill="outline" label-placement="floating" label=${t5("ui.colDuration")} type="number" step="1" .value=${this.newDuration} @ionInput=${(e5) => this.newDuration = e5.target.value}></ion-input>
+            <ion-input data-testid="services-list-name" fill="outline" label-placement="floating" label=${t5("ui.colName")} .value=${this.newName} @ionInput=${(e6) => this.newName = e6.target.value}></ion-input>
+            <ion-input data-testid="services-list-price" fill="outline" label-placement="floating" label=${t5("ui.colPrice")} type="text" inputmode="decimal" .value=${this.newPrice} @ionInput=${(e6) => this.newPrice = e6.target.value}></ion-input>
+            <ion-input data-testid="services-list-duration" fill="outline" label-placement="floating" label=${t5("ui.colDuration")} type="number" step="1" .value=${this.newDuration} @ionInput=${(e6) => this.newDuration = e6.target.value}></ion-input>
             <!-- Both selects go WITHOUT a placeholder, on purpose (services#57): with a floating
                  label, Ionic lifts the label into the border gap as soon as the field has focus and
                  paints the placeholder INSIDE — two near-identical texts a few pixels apart. The
                  label alone says what the field is; a placeholder only fits if it adds something
                  (a format, an example), not if it repeats the name. -->
-            <ion-select data-testid="services-list-category" fill="outline" label-placement="floating" label=${t5("ui.colCategory")} .value=${this.newCategory} @ionChange=${(e5) => this.newCategory = e5.target.value}>
+            <ion-select data-testid="services-list-category" fill="outline" label-placement="floating" label=${t5("ui.colCategory")} .value=${this.newCategory} @ionChange=${(e6) => this.newCategory = e6.target.value}>
               <ion-select-option value="">${t5("ui.optionNoCategory")}</ion-select-option>
               ${this.categories.map((c5) => b2`<ion-select-option .value=${c5.id}>${c5.name}</ion-select-option>`)}
             </ion-select>
-            <ion-select data-testid="services-list-tax" fill="outline" label-placement="floating" label=${t5("ui.colTax")} .value=${this.newTaxRateId} @ionChange=${(e5) => this.newTaxRateId = e5.target.value}>
+            <ion-select data-testid="services-list-tax" fill="outline" label-placement="floating" label=${t5("ui.colTax")} .value=${this.newTaxRateId} @ionChange=${(e6) => this.newTaxRateId = e6.target.value}>
               ${this.taxOptions()}
             </ion-select>
             <!-- Without tax categories creating is impossible (the category is required): say where
@@ -5422,9 +5460,9 @@ var ErpServicesPackages = class extends i3 {
   }
   /** pm#450: the table's «Add» emits no event and keeps our form state; after an edit it would
    *  show the edited record under a «New» header, and the submit would UPDATE it. */
-  onTableClick(e5) {
+  onTableClick(e6) {
     const addId = "services-packages-table-add";
-    if (!e5.composedPath().some((n6) => n6 instanceof HTMLElement && n6.dataset.testid === addId)) return;
+    if (!e6.composedPath().some((n6) => n6 instanceof HTMLElement && n6.dataset.testid === addId)) return;
     if (this.editingId) this.cancelEdit();
     else this.editSeq++;
   }
@@ -5433,7 +5471,7 @@ var ErpServicesPackages = class extends i3 {
    *  demands one. */
   firstUpdated() {
     const table = this.renderRoot.querySelector("ok-data-table");
-    table?.addEventListener("click", (e5) => this.onTableClick(e5));
+    table?.addEventListener("click", (e6) => this.onTableClick(e6));
     table?.addEventListener("panelClose", () => this.editSeq++);
   }
   addItem() {
@@ -5519,9 +5557,9 @@ var ErpServicesPackages = class extends i3 {
       if (this.movementsOf !== target) return;
       this.movements = [...this.movements, ...page?.rows ?? []];
       this.movementsTotal = page?.total ?? this.movements.length;
-    } catch (e5) {
+    } catch (e6) {
       if (this.movementsOf !== target) return;
-      this.movementsError = domainMessage(e5, erplora3().locale, erplora3().t(CATALOG3, "ui.errorMovements"));
+      this.movementsError = domainMessage(e6, erplora3().locale, erplora3().t(CATALOG3, "ui.errorMovements"));
     } finally {
       if (this.movementsOf === target) this.movementsLoading = false;
     }
@@ -5555,8 +5593,8 @@ var ErpServicesPackages = class extends i3 {
       if (!this.orphansOpen) return;
       this.orphans = [...this.orphans, ...page?.rows ?? []];
       this.orphansTotal = page?.total ?? this.orphans.length;
-    } catch (e5) {
-      this.orphansError = domainMessage(e5, erplora3().locale, erplora3().t(CATALOG3, "ui.errorOrphans"));
+    } catch (e6) {
+      this.orphansError = domainMessage(e6, erplora3().locale, erplora3().t(CATALOG3, "ui.errorOrphans"));
     } finally {
       this.orphansLoading = false;
     }
@@ -5610,8 +5648,8 @@ var ErpServicesPackages = class extends i3 {
       this.cancelEdit();
       this.dataTable()?.close();
       await this.ctrl.load();
-    } catch (e5) {
-      this.formError = domainMessage(e5, erplora3().locale, t5("ui.errorSavePackage"));
+    } catch (e6) {
+      this.formError = domainMessage(e6, erplora3().locale, t5("ui.errorSavePackage"));
     } finally {
       this.saving = false;
     }
@@ -5624,8 +5662,8 @@ var ErpServicesPackages = class extends i3 {
       await erplora3().command("services.packages.delete", { package_id: target.id });
       this.deleteTarget = null;
       await this.ctrl.load();
-    } catch (e5) {
-      this.formError = domainMessage(e5, erplora3().locale, erplora3().t(CATALOG3, "ui.errorDeletePackage"));
+    } catch (e6) {
+      this.formError = domainMessage(e6, erplora3().locale, erplora3().t(CATALOG3, "ui.errorDeletePackage"));
       this.deleteTarget = null;
     } finally {
       this.saving = false;
@@ -5765,10 +5803,10 @@ var ErpServicesPackages = class extends i3 {
     const t5 = (k2) => erplora3().t(CATALOG3, k2);
     return b2`<p class="lines-title">${t5("ui.packageLinesTitle")}</p>
       ${this.items.map((line, i7) => b2`<div class="line">
-        <ion-select data-testid=${`services-packages-line-service-${i7}`} fill="outline" label-placement="floating" label=${t5("ui.colService")} .value=${line.serviceId} @ionChange=${(e5) => this.setItem(i7, { serviceId: e5.target.value })}>
+        <ion-select data-testid=${`services-packages-line-service-${i7}`} fill="outline" label-placement="floating" label=${t5("ui.colService")} .value=${line.serviceId} @ionChange=${(e6) => this.setItem(i7, { serviceId: e6.target.value })}>
           ${this.services.map((s5) => b2`<ion-select-option .value=${s5.id}>${s5.name} · ${erplora3().formatMoney(Number(s5.price) || 0)}</ion-select-option>`)}
         </ion-select>
-        <ion-input data-testid=${`services-packages-line-sessions-${i7}`} fill="outline" label-placement="floating" label=${t5("ui.colSessions")} type="number" min="1" step="1" .value=${line.sessions} @ionInput=${(e5) => this.setItem(i7, { sessions: e5.target.value })}></ion-input>
+        <ion-input data-testid=${`services-packages-line-sessions-${i7}`} fill="outline" label-placement="floating" label=${t5("ui.colSessions")} type="number" min="1" step="1" .value=${line.sessions} @ionInput=${(e6) => this.setItem(i7, { sessions: e6.target.value })}></ion-input>
         <ion-button data-testid=${`services-packages-line-remove-${i7}`} fill="clear" size="small" aria-label=${t5("ui.removeLine")} @click=${() => this.removeItem(i7)}><ion-icon slot="icon-only" name="close-outline"></ion-icon></ion-button>
       </div>`)}
       <ion-button data-testid="services-packages-add-line" fill="outline" size="small" @click=${() => this.addItem()}>${t5("ui.addLine")}</ion-button>`;
@@ -5782,22 +5820,22 @@ var ErpServicesPackages = class extends i3 {
       ${can3("services.view_orphan_grant") ? b2`<ion-button class="orphans-entry" data-testid="services-packages-open-orphans" size="small" fill="clear" @click=${() => this.openOrphans()}>
             <ion-icon slot="start" name="person-remove-outline"></ion-icon>${t5("ui.openOrphans")}
           </ion-button>` : A}
-      <ok-data-table testid="services-packages-table" .serverSide=${true} .fill=${true} .views=${true} .addable=${can3("services.add_package")} .cardTitle=${(row) => String(row.name ?? "")} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "asc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchPackagePlaceholder")} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.emptyPackages")} @rowAction=${(e5) => this.onRowAction(e5)} @rowClick=${(e5) => this.onRowAction({ detail: { actionId: "edit", row: e5.detail.row } })}
- @pageChange=${(e5) => this.ctrl.setPage(e5.detail)} @pageSizeChange=${(e5) => this.ctrl.setPageSize(e5.detail)} @sortChange=${(e5) => this.ctrl.setSort(e5.detail.sort, e5.detail.dir)} @searchChange=${(e5) => this.ctrl.setSearch(e5.detail)} @filterChange=${(e5) => this.ctrl.setFilter(e5.detail.col, e5.detail.value)}>
-        <form slot="create" class="form" data-testid="services-packages-form" @submit=${(e5) => this.save(e5)}>
+      <ok-data-table testid="services-packages-table" .serverSide=${true} .fill=${true} .views=${true} .addable=${can3("services.add_package")} .cardTitle=${(row) => String(row.name ?? "")} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "asc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchPackagePlaceholder")} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.emptyPackages")} @rowAction=${(e6) => this.onRowAction(e6)} @rowClick=${(e6) => this.onRowAction({ detail: { actionId: "edit", row: e6.detail.row } })}
+ @pageChange=${(e6) => this.ctrl.setPage(e6.detail)} @pageSizeChange=${(e6) => this.ctrl.setPageSize(e6.detail)} @sortChange=${(e6) => this.ctrl.setSort(e6.detail.sort, e6.detail.dir)} @searchChange=${(e6) => this.ctrl.setSearch(e6.detail)} @filterChange=${(e6) => this.ctrl.setFilter(e6.detail.col, e6.detail.value)}>
+        <form slot="create" class="form" data-testid="services-packages-form" @submit=${(e6) => this.save(e6)}>
           ${this.editingId && !this.editTitleInHeader ? b2`<ok-inline-feedback data-testid="services-packages-editing" tone="info" icon="create-outline">
                 <b>${t5("ui.editingPackageTitle")}</b> — ${this.form.name}
                 <ion-button size="small" fill="clear" data-testid="services-packages-edit-cancel" @click=${() => this.cancelEdit()}>${t5("ui.editingCancel")}</ion-button>
               </ok-inline-feedback>` : A}
-          <ion-input data-testid="services-packages-name" fill="outline" label-placement="floating" label=${t5("ui.colName")} .value=${this.form.name} @ionInput=${(e5) => this.form = { ...this.form, name: e5.target.value }}></ion-input>
-          <ion-select data-testid="services-packages-discount-type" fill="outline" label-placement="floating" label=${t5("ui.colDiscountType")} .value=${this.form.discountType} @ionChange=${(e5) => this.form = { ...this.form, discountType: e5.target.value }}>
+          <ion-input data-testid="services-packages-name" fill="outline" label-placement="floating" label=${t5("ui.colName")} .value=${this.form.name} @ionInput=${(e6) => this.form = { ...this.form, name: e6.target.value }}></ion-input>
+          <ion-select data-testid="services-packages-discount-type" fill="outline" label-placement="floating" label=${t5("ui.colDiscountType")} .value=${this.form.discountType} @ionChange=${(e6) => this.form = { ...this.form, discountType: e6.target.value }}>
             <ion-select-option value="percentage">${t5("ui.discountType.percentage")}</ion-select-option>
             <ion-select-option value="fixed">${t5("ui.discountType.fixed")}</ion-select-option>
           </ion-select>
-          <ion-input data-testid="services-packages-discount-value" fill="outline" label-placement="floating" label=${fixed ? t5("ui.colDiscountAmount") : t5("ui.colDiscountPercent")} type="text" inputmode="decimal" .value=${this.form.discountValue} @ionInput=${(e5) => this.form = { ...this.form, discountValue: e5.target.value }}></ion-input>
-          <ion-input data-testid="services-packages-fixed-price" fill="outline" label-placement="floating" label=${t5("ui.colFixedPrice")} helper-text=${t5("ui.fixedPriceHelp")} type="text" inputmode="decimal" .value=${this.form.fixedPrice} @ionInput=${(e5) => this.form = { ...this.form, fixedPrice: e5.target.value }}></ion-input>
-          <ion-input data-testid="services-packages-validity-days" fill="outline" label-placement="floating" label=${t5("ui.colValidityDays")} helper-text=${t5("ui.validityHelp")} type="number" min="1" step="1" .value=${this.form.validityDays} @ionInput=${(e5) => this.form = { ...this.form, validityDays: e5.target.value }}></ion-input>
-          <ion-input data-testid="services-packages-max-uses" fill="outline" label-placement="floating" label=${t5("ui.colMaxUses")} helper-text=${t5("ui.maxUsesHelp")} type="number" min="1" step="1" .value=${this.form.maxUses} @ionInput=${(e5) => this.form = { ...this.form, maxUses: e5.target.value }}></ion-input>
+          <ion-input data-testid="services-packages-discount-value" fill="outline" label-placement="floating" label=${fixed ? t5("ui.colDiscountAmount") : t5("ui.colDiscountPercent")} type="text" inputmode="decimal" .value=${this.form.discountValue} @ionInput=${(e6) => this.form = { ...this.form, discountValue: e6.target.value }}></ion-input>
+          <ion-input data-testid="services-packages-fixed-price" fill="outline" label-placement="floating" label=${t5("ui.colFixedPrice")} helper-text=${t5("ui.fixedPriceHelp")} type="text" inputmode="decimal" .value=${this.form.fixedPrice} @ionInput=${(e6) => this.form = { ...this.form, fixedPrice: e6.target.value }}></ion-input>
+          <ion-input data-testid="services-packages-validity-days" fill="outline" label-placement="floating" label=${t5("ui.colValidityDays")} helper-text=${t5("ui.validityHelp")} type="number" min="1" step="1" .value=${this.form.validityDays} @ionInput=${(e6) => this.form = { ...this.form, validityDays: e6.target.value }}></ion-input>
+          <ion-input data-testid="services-packages-max-uses" fill="outline" label-placement="floating" label=${t5("ui.colMaxUses")} helper-text=${t5("ui.maxUsesHelp")} type="number" min="1" step="1" .value=${this.form.maxUses} @ionInput=${(e6) => this.form = { ...this.form, maxUses: e6.target.value }}></ion-input>
           ${this.editingId ? b2`<ok-inline-feedback data-testid="services-packages-lines-fixed" tone="neutral" icon="information-circle-outline">${t5("ui.packageLinesFixed")}</ok-inline-feedback>` : this.renderLines()}
           <ion-button type="submit" data-testid="services-packages-submit" ?disabled=${this.saving || !this.form.name}>${this.saving ? t5("ui.btnSaving") : this.editingId ? t5("ui.btnSave") : t5("ui.btnAdd")}</ion-button>
         </form>
@@ -5867,10 +5905,10 @@ define("erp-services-packages", ErpServicesPackages);
 // ui/components/erp-services-session-refund/erp-services-session-refund.ts
 var CATALOG4 = { es: es_default, en: en_default };
 var REASONS = ["already_refunded", "not_settled"];
-function checkedOf(e5) {
-  const detail = e5.detail;
+function checkedOf(e6) {
+  const detail = e6.detail;
   if (detail && typeof detail.checked === "boolean") return detail.checked;
-  return !!e5.target?.checked;
+  return !!e6.target?.checked;
 }
 function erplora4() {
   const c5 = globalThis.erplora;
@@ -5904,8 +5942,8 @@ var ErpServicesSessionRefund = class extends i3 {
      * back and unmounts this element mid-command, leaving the session spent with nobody at the
      * counter able to give it back — the exact failure this whole issue is about.
      */
-    this.onCommit = (e5) => {
-      const detail = e5.detail ?? {};
+    this.onCommit = (e6) => {
+      const detail = e6.detail ?? {};
       const ref = String(detail.refundRef || this.refundRef || detail.refundId || this.refundId || "");
       if (this.committed || !this.armed || !this.session || !ref) return;
       this.committed = true;
@@ -5970,10 +6008,10 @@ var ErpServicesSessionRefund = class extends i3 {
       const mine = (Array.isArray(rows) ? rows : []).filter((r6) => r6.service_id === this.serviceId);
       this.session = mine[this.lineIndex] ?? null;
       this.settleArming();
-    } catch (e5) {
+    } catch (e6) {
       this.session = null;
       this.loadFailed = true;
-      this.feedback = domainMessage(e5, erplora4().locale, this.t("ui.sessionRefund.loadFailed"));
+      this.feedback = domainMessage(e6, erplora4().locale, this.t("ui.sessionRefund.loadFailed"));
       this.setArmed(false);
     } finally {
       this.loading = false;
@@ -6027,9 +6065,9 @@ var ErpServicesSessionRefund = class extends i3 {
         refund_ref: refundRef
       });
       this.refunded = true;
-    } catch (e5) {
-      this.feedback = domainMessage(e5, erplora4().locale, this.t("ui.sessionRefund.refundFailed"));
-      throw e5;
+    } catch (e6) {
+      this.feedback = domainMessage(e6, erplora4().locale, this.t("ui.sessionRefund.refundFailed"));
+      throw e6;
     } finally {
       this.busy = false;
     }
@@ -6117,7 +6155,7 @@ var ErpServicesSessionRefund = class extends i3 {
           justify="start"
           ?checked=${this.armed}
           ?disabled=${this.busy}
-          @ionChange=${(e5) => this.toggle(checkedOf(e5))}
+          @ionChange=${(e6) => this.toggle(checkedOf(e6))}
         >
           <div>
             <div class="head">
@@ -6271,10 +6309,10 @@ var ErpServicesVoucherTender = class extends i3 {
       if (!stillThere) {
         this.selectedId = this.options.find((o7) => Number(o7.is_default) === 1)?.grant_id ?? this.options[0]?.grant_id ?? "";
       }
-    } catch (e5) {
+    } catch (e6) {
       this.options = [];
       this.loadFailed = true;
-      this.feedback = domainMessage(e5, erplora5().locale, this.t("ui.tender.loadFailed"));
+      this.feedback = domainMessage(e6, erplora5().locale, this.t("ui.tender.loadFailed"));
     } finally {
       this.loading = false;
     }
@@ -6344,8 +6382,8 @@ var ErpServicesVoucherTender = class extends i3 {
           }
         })
       );
-    } catch (e5) {
-      this.feedback = domainMessage(e5, erplora5().locale, this.t("ui.tender.holdFailed"));
+    } catch (e6) {
+      this.feedback = domainMessage(e6, erplora5().locale, this.t("ui.tender.holdFailed"));
     } finally {
       this.busy = false;
     }
@@ -6369,8 +6407,8 @@ var ErpServicesVoucherTender = class extends i3 {
         })
       );
       await this.load();
-    } catch (e5) {
-      this.feedback = domainMessage(e5, erplora5().locale, this.t("ui.tender.releaseFailed"));
+    } catch (e6) {
+      this.feedback = domainMessage(e6, erplora5().locale, this.t("ui.tender.releaseFailed"));
     } finally {
       this.busy = false;
     }

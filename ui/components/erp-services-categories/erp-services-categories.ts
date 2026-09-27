@@ -1,5 +1,6 @@
 import { LitElement, html, css, nothing } from 'lit';
 import { state } from 'lit/decorators.js';
+import { classMap } from 'lit/directives/class-map.js';
 import { define } from '@erplora/outfitkit/define';
 import '@erplora/outfitkit/ok-inline-feedback';
 import '@erplora/outfitkit/ok-data-table';
@@ -67,6 +68,11 @@ export class ErpServicesCategories extends LitElement {
   @state() newSortOrder = '';
   @state() saving = false;
   @state() formError = '';
+  /** services#107: a refusal that belongs to the Name field (`services.category_name_taken`) is
+   *  shown UNDER it, not in the banner, so the owner sees which field to fix. The invalid marks go
+   *  through `classMap`: a plain `class=` binding would wipe the classes Ionic writes on the host
+   *  (`hydrated`, the mode). */
+  @state() nameError = '';
   /** Category being edited; `null` = create mode. The submit decides create vs update. */
   @state() editingId: string | null = null;
 
@@ -182,6 +188,7 @@ export class ErpServicesCategories extends LitElement {
       this.newParent = c.parent_id ?? '';
       this.newSortOrder = String(c.sort_order ?? 0);
       this.formError = '';
+      this.nameError = '';
       const title = `${erplora().t(CATALOG, 'ui.editingCategoryTitle')} — ${this.newName}`;
       const table = this.dataTable();
       table?.open('edit', { title });
@@ -204,6 +211,7 @@ export class ErpServicesCategories extends LitElement {
     this.newParent = '';
     this.newSortOrder = '';
     this.formError = '';
+    this.nameError = '';
   }
 
   /** Submit: create OR update by `editingId`. The update goes through the PARTIAL door
@@ -214,6 +222,7 @@ export class ErpServicesCategories extends LitElement {
     if (!can(required) || !this.newName.trim()) return;
     this.saving = true;
     this.formError = '';
+    this.nameError = '';
     try {
       const fields = {
         name: this.newName.trim(),
@@ -229,7 +238,9 @@ export class ErpServicesCategories extends LitElement {
       this.dataTable()?.close();
       await Promise.all([this.ctrl.load(), this.loadAll()]);
     } catch (e) {
-      this.formError = domainMessage(e, erplora().locale, erplora().t(CATALOG, 'ui.errorSaveCategory'));
+      const message = domainMessage(e, erplora().locale, erplora().t(CATALOG, 'ui.errorSaveCategory'));
+      if ((e as { code?: unknown } | null)?.code === 'services.category_name_taken') this.nameError = message;
+      else this.formError = message;
     } finally {
       this.saving = false;
     }
@@ -293,7 +304,7 @@ export class ErpServicesCategories extends LitElement {
                 <ion-button size="small" fill="clear" data-testid="services-categories-edit-cancel" @click=${() => this.cancelEdit()}>${t('ui.editingCancel')}</ion-button>
               </ok-inline-feedback>`
             : nothing}
-          <ion-input data-testid="services-categories-name" fill="outline" label-placement="floating" label=${t('ui.colName')} .value=${this.newName} @ionInput=${(e: any) => (this.newName = e.target.value)}></ion-input>
+          <ion-input data-testid="services-categories-name" fill="outline" label-placement="floating" label=${t('ui.colName')} class=${classMap({ 'ion-invalid': !!this.nameError, 'ion-touched': !!this.nameError })} error-text=${this.nameError || nothing} .value=${this.newName} @ionInput=${(e: any) => { this.newName = e.target.value; this.nameError = ''; }}></ion-input>
           <ion-select data-testid="services-categories-parent" fill="outline" label-placement="floating" label=${t('ui.colParent')} placeholder=${t('ui.placeholderParent')} .value=${this.newParent} @ionChange=${(e: any) => (this.newParent = e.target.value)}>
             <ion-select-option value="">${t('ui.optionNoParent')}</ion-select-option>
             ${parentOptions.map((c) => html`<ion-select-option .value=${c.id}>${c.name}</ion-select-option>`)}

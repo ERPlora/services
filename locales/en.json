@@ -222,6 +222,7 @@
     "services.service_not_archived": "That service could not be brought back: it does not exist in this business, or it is already being offered.",
     "services.parent_category_unavailable": "That parent category is not available: it does not exist in this business or it has been deleted.",
     "services.category_update_rejected": "The category could not be updated: it does not exist in this business, or the parent you picked does not (or is the category itself).",
+    "services.category_name_taken": "There is already a category with that name. Pick another name.",
     "services.category_not_found": "That category does not exist in this business.",
     "services.package_not_found": "That package does not exist in this business.",
     "services.package_no_grant": "This customer does not have that voucher: nobody has sold it to them.",

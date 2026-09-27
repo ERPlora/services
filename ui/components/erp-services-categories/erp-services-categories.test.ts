@@ -329,3 +329,85 @@ describe('two «edit» in a row: the last opening wins (pm#459)', () => {
     ).toBeNull();
   });
 });
+
+// ── services#107: a name already taken is refused ON the Name field ─────────────────────────────
+//
+// The server refuses a second live category with the same name (`services.category_name_taken`,
+// the `on_unique` code of both commands). The owner has to see WHICH field to fix, so the
+// sentence goes under «Name» (Ionic's `error-text`, shown with `ion-invalid ion-touched`), the
+// form keeps what was typed, and typing again clears the error. Any other refusal keeps the
+// banner above the table.
+describe('a name already taken is flagged on the Name field (services#107)', () => {
+  const taken = (): void => {
+    sdk.command = async (name: string, payload: Record<string, unknown>) => {
+      commands.push({ name, payload });
+      throw Object.assign(new Error('the operation conflicts with a record that already exists'), { code: 'services.category_name_taken' });
+    };
+  };
+  const nameInput = (el: Mounted) => el.shadowRoot.querySelector('[data-testid="services-categories-name"]') as (HTMLElement & { errorText?: string }) | null;
+
+  it('create: the translated sentence sits under «Name», marked invalid, and the name is kept', async () => {
+    taken();
+    const el = await mount();
+    el.newName = 'Peinados de fiesta';
+    await el.save(new Event('submit'));
+    await settle(el);
+    const input = nameInput(el);
+    expect(input?.getAttribute('error-text')).toBe('Ya hay una categoría con ese nombre. Elige otro nombre.');
+    expect(input?.classList.contains('ion-invalid')).toBe(true);
+    expect(input?.classList.contains('ion-touched')).toBe(true);
+    expect(el.newName).toBe('Peinados de fiesta');
+    expect(el.shadowRoot.querySelector('[data-testid="services-categories-form-error"]'), 'no generic banner for a field error').toBeNull();
+  });
+
+  it('update: the same, and the edit stays open', async () => {
+    taken();
+    const el = await mount();
+    await action(el, 'edit', ROWS[1]);
+    await settle(el);
+    el.newName = 'Peluquería';
+    await el.save(new Event('submit'));
+    await settle(el);
+    expect(el.editingId).toBe('c2');
+    expect(nameInput(el)?.classList.contains('ion-invalid')).toBe(true);
+  });
+
+  it('typing a new name clears the error', async () => {
+    taken();
+    const el = await mount();
+    el.newName = 'Peinados de fiesta';
+    await el.save(new Event('submit'));
+    await settle(el);
+    const input = nameInput(el)!;
+    (input as HTMLElement & { value: string }).value = 'Peinados de boda';
+    input.dispatchEvent(new CustomEvent('ionInput', { bubbles: true, composed: true }));
+    await settle(el);
+    expect(input.classList.contains('ion-invalid')).toBe(false);
+    expect(el.newName).toBe('Peinados de boda');
+  });
+
+  it("the invalid marks do not wipe the classes Ionic put on the input (`hydrated` keeps it visible)", async () => {
+    taken();
+    const el = await mount();
+    const input = nameInput(el)!;
+    input.classList.add('hydrated', 'md');
+    el.newName = 'Peinados de fiesta';
+    await el.save(new Event('submit'));
+    await settle(el);
+    expect(input.classList.contains('ion-invalid')).toBe(true);
+    expect(input.classList.contains('hydrated')).toBe(true);
+    expect(input.classList.contains('md')).toBe(true);
+  });
+
+  it('any other refusal keeps the banner and leaves the field clean', async () => {
+    sdk.command = async () => {
+      throw Object.assign(new Error('x'), { code: 'services.parent_category_unavailable' });
+    };
+    const el = await mount();
+    el.newName = 'Estética';
+    await el.save(new Event('submit'));
+    await settle(el);
+    expect(el.shadowRoot.querySelector('[data-testid="services-categories-form-error"]')).not.toBeNull();
+    expect(nameInput(el)?.classList.contains('ion-invalid')).toBe(false);
+  });
+});
