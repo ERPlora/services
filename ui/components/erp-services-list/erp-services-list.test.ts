@@ -43,6 +43,8 @@ beforeEach(() => {
     },
     on: () => () => {},
     locale: 'es',
+    // The real client always exposes it (module-sdk getter): the list controller needs it for `moneyFilters`.
+    currencyDecimals: 2,
     // El SDK real siempre provee formatMoney (divide céntimos por 10^decimales). Mockeado aquí
     // porque ok-data-table renderiza la celda de precio al montar.
     formatMoney: (minor: number) => `${(Number(minor || 0) / 100).toFixed(2)} €`,
@@ -153,6 +155,8 @@ describe('el precio va en céntimos — display divide y alta multiplica (#268)'
       },
       on: () => () => {},
       locale: 'es',
+      // The real client always exposes it (module-sdk getter): the list controller needs it for `moneyFilters`.
+      currencyDecimals: 2,
       // formatMoney(minor): el helper del SDK divide los céntimos entre 10^decimales (2 en EUR).
       // Mockeado aquí para que el test no dependa del Intl del entorno.
       formatMoney: (minor: number) => `${(Number(minor || 0) / 100).toFixed(2)} €`,

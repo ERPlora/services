@@ -6,8 +6,11 @@
 // is: «Price from 20» let a 0,20 € service through and «to 30» hid a 15 € cut.
 //
 // What the table types (major unit) is scaled to the minor unit with the hub's currency decimals
-// before the list is asked for; the edges of every other column travel untouched.
+// before the list is asked for; the edges of every other column travel untouched. Since pm#501 the
+// scaling is the SDK's (`moneyFilters` of the list controller, hub#2271), not a local copy: this file
+// is the guard that the declaration is right.
 import { beforeEach, describe, expect, it } from 'vitest';
+import { buildListParams } from '@erplora/module-sdk';
 import './erp-services-list';
 
 /** The `filters` of every page the screen asked the hub for, in call order. */
@@ -104,9 +107,22 @@ describe('«Price» range filter compares in the unit the column shows (services
   });
 
   it('text that is not a number is not turned into «from 0»', async () => {
+    // Judged on what the hub RECEIVES (`buildListParams`, what the real `queryPage` sends): the SDK
+    // keeps the unscalable edge until it flattens, and it travels as nothing, never as 0 (pm#501).
     const el = await mount();
-    expect(await type(el, 'price', { from: 'abc' })).toEqual({});
-    expect(await type(el, 'price', { to: '   ' })).toEqual({});
+    expect(buildListParams({ filters: await type(el, 'price', { from: 'abc' }) })).toEqual({});
+    expect(buildListParams({ filters: await type(el, 'price', { to: '   ' }) })).toEqual({});
+  });
+
+  it('the list keeps what was typed: only the request to the hub carries cents (pm#501)', async () => {
+    // The SDK scales a COPY on every load (`moneyFilters`); the controller state stays in the unit
+    // the person typed, so a reload never scales an already scaled edge again (12 → 1200 → 120000).
+    const el = await mount();
+    expect(await type(el, 'price', { from: 12 })).toEqual({ price: { from: 1200 } });
+    const ctrl = (el as unknown as { ctrl: { state: { filters: Record<string, unknown> }; load(): Promise<void> } }).ctrl;
+    expect(ctrl.state.filters.price).toEqual({ from: 12 });
+    await ctrl.load();
+    expect(asked[asked.length - 1]).toEqual({ price: { from: 1200 } });
   });
 
   it('a cleared filter (null) clears it, never a crash', async () => {
@@ -138,6 +154,22 @@ describe('«Price» range filter compares in the unit the column shows (services
     const el = await mount();
     expect(await type(el, 'duration_minutes', '30')).toEqual({ duration_minutes: '30' });
     expect(await type(el, 'pricing_type', 'fixed')).toEqual({ duration_minutes: '30', pricing_type: 'fixed' });
+  });
+
+  it('every other filterable column of the table travels untouched: none is scaled as money or quantity (pm#501)', async () => {
+    const el = await mount();
+    const table = el.shadowRoot.querySelector('ok-data-table') as unknown as {
+      columns: Array<{ key: string; filterable?: boolean; filterType?: string; options?: Array<{ value: string }> }>;
+    };
+    const others = table.columns.filter((c) => c.filterable && !['price'].includes(c.key));
+    expect(others.length).toBeGreaterThan(2);
+    for (const c of others) {
+      // What the table emits for each kind of filter: a range, a picked value, typed text.
+      const value = c.filterType === 'range' ? { from: '2026-09-01' } : c.filterType === 'select' ? (c.options?.[0]?.value ?? 'x') : '12';
+      const sent = await type(el, c.key, value);
+      expect(sent[c.key], c.key).toEqual(value);
+      await type(el, c.key, null);
+    }
   });
 
   it('only MONEY columns are scaled: a range-shaped value on another column travels as typed', async () => {

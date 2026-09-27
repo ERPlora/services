@@ -97,6 +97,8 @@ beforeEach(() => {
     hasPermission: () => true,
     on: () => () => {},
     locale: 'es',
+    // The real client always exposes it (module-sdk getter): the list controller needs it for `moneyFilters`.
+    currencyDecimals: 2,
     formatMoney: (minor: number) => `${(Number(minor || 0) / 100).toFixed(2)} €`,
     t: (_catalog: unknown, key: string) => key,
     loadSlot: async () => [],
