@@ -1,0 +1,149 @@
+// The «Price» range filter of Services filters in the unit the column shows (services#113, pm#498).
+//
+// `services_service.price` is an INTEGER in the minor unit (cents in EUR, ADR-0007/0123) and the
+// dispatcher compares the `range` filter against that integer. The column paints it as money of
+// the hub («20,00 €»), so the person types «20» meaning twenty euros — and the screen sent `20` as
+// is: «Price from 20» let a 0,20 € service through and «to 30» hid a 15 € cut.
+//
+// What the table types (major unit) is scaled to the minor unit with the hub's currency decimals
+// before the list is asked for; the edges of every other column travel untouched.
+import { beforeEach, describe, expect, it } from 'vitest';
+import './erp-services-list';
+
+/** The `filters` of every page the screen asked the hub for, in call order. */
+const asked: Array<Record<string, unknown>> = [];
+let decimals = 2;
+
+beforeEach(() => {
+  document.body.replaceChildren();
+  asked.length = 0;
+  decimals = 2;
+  (globalThis as Record<string, unknown>).erplora = {
+    query: async () => [],
+    queryAll: async () => [],
+    queryPage: async (name: string, params: { filters?: Record<string, unknown> }) => {
+      if (name === 'services.services.list') asked.push(structuredClone(params.filters ?? {}));
+      return { rows: [], total: 0, limit: 50, offset: 0 };
+    },
+    command: async () => ({}),
+    on: () => () => {},
+    locale: 'es',
+    t: (_catalog: unknown, key: string) => key,
+    formatMoney: (minor: number) => `MONEY(${minor})`,
+    get currencyDecimals() {
+      return decimals;
+    },
+  };
+});
+
+type Mounted = HTMLElement & { shadowRoot: ShadowRoot; updateComplete: Promise<unknown> };
+
+async function settle(el: Mounted): Promise<void> {
+  await el.updateComplete;
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await el.updateComplete;
+}
+
+async function mount(): Promise<Mounted> {
+  const el = document.createElement('erp-services-list') as Mounted;
+  document.body.appendChild(el);
+  await settle(el);
+  return el;
+}
+
+/** Fires what `ok-data-table` emits when one edge of a filter is typed. */
+async function type(el: Mounted, col: string, value: unknown): Promise<Record<string, unknown>> {
+  el.shadowRoot
+    .querySelector('ok-data-table')!
+    .dispatchEvent(new CustomEvent('filterChange', { detail: { col, value } }));
+  await settle(el);
+  return asked[asked.length - 1];
+}
+
+describe('«Price» range filter compares in the unit the column shows (services#113)', () => {
+  it('«from 12» asks for 12,00 € (1200 cents), not 12 cents', async () => {
+    const el = await mount();
+    expect(await type(el, 'price', { from: 12 })).toEqual({ price: { from: 1200 } });
+  });
+
+  it('«to 50» keeps the other edge and asks for 5000 cents, so a 15 € cut is not hidden', async () => {
+    const el = await mount();
+    await type(el, 'price', { from: 12 });
+    expect(await type(el, 'price', { to: 50 })).toEqual({ price: { from: 1200, to: 5000 } });
+  });
+
+  it('a decimal amount is rounded to the minor unit (12.10 → 1210, never 1209)', async () => {
+    const el = await mount();
+    expect(await type(el, 'price', { from: 12.1 })).toEqual({ price: { from: 1210 } });
+    expect(await type(el, 'price', { to: 0.29 })).toEqual({ price: { from: 1210, to: 29 } });
+  });
+
+  it('the inline control emits text: «12.5» and «12,5» both mean 12,50 €', async () => {
+    const el = await mount();
+    expect(await type(el, 'price', { from: '12.5' })).toEqual({ price: { from: 1250 } });
+    expect(await type(el, 'price', { from: '12,5' })).toEqual({ price: { from: 1250 } });
+  });
+
+  it('uses the scale of the hub currency: 0 decimals (JPY) sends the amount as is, 3 (KWD) ×1000', async () => {
+    decimals = 0;
+    const jpy = await mount();
+    expect(await type(jpy, 'price', { from: 1999 })).toEqual({ price: { from: 1999 } });
+    jpy.remove();
+    decimals = 3;
+    const kwd = await mount();
+    expect(await type(kwd, 'price', { from: 1.5 })).toEqual({ price: { from: 1500 } });
+  });
+
+  it('clearing an edge drops it instead of filtering «from 0»', async () => {
+    const el = await mount();
+    await type(el, 'price', { from: 12 });
+    await type(el, 'price', { to: 50 });
+    expect(await type(el, 'price', { from: '' })).toEqual({ price: { to: 5000 } });
+    expect(await type(el, 'price', { to: '' })).toEqual({});
+  });
+
+  it('text that is not a number is not turned into «from 0»', async () => {
+    const el = await mount();
+    expect(await type(el, 'price', { from: 'abc' })).toEqual({});
+    expect(await type(el, 'price', { to: '   ' })).toEqual({});
+  });
+
+  it('a cleared filter (null) clears it, never a crash', async () => {
+    const el = await mount();
+    await type(el, 'price', { from: 12 });
+    expect(await type(el, 'price', null)).toEqual({});
+  });
+
+  it('typed in the real Filters panel: asks for cents and the field still shows what was typed', async () => {
+    const el = await mount();
+    type Table = HTMLElement & { open(panel: 'filters'): void; shadowRoot: ShadowRoot; updateComplete: Promise<unknown> };
+    const table = el.shadowRoot.querySelector('ok-data-table') as Table;
+    table.open('filters');
+    await table.updateComplete;
+    const fromOfPrice = (): HTMLInputElement => {
+      const label = [...table.shadowRoot.querySelectorAll('.flabel')].find((l) => l.textContent === 'ui.colPrice');
+      return label!.parentElement!.querySelector('ion-input') as unknown as HTMLInputElement;
+    };
+    fromOfPrice().value = '12';
+    fromOfPrice().dispatchEvent(new CustomEvent('ionInput', { bubbles: true, composed: true }));
+    await settle(el);
+    await table.updateComplete;
+    expect(asked[asked.length - 1]).toEqual({ price: { from: 1200 } });
+    // The cents only travel to the hub: the field keeps «12», never «1200».
+    expect(String(fromOfPrice().value)).toBe('12');
+  });
+
+  it('other columns travel untouched: the duration and the pricing type stay what was picked', async () => {
+    const el = await mount();
+    expect(await type(el, 'duration_minutes', '30')).toEqual({ duration_minutes: '30' });
+    expect(await type(el, 'pricing_type', 'fixed')).toEqual({ duration_minutes: '30', pricing_type: 'fixed' });
+  });
+
+  it('only MONEY columns are scaled: a range-shaped value on another column travels as typed', async () => {
+    // No other column of this screen is a `range` today; this pins the guard so a future one
+    // (minutes, a count) is not multiplied by 100 behind the person's back.
+    const el = await mount();
+    expect(await type(el, 'duration_minutes', { from: 30 })).toEqual({ duration_minutes: { from: 30 } });
+  });
+});

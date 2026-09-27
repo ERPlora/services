@@ -46,6 +46,33 @@ function toMajorText(minor: unknown): string {
   }).format(major);
 }
 
+/**
+ * Columns whose `range` filter is money (services#113, pm#498). The column paints the INTEGER in
+ * the minor unit as money of the hub («20,00 €»), so the person types the major unit («20»); the
+ * dispatcher compares against the integer, so each edge is scaled before the list is asked for.
+ */
+const MONEY_RANGE_FILTERS = new Set(['price']);
+
+/**
+ * One typed edge of a money range → minor units, with the hub's currency decimals. The table emits
+ * a Number from the panel and text from the inline control («12,5» included). Empty or not a
+ * number → `''`, which the list controller drops: a stray keystroke never becomes «from 0».
+ */
+function moneyEdgeToMinor(edge: unknown, decimals: number): number | '' {
+  const text = typeof edge === 'string' ? edge.trim().replace(',', '.') : edge;
+  if (text === '' || text === null || text === undefined) return '';
+  const n = Number(text);
+  return Number.isFinite(n) ? majorToMinor(n, decimals) : '';
+}
+
+/** The `{ from?, to? }` a money range emits, scaled edge by edge; any other shape travels as is. */
+function moneyRangeToMinor(value: unknown, decimals: number): unknown {
+  if (value === null || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([edge, v]) => [edge, moneyEdgeToMinor(v, decimals)]),
+  );
+}
+
 interface ErploraClientLike extends ListClient {
   query<T = unknown>(name: string, params?: Record<string, unknown>): Promise<T>;
   /** TODAS las filas, sin tope (salvo que pases `limit`). Para lo que no es «una página»: la
@@ -327,13 +354,15 @@ export class ErpServicesList extends LitElement {
    *
    *  The scope is written straight into the controller's context and the reload is left to
    *  `setFilter`: `setContext` would reload on its own and the same tap would cost two round trips
-   *  to the hub. */
+   *  to the hub.
+   *
+   *  Money ranges travel in the minor unit (services#113, pm#498). */
   onFilterChange(col: string, value: unknown): void {
     if (col === 'status') {
       this.showingArchived = String(value ?? '') === ARCHIVED_STATUS;
       this.ctrl.state.context = this.showingArchived ? { include_archived: 1 } : {};
     }
-    this.ctrl.setFilter(col, value);
+    this.ctrl.setFilter(col, MONEY_RANGE_FILTERS.has(col) ? moneyRangeToMinor(value, erplora().currencyDecimals) : value);
   }
 
   /** Puts an archived service back (`services.services.restore`). No confirmation: restoring is not
