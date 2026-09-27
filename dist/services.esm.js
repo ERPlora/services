@@ -4679,6 +4679,19 @@ function toMajorText(minor) {
     useGrouping: false
   }).format(major);
 }
+var MONEY_RANGE_FILTERS = /* @__PURE__ */ new Set(["price"]);
+function moneyEdgeToMinor(edge, decimals2) {
+  const text = typeof edge === "string" ? edge.trim().replace(",", ".") : edge;
+  if (text === "" || text === null || text === void 0) return "";
+  const n6 = Number(text);
+  return Number.isFinite(n6) ? majorToMinor(n6, decimals2) : "";
+}
+function moneyRangeToMinor(value, decimals2) {
+  if (value === null || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([edge, v3]) => [edge, moneyEdgeToMinor(v3, decimals2)])
+  );
+}
 function taxCategoryDisplayName(c5) {
   return (c5.display_name ?? "").trim() || (c5.name ?? "").trim() || c5.key;
 }
@@ -4833,13 +4846,15 @@ var ErpServicesList = class extends i3 {
    *
    *  The scope is written straight into the controller's context and the reload is left to
    *  `setFilter`: `setContext` would reload on its own and the same tap would cost two round trips
-   *  to the hub. */
+   *  to the hub.
+   *
+   *  Money ranges travel in the minor unit (services#113, pm#498). */
   onFilterChange(col, value) {
     if (col === "status") {
       this.showingArchived = String(value ?? "") === ARCHIVED_STATUS;
       this.ctrl.state.context = this.showingArchived ? { include_archived: 1 } : {};
     }
-    this.ctrl.setFilter(col, value);
+    this.ctrl.setFilter(col, MONEY_RANGE_FILTERS.has(col) ? moneyRangeToMinor(value, erplora2().currencyDecimals) : value);
   }
   /** Puts an archived service back (`services.services.restore`). No confirmation: restoring is not
    *  destructive —it undoes one— and the market does not ask for one either. */

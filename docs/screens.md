@@ -12,7 +12,8 @@ by name.
 
 - **Search** by name.
 - **Sort** by name, price, pricing type, duration, bookable flag or category.
-- **Filter** by name, price range, pricing type, duration, bookable flag or category.
+- **Filter** by name, price range, pricing type, duration, bookable flag or category. The price
+  range is typed in the hub's currency, as the column shows it: «from 20» means 20,00 €.
 
 ### Create a service
 
