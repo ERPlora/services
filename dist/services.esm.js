@@ -3743,6 +3743,12 @@ __decorateClass3([
 var OkDataTable = _OkDataTable;
 define("ok-data-table", OkDataTable);
 
+// @erplora/module-sdk/src/quantity.ts
+var QUANTITY_SCALE = 1e6;
+function toMicro(quantity) {
+  return Math.round(quantity * QUANTITY_SCALE);
+}
+
 // @erplora/module-sdk/src/index.ts
 function isEmpty(v3) {
   return v3 === null || v3 === void 0 || v3 === "";
@@ -3768,6 +3774,29 @@ var ListController = class {
       filters: { ...opts.filters ?? {} },
       context: { ...opts.context ?? {} }
     };
+    this.moneyFilters = new Set(opts.moneyFilters ?? []);
+    this.quantityFilters = new Set(opts.quantityFilters ?? []);
+    if (this.moneyFilters.size > 0 && typeof client.currencyDecimals !== "number") {
+      throw new ErploraError(
+        "list_money_filters_need_currency_decimals",
+        "moneyFilters needs a list client that exposes currencyDecimals"
+      );
+    }
+  }
+  /**
+   * The filters as the runtime compares them: money and quantity columns scaled from what the
+   * person typed to the stored integer. `state.filters` stays as typed, so a table that echoes it
+   * back keeps showing «12», not «1200».
+   */
+  wireFilters() {
+    if (this.moneyFilters.size === 0 && this.quantityFilters.size === 0) return this.state.filters;
+    const decimals2 = this.client.currencyDecimals ?? 0;
+    const out = {};
+    for (const [col, value] of Object.entries(this.state.filters)) {
+      const scale = this.moneyFilters.has(col) ? (n6) => majorToMinor(n6, decimals2) : this.quantityFilters.has(col) ? toMicro : null;
+      out[col] = scale ? scaleFilterValue(value, scale) : value;
+    }
+    return out;
   }
   /** Nº de páginas según el total del servidor (mínimo 1). */
   get pageCount() {
@@ -3787,7 +3816,7 @@ var ListController = class {
         search: s5.search,
         sort: s5.sort,
         dir: s5.dir,
-        filters: s5.filters,
+        filters: this.wireFilters(),
         params: s5.context
       });
       if (mySeq !== this.seq) return;
@@ -3856,10 +3885,33 @@ var ListController = class {
     void this.load();
   }
 };
+function scaleFilterEdge(edge, scale) {
+  const text = typeof edge === "string" ? edge.trim().replace(",", ".") : edge;
+  if (text === "" || text === null || text === void 0) return "";
+  const n6 = Number(text);
+  return Number.isFinite(n6) ? scale(n6) : "";
+}
+function scaleFilterValue(value, scale) {
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([edge, v3]) => [edge, scaleFilterEdge(v3, scale)])
+    );
+  }
+  return scaleFilterEdge(value, scale);
+}
 function createListController(client, queryName, onChange = () => {
 }, opts = {}) {
   return new ListController(client, queryName, onChange, opts);
 }
+var ErploraError = class extends Error {
+  constructor(code, message, permission, fields) {
+    super(message);
+    this.code = code;
+    this.permission = permission;
+    this.fields = fields;
+    this.name = "ErploraError";
+  }
+};
 function majorToMinor(amount, decimals2) {
   const n6 = Number(amount);
   return Number.isFinite(n6) ? Math.round(n6 * 10 ** decimals2) : 0;
@@ -4700,19 +4752,6 @@ function toMajorText(minor) {
     useGrouping: false
   }).format(major);
 }
-var MONEY_RANGE_FILTERS = /* @__PURE__ */ new Set(["price"]);
-function moneyEdgeToMinor(edge, decimals2) {
-  const text = typeof edge === "string" ? edge.trim().replace(",", ".") : edge;
-  if (text === "" || text === null || text === void 0) return "";
-  const n6 = Number(text);
-  return Number.isFinite(n6) ? majorToMinor(n6, decimals2) : "";
-}
-function moneyRangeToMinor(value, decimals2) {
-  if (value === null || typeof value !== "object") return value;
-  return Object.fromEntries(
-    Object.entries(value).map(([edge, v3]) => [edge, moneyEdgeToMinor(v3, decimals2)])
-  );
-}
 function taxCategoryDisplayName(c5) {
   return (c5.display_name ?? "").trim() || (c5.name ?? "").trim() || c5.key;
 }
@@ -4870,13 +4909,14 @@ var ErpServicesList = class extends i3 {
    *  `setFilter`: `setContext` would reload on its own and the same tap would cost two round trips
    *  to the hub.
    *
-   *  Money ranges travel in the minor unit (services#113, pm#498). */
+   *  The value travels as typed: the «Price» range is scaled to the minor unit by the SDK
+   *  (`moneyFilters`, services#113, pm#501). */
   onFilterChange(col, value) {
     if (col === "status") {
       this.showingArchived = String(value ?? "") === ARCHIVED_STATUS;
       this.ctrl.state.context = this.showingArchived ? { include_archived: 1 } : {};
     }
-    this.ctrl.setFilter(col, MONEY_RANGE_FILTERS.has(col) ? moneyRangeToMinor(value, erplora2().currencyDecimals) : value);
+    this.ctrl.setFilter(col, value);
   }
   /** Puts an archived service back (`services.services.restore`). No confirmation: restoring is not
    *  destructive —it undoes one— and the market does not ask for one either. */
@@ -4899,7 +4939,10 @@ var ErpServicesList = class extends i3 {
     this.ctrl = createListController(erplora2(), "services.services.list", () => this.requestUpdate(), {
       pageSize: 50,
       sort: "name",
-      dir: "asc"
+      dir: "asc",
+      // `price` is an INTEGER in the minor unit painted as money of the hub («20,00 €»): the person
+      // types the major unit and the SDK scales each edge with the hub's currency decimals.
+      moneyFilters: ["price"]
     });
     await Promise.all([this.ctrl.load(), this.loadAux()]);
     try {
