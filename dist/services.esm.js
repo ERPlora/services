@@ -4418,6 +4418,7 @@ var ErpServicesCategories = class extends i3 {
     this.newSortOrder = "";
     this.saving = false;
     this.formError = "";
+    this.pageError = "";
     this.nameError = "";
     this.editingId = null;
     this.editTitleInHeader = false;
@@ -4522,6 +4523,7 @@ var ErpServicesCategories = class extends i3 {
       this.editTitleInHeader = table?.shadowRoot?.querySelector('[role="dialog"]')?.getAttribute("aria-label") === title;
     } else if (actionId === "delete" && can("services.delete_category")) {
       this.deleteTarget = c5;
+      this.pageError = "";
     }
   }
   /** Back to a clean CREATE form. */
@@ -4542,6 +4544,7 @@ var ErpServicesCategories = class extends i3 {
     this.saving = true;
     this.formError = "";
     this.nameError = "";
+    this.pageError = "";
     try {
       const fields = {
         name: this.newName.trim(),
@@ -4573,7 +4576,7 @@ var ErpServicesCategories = class extends i3 {
       this.deleteTarget = null;
       await Promise.all([this.ctrl.load(), this.loadAll()]);
     } catch (e6) {
-      this.formError = domainMessage(e6, erplora().locale, erplora().t(CATALOG, "ui.errorDeleteCategory"));
+      this.pageError = domainMessage(e6, erplora().locale, erplora().t(CATALOG, "ui.errorDeleteCategory"));
       this.deleteTarget = null;
     } finally {
       this.saving = false;
@@ -4602,11 +4605,23 @@ var ErpServicesCategories = class extends i3 {
       </ion-content>
     </ion-modal>`;
   }
+  /** pm#478: the refusal appears ABOVE the button that was pressed, at the foot of the form — on a
+   *  phone that can leave it off the sheet. Bring it into view once it has painted itself: scrolled
+   *  before, the banner still measures 0 px and ends up under the tab bar. */
+  updated(changed) {
+    super.updated(changed);
+    if (changed.has("formError") && this.formError) void this.revealFormError();
+  }
+  async revealFormError() {
+    const banner = this.renderRoot.querySelector('[data-testid="services-categories-form-error"]');
+    await banner?.updateComplete;
+    banner?.scrollIntoView?.({ block: "center" });
+  }
   render() {
     const t5 = (k2) => erplora().t(CATALOG, k2);
     const parentOptions = this.allCategories.filter((c5) => c5.id !== this.editingId);
     return b2`<div class="page">
-      ${this.formError ? b2`<ok-inline-feedback data-testid="services-categories-form-error" tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : A}
+      ${this.pageError ? b2`<ok-inline-feedback data-testid="services-categories-page-error" tone="danger" icon="alert-circle-outline">${this.pageError}</ok-inline-feedback>` : A}
       ${this.ctrl?.error ? b2`<ok-inline-feedback data-testid="services-categories-load-error" tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : A}
       <ok-data-table testid="services-categories-table" .serverSide=${true} .fill=${true} .views=${true} .addable=${can("services.add_category")} .cardTitle=${(row) => String(row.name ?? "")} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "asc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchCategoryPlaceholder")} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.emptyCategories")} @rowAction=${(e6) => this.onRowAction(e6)} @rowClick=${(e6) => this.onRowAction({ detail: { actionId: "edit", row: e6.detail.row } })}
  @pageChange=${(e6) => this.ctrl.setPage(e6.detail)} @pageSizeChange=${(e6) => this.ctrl.setPageSize(e6.detail)} @sortChange=${(e6) => this.ctrl.setSort(e6.detail.sort, e6.detail.dir)} @searchChange=${(e6) => this.ctrl.setSearch(e6.detail)} @filterChange=${(e6) => this.ctrl.setFilter(e6.detail.col, e6.detail.value)}>
@@ -4624,6 +4639,9 @@ var ErpServicesCategories = class extends i3 {
             ${parentOptions.map((c5) => b2`<ion-select-option .value=${c5.id}>${c5.name}</ion-select-option>`)}
           </ion-select>
           <ion-input data-testid="services-categories-sort-order" fill="outline" label-placement="floating" label=${t5("ui.colSortOrder")} type="number" step="1" .value=${this.newSortOrder} @ionInput=${(e6) => this.newSortOrder = e6.target.value}></ion-input>
+          <!-- pm#478: the refusal travels WITH the form — on a phone the panel is a full-screen
+               sheet and a banner on the page underneath it is never seen. -->
+          ${this.formError ? b2`<ok-inline-feedback data-testid="services-categories-form-error" tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : A}
           <ion-button type="submit" data-testid="services-categories-submit" ?disabled=${this.saving || !this.newName}>${this.saving ? t5("ui.btnSaving") : this.editingId ? t5("ui.btnSave") : t5("ui.btnAdd")}</ion-button>
         </form>
       </ok-data-table>
@@ -4646,6 +4664,9 @@ __decorateClass([
 __decorateClass([
   r5()
 ], ErpServicesCategories.prototype, "formError", 2);
+__decorateClass([
+  r5()
+], ErpServicesCategories.prototype, "pageError", 2);
 __decorateClass([
   r5()
 ], ErpServicesCategories.prototype, "nameError", 2);
@@ -4728,6 +4749,7 @@ var ErpServicesList = class extends i3 {
     this.categories = [];
     this.taxRates = [];
     this.formError = "";
+    this.pageError = "";
     this.newName = "";
     this.newPrice = "";
     this.newDuration = "";
@@ -4860,13 +4882,13 @@ var ErpServicesList = class extends i3 {
    *  destructive —it undoes one— and the market does not ask for one either. */
   async restoreService(row) {
     if (!can2("services.change_service")) return;
-    this.formError = "";
+    this.pageError = "";
     this.saving = true;
     try {
       await erplora2().command("services.services.restore", { service_id: String(row.id) });
       await this.ctrl.load();
     } catch (e6) {
-      this.formError = domainMessage(e6, erplora2().locale, erplora2().t(CATALOG2, "ui.errorRestore"));
+      this.pageError = domainMessage(e6, erplora2().locale, erplora2().t(CATALOG2, "ui.errorRestore"));
     } finally {
       this.saving = false;
     }
@@ -4963,6 +4985,7 @@ var ErpServicesList = class extends i3 {
     }
     this.saving = true;
     this.formError = "";
+    this.pageError = "";
     try {
       await erplora2().command("services.services.create", {
         name: this.newName.trim(),
@@ -5007,6 +5030,7 @@ var ErpServicesList = class extends i3 {
     }
     this.saving = true;
     this.formError = "";
+    this.pageError = "";
     try {
       await erplora2().command("services.services.update", {
         service_id: this.editingId,
@@ -5053,7 +5077,7 @@ var ErpServicesList = class extends i3 {
       return;
     }
     if (actionId !== "archive" || !can2("services.delete_service")) return;
-    this.formError = "";
+    this.pageError = "";
     this.archiveTarget = row;
     this.archiveActive = null;
     try {
@@ -5073,14 +5097,13 @@ var ErpServicesList = class extends i3 {
     const target = this.archiveTarget;
     if (!target || !can2("services.delete_service")) return;
     this.saving = true;
-    this.formError = "";
     try {
       await erplora2().command("services.services.delete", { service_id: target.id });
       this.archiveTarget = null;
       this.archiveActive = null;
       await this.ctrl.load();
     } catch (e6) {
-      this.formError = domainMessage(e6, erplora2().locale, erplora2().t(CATALOG2, "ui.errorArchive"));
+      this.pageError = domainMessage(e6, erplora2().locale, erplora2().t(CATALOG2, "ui.errorArchive"));
       this.archiveTarget = null;
     } finally {
       this.saving = false;
@@ -5115,11 +5138,23 @@ var ErpServicesList = class extends i3 {
       </ion-content>
     </ion-modal>`;
   }
+  /** pm#478: the refusal appears ABOVE the button that was pressed, at the foot of the form — on a
+   *  phone that can leave it off the sheet. Bring it into view once it has painted itself: scrolled
+   *  before, the banner still measures 0 px and ends up under the tab bar. */
+  updated(changed) {
+    super.updated(changed);
+    if (changed.has("formError") && this.formError) void this.revealFormError();
+  }
+  async revealFormError() {
+    const banner = this.renderRoot.querySelector('[data-testid="services-list-form-error"]');
+    await banner?.updateComplete;
+    banner?.scrollIntoView?.({ block: "center" });
+  }
   // The view title is painted by the shell topbar: repeating it here showed it twice on screen.
   render() {
     const t5 = (k2) => erplora2().t(CATALOG2, k2);
     return b2`<div class="page">
-        ${this.formError ? b2`<ok-inline-feedback data-testid="services-list-form-error" tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : A}
+        ${this.pageError ? b2`<ok-inline-feedback data-testid="services-list-page-error" tone="danger" icon="alert-circle-outline">${this.pageError}</ok-inline-feedback>` : A}
         ${this.ctrl?.error ? b2`<ok-inline-feedback data-testid="services-list-load-error" tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : A}
         <ok-data-table testid="services-list-table" .serverSide=${true} .fill=${true} .addable=${true} .views=${true} .cardTitle=${(row) => String(row.name ?? "")} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "asc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchPlaceholder")} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.empty")} @rowAction=${(e6) => this.onRowAction(e6)} @rowClick=${(e6) => this.onRowAction({ detail: { actionId: "edit", row: e6.detail.row } })}
  @pageChange=${(e6) => this.ctrl.setPage(e6.detail)} @pageSizeChange=${(e6) => this.ctrl.setPageSize(e6.detail)} @sortChange=${(e6) => this.ctrl.setSort(e6.detail.sort, e6.detail.dir)} @searchChange=${(e6) => this.ctrl.setSearch(e6.detail)} @filterChange=${(e6) => this.onFilterChange(e6.detail.col, e6.detail.value)}>
@@ -5148,6 +5183,9 @@ var ErpServicesList = class extends i3 {
             <!-- Without tax categories creating is impossible (the category is required): say where
                  to fix it, instead of leaving an empty dropdown with no explanation. -->
             ${this.taxRates.length === 0 ? b2`<ok-inline-feedback data-testid="services-list-tax-missing" tone="warning" icon="alert-circle-outline">${t5("ui.taxCategoriesMissing")}</ok-inline-feedback>` : A}
+            <!-- pm#478: the refusal travels WITH the form — on a phone the panel is a full-screen
+                 sheet and a banner on the page underneath it is never seen. -->
+            ${this.formError ? b2`<ok-inline-feedback data-testid="services-list-form-error" tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : A}
             <ion-button type="submit" data-testid="services-list-submit" ?disabled=${this.saving || !this.newName || !this.newTaxRateId}>${this.saving ? t5("ui.btnSaving") : this.editingId ? t5("ui.btnSave") : t5("ui.btnAdd")}</ion-button>
           </form>
         </ok-data-table>
@@ -5164,6 +5202,9 @@ __decorateClass([
 __decorateClass([
   r5()
 ], ErpServicesList.prototype, "formError", 2);
+__decorateClass([
+  r5()
+], ErpServicesList.prototype, "pageError", 2);
 __decorateClass([
   r5()
 ], ErpServicesList.prototype, "newName", 2);
@@ -5365,6 +5406,7 @@ var ErpServicesPackages = class extends i3 {
     this.services = [];
     this.saving = false;
     this.formError = "";
+    this.pageError = "";
     this.editingId = null;
     this.editTitleInHeader = false;
     /** pm#459: generation of the last edit opening; a stale wait (package fetch, table render) of an
@@ -5532,6 +5574,7 @@ var ErpServicesPackages = class extends i3 {
       await this.openMovements(p4);
     } else if (actionId === "delete" && can3("services.delete_package")) {
       this.deleteTarget = p4;
+      this.pageError = "";
     }
   }
   /** Open the voucher's ledger and load its FIRST page. The three states are painted, not only the
@@ -5649,6 +5692,7 @@ var ErpServicesPackages = class extends i3 {
     }
     this.saving = true;
     this.formError = "";
+    this.pageError = "";
     try {
       if (this.editingId) {
         await erplora3().command("services.packages.update", {
@@ -5678,7 +5722,7 @@ var ErpServicesPackages = class extends i3 {
       this.deleteTarget = null;
       await this.ctrl.load();
     } catch (e6) {
-      this.formError = domainMessage(e6, erplora3().locale, erplora3().t(CATALOG3, "ui.errorDeletePackage"));
+      this.pageError = domainMessage(e6, erplora3().locale, erplora3().t(CATALOG3, "ui.errorDeletePackage"));
       this.deleteTarget = null;
     } finally {
       this.saving = false;
@@ -5826,11 +5870,23 @@ var ErpServicesPackages = class extends i3 {
       </div>`)}
       <ion-button data-testid="services-packages-add-line" fill="outline" size="small" @click=${() => this.addItem()}>${t5("ui.addLine")}</ion-button>`;
   }
+  /** pm#478: the refusal appears ABOVE the button that was pressed, at the foot of the form — on a
+   *  phone that can leave it off the sheet. Bring it into view once it has painted itself: scrolled
+   *  before, the banner still measures 0 px and ends up under the tab bar. */
+  updated(changed) {
+    super.updated(changed);
+    if (changed.has("formError") && this.formError) void this.revealFormError();
+  }
+  async revealFormError() {
+    const banner = this.renderRoot.querySelector('[data-testid="services-packages-form-error"]');
+    await banner?.updateComplete;
+    banner?.scrollIntoView?.({ block: "center" });
+  }
   render() {
     const t5 = (k2) => erplora3().t(CATALOG3, k2);
     const fixed = this.form.discountType === "fixed";
     return b2`<div class="page">
-      ${this.formError ? b2`<ok-inline-feedback data-testid="services-packages-form-error" tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : A}
+      ${this.pageError ? b2`<ok-inline-feedback data-testid="services-packages-page-error" tone="danger" icon="alert-circle-outline">${this.pageError}</ok-inline-feedback>` : A}
       ${this.ctrl?.error ? b2`<ok-inline-feedback data-testid="services-packages-load-error" tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : A}
       ${can3("services.view_orphan_grant") ? b2`<ion-button class="orphans-entry" data-testid="services-packages-open-orphans" size="small" fill="clear" @click=${() => this.openOrphans()}>
             <ion-icon slot="start" name="person-remove-outline"></ion-icon>${t5("ui.openOrphans")}
@@ -5852,6 +5908,9 @@ var ErpServicesPackages = class extends i3 {
           <ion-input data-testid="services-packages-validity-days" fill="outline" label-placement="floating" label=${t5("ui.colValidityDays")} helper-text=${t5("ui.validityHelp")} type="number" min="1" step="1" .value=${this.form.validityDays} @ionInput=${(e6) => this.form = { ...this.form, validityDays: e6.target.value }}></ion-input>
           <ion-input data-testid="services-packages-max-uses" fill="outline" label-placement="floating" label=${t5("ui.colMaxUses")} helper-text=${t5("ui.maxUsesHelp")} type="number" min="1" step="1" .value=${this.form.maxUses} @ionInput=${(e6) => this.form = { ...this.form, maxUses: e6.target.value }}></ion-input>
           ${this.editingId ? b2`<ok-inline-feedback data-testid="services-packages-lines-fixed" tone="neutral" icon="information-circle-outline">${t5("ui.packageLinesFixed")}</ok-inline-feedback>` : this.renderLines()}
+          <!-- pm#478: the refusal travels WITH the form — on a phone the panel is a full-screen
+               sheet and a banner on the page underneath it is never seen. -->
+          ${this.formError ? b2`<ok-inline-feedback data-testid="services-packages-form-error" tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : A}
           <ion-button type="submit" data-testid="services-packages-submit" ?disabled=${this.saving || !this.form.name}>${this.saving ? t5("ui.btnSaving") : this.editingId ? t5("ui.btnSave") : t5("ui.btnAdd")}</ion-button>
         </form>
       </ok-data-table>
@@ -5876,6 +5935,9 @@ __decorateClass([
 __decorateClass([
   r5()
 ], ErpServicesPackages.prototype, "formError", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "pageError", 2);
 __decorateClass([
   r5()
 ], ErpServicesPackages.prototype, "editingId", 2);
