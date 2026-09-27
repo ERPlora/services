@@ -1,4 +1,5 @@
 import { LitElement, html, css, nothing } from 'lit';
+import type { PropertyValues } from 'lit';
 import { state } from 'lit/decorators.js';
 import { define } from '@erplora/outfitkit/define';
 import '@erplora/outfitkit/ok-inline-feedback';
@@ -199,6 +200,9 @@ export class ErpServicesPackages extends LitElement {
   @state() services: ServiceOption[] = [];
   @state() saving = false;
   @state() formError = '';
+  /** What went wrong in a ROW action (delete, confirmed on the page): no panel is open then, so it
+   *  is painted on the page. `formError` is only what the panel's form was refused (pm#478). */
+  @state() pageError = '';
   /** Package being edited (header only); `null` = create mode. */
   @state() editingId: string | null = null;
 
@@ -397,6 +401,7 @@ export class ErpServicesPackages extends LitElement {
       await this.openMovements(p);
     } else if (actionId === 'delete' && can('services.delete_package')) {
       this.deleteTarget = p;
+      this.pageError = '';
     }
   }
 
@@ -530,6 +535,7 @@ export class ErpServicesPackages extends LitElement {
     }
     this.saving = true;
     this.formError = '';
+    this.pageError = ''; // a save is the next thing the person did: an older row refusal is stale
     try {
       if (this.editingId) {
         // The update schema wants numbers, not nulls, for the two discount columns: the one that
@@ -562,7 +568,7 @@ export class ErpServicesPackages extends LitElement {
       this.deleteTarget = null;
       await this.ctrl.load();
     } catch (e) {
-      this.formError = domainMessage(e, erplora().locale, erplora().t(CATALOG, 'ui.errorDeletePackage'));
+      this.pageError = domainMessage(e, erplora().locale, erplora().t(CATALOG, 'ui.errorDeletePackage'));
       this.deleteTarget = null;
     } finally {
       this.saving = false;
@@ -746,11 +752,27 @@ export class ErpServicesPackages extends LitElement {
       <ion-button data-testid="services-packages-add-line" fill="outline" size="small" @click=${() => this.addItem()}>${t('ui.addLine')}</ion-button>`;
   }
 
+  /** pm#478: the refusal appears ABOVE the button that was pressed, at the foot of the form — on a
+   *  phone that can leave it off the sheet. Bring it into view once it has painted itself: scrolled
+   *  before, the banner still measures 0 px and ends up under the tab bar. */
+  updated(changed: PropertyValues<this>): void {
+    super.updated(changed);
+    if (changed.has('formError') && this.formError) void this.revealFormError();
+  }
+
+  private async revealFormError(): Promise<void> {
+    const banner = this.renderRoot.querySelector('[data-testid="services-packages-form-error"]') as
+      | (HTMLElement & { updateComplete?: Promise<unknown> })
+      | null;
+    await banner?.updateComplete;
+    banner?.scrollIntoView?.({ block: 'center' });
+  }
+
   render() {
     const t = (k: string): string => erplora().t(CATALOG, k);
     const fixed = this.form.discountType === 'fixed';
     return html`<div class="page">
-      ${this.formError ? html`<ok-inline-feedback data-testid="services-packages-form-error" tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : nothing}
+      ${this.pageError ? html`<ok-inline-feedback data-testid="services-packages-page-error" tone="danger" icon="alert-circle-outline">${this.pageError}</ok-inline-feedback>` : nothing}
       ${this.ctrl?.error ? html`<ok-inline-feedback data-testid="services-packages-load-error" tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : nothing}
       ${can('services.view_orphan_grant')
         ? html`<ion-button class="orphans-entry" data-testid="services-packages-open-orphans" size="small" fill="clear" @click=${() => this.openOrphans()}>
@@ -778,6 +800,9 @@ export class ErpServicesPackages extends LitElement {
           ${this.editingId
             ? html`<ok-inline-feedback data-testid="services-packages-lines-fixed" tone="neutral" icon="information-circle-outline">${t('ui.packageLinesFixed')}</ok-inline-feedback>`
             : this.renderLines()}
+          <!-- pm#478: the refusal travels WITH the form — on a phone the panel is a full-screen
+               sheet and a banner on the page underneath it is never seen. -->
+          ${this.formError ? html`<ok-inline-feedback data-testid="services-packages-form-error" tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : nothing}
           <ion-button type="submit" data-testid="services-packages-submit" ?disabled=${this.saving || !this.form.name}>${this.saving ? t('ui.btnSaving') : this.editingId ? t('ui.btnSave') : t('ui.btnAdd')}</ion-button>
         </form>
       </ok-data-table>
