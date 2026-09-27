@@ -231,6 +231,17 @@ describe.each(SCREENS)('pm#478 · $surface: save refusal in the form, row refusa
     expect(onPage(el, pageError), 'a stale refusal must not stay red after a save that worked').toBeNull();
   });
 
+  it('the page error of a refused row action goes away once a later EDIT save succeeds', async () => {
+    const el = await mount(s.tag, s.path);
+    await refusedDestroy(el, s);
+    refusal = null;
+    await el.onRowAction(rowAction('edit', s.row));
+    await settle(el);
+    await s.save(el);
+    await settle(el);
+    expect(onPage(el, pageError), 'saving an edit is a save too: the stale refusal goes').toBeNull();
+  });
+
   it('asking for the row action again hides the previous refusal until the new answer arrives', async () => {
     const el = await mount(s.tag, s.path);
     await refusedDestroy(el, s);
@@ -253,6 +264,16 @@ describe('pm#478 · refusals the screen itself raises before calling the server'
   it('services: «tax category required» is said inside the form, scrolled into view', async () => {
     const el = await mount('erp-services-list', '../components/erp-services-list/erp-services-list');
     el.newName = 'Manicura';
+    el.newTaxRateId = '';
+    await el.createService(submitEvent());
+    await settle(el);
+    expect(inFormAndRevealed(el, 'services-list-form-error')?.textContent?.trim()).toBe('ui.errorTaxRequired');
+  });
+
+  it('services: clearing the tax category of an edited service is said inside the form too', async () => {
+    const el = await mount('erp-services-list', '../components/erp-services-list/erp-services-list');
+    await el.onRowAction(rowAction('edit', SERVICE));
+    await settle(el);
     el.newTaxRateId = '';
     await el.createService(submitEvent());
     await settle(el);
