@@ -211,6 +211,53 @@ describe('«Vouchers sold» names the customer and the employee who voided', () 
     expect(text).not.toContain('u-marta');
   });
 
+  it('finds who voided anywhere in the people list, not only first', async () => {
+    users = async () => [
+      { id: 'u-other', name: 'Otro', role: 'cashier', is_active: true },
+      { id: 'u-marta', name: 'Marta Ruiz', role: 'manager', is_active: true },
+    ];
+    const text = await openSheet(await mount(), 'grants');
+    expect(text).toContain('"who":"Marta Ruiz"');
+  });
+
+  it('says who voided is loading while the people list is on its way, then names them', async () => {
+    let release: (v: unknown) => void = () => {};
+    users = () => new Promise((r) => (release = r));
+    const el = await mount();
+    const text = await openSheet(el, 'grants');
+    expect(text).toContain('"who":"ui.nameLoading"');
+    expect(text).not.toContain('u-marta');
+    release([{ id: 'u-marta', name: 'Marta Ruiz' }]);
+    await settle(el);
+    expect(el.shadowRoot.textContent ?? '').toContain('"who":"Marta Ruiz"');
+  });
+
+  it('asks the people list once per opening, not once per page', async () => {
+    let calls = 0;
+    users = async () => {
+      calls += 1;
+      return [{ id: 'u-marta', name: 'Marta Ruiz' }];
+    };
+    let pages = 0;
+    const g = globalThis as { erplora: { queryPage: (name: string) => Promise<unknown> } };
+    const base = g.erplora.queryPage;
+    g.erplora.queryPage = async (name: string) => {
+      if (name !== 'services.packages.grants') return base(name);
+      pages += 1;
+      return pages % 2 === 1
+        ? { rows: [VOIDED], total: 2 }
+        : { rows: [{ ...VOIDED, grant_id: 'g-void-2' }], total: 2 };
+    };
+    const el = (await mount()) as Mounted & { loadMoreGrants(): Promise<void> };
+    await openSheet(el, 'grants');
+    await el.loadMoreGrants();
+    await settle(el);
+    expect(pages).toBe(2);
+    expect(calls).toBe(1);
+    await openSheet(el, 'grants');
+    expect(calls).toBe(2);
+  });
+
   it('names the customer in the void confirmation', async () => {
     const el = await mount();
     await openSheet(el, 'grants');
