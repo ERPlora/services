@@ -4137,7 +4137,28 @@ var es_default = {
     orphanExpired: "Caducado",
     orphanCustomerRef: "Referencia del cliente",
     orphansCount: "{shown} de {total}",
-    orphansMore: "Cargar m\xE1s"
+    orphansMore: "Cargar m\xE1s",
+    actionGrants: "Bonos vendidos",
+    grantsTitle: "Bonos vendidos",
+    grantsHint: "cada cliente que ha comprado este bono, con las sesiones usadas y las que le quedan. Una venta de la que no se ha usado nada se puede anular.",
+    emptyGrants: "Nadie ha comprado este bono todav\xEDa.",
+    errorGrants: "No se han podido cargar los bonos vendidos",
+    grantsCount: "Se muestran {shown} de {total}",
+    grantsMore: "Cargar m\xE1s",
+    grantStatus: {
+      active: "Activo",
+      voided: "Anulado"
+    },
+    grantUses: "{used} usadas \xB7 quedan {remaining}",
+    grantUsesUnlimited: "{used} usadas \xB7 sin l\xEDmite",
+    grantVoidedBy: "Anulado por {who} el {when}",
+    actionVoidGrant: "Anular",
+    btnVoiding: "Anulando\u2026",
+    voidGrantTitle: "\xBFAnular este bono?",
+    voidGrantHint: "El bono del cliente {customer} ({amount}) deja de poder usarse y queda en la lista como anulado. El dinero no se devuelve aqu\xED: si se cobr\xF3, devuelve la venta desde Ventas con una devoluci\xF3n.",
+    voidReasonLabel: "Motivo",
+    voidReasonHelp: "Obligatorio. Queda en el registro del bono, p. ej. \xABvendido al cliente equivocado\xBB.",
+    errorVoidGrant: "No se ha podido anular el bono"
   },
   errors: {
     "services.category_unavailable": "Esa categor\xEDa no est\xE1 disponible: no existe en este negocio o se ha eliminado.",
@@ -4161,7 +4182,12 @@ var es_default = {
     "services.redemption_not_found": "Esa sesi\xF3n del bono no existe en este negocio.",
     "services.redemption_not_settled": "Esa sesi\xF3n del bono nunca se cobr\xF3, as\xED que no hay nada que devolver. Lo que procede es liberar la reserva.",
     "services.redemption_already_refunded": "Esa sesi\xF3n del bono ya se devolvi\xF3 en otra devoluci\xF3n.",
-    "services.redemption_not_refundable": "Esa sesi\xF3n del bono no se puede devolver ahora mismo."
+    "services.redemption_not_refundable": "Esa sesi\xF3n del bono no se puede devolver ahora mismo.",
+    "services.grant_not_found": "Esa venta de bono no existe en este negocio.",
+    "services.grant_already_voided": "Ese bono ya estaba anulado.",
+    "services.grant_in_use": "Ese bono ya se ha usado: no se puede anular.",
+    "services.grant_void_reason_required": "Indica por qu\xE9 se anula este bono: el motivo queda en su registro.",
+    "services.grant_not_voidable": "Ese bono no se puede anular ahora: se ha usado o anulado mientras tanto. Recarga la lista y vuelve a intentarlo."
   }
 };
 
@@ -4381,7 +4407,28 @@ var en_default = {
     orphanExpired: "Expired",
     orphanCustomerRef: "Customer reference",
     orphansCount: "{shown} of {total}",
-    orphansMore: "Load more"
+    orphansMore: "Load more",
+    actionGrants: "Sold vouchers",
+    grantsTitle: "Sold vouchers",
+    grantsHint: "every customer who bought this voucher, with the sessions used and left. A sale nothing was used from can be voided.",
+    emptyGrants: "Nobody has bought this voucher yet.",
+    errorGrants: "Could not load the sold vouchers",
+    grantsCount: "Showing {shown} of {total}",
+    grantsMore: "Load more",
+    grantStatus: {
+      active: "Active",
+      voided: "Voided"
+    },
+    grantUses: "{used} used \xB7 {remaining} left",
+    grantUsesUnlimited: "{used} used \xB7 no limit",
+    grantVoidedBy: "Voided by {who} on {when}",
+    actionVoidGrant: "Void",
+    btnVoiding: "Voiding\u2026",
+    voidGrantTitle: "Void this voucher?",
+    voidGrantHint: "The voucher of customer {customer} ({amount}) stops being usable and stays in the list as voided. The money is not given back here: if it was paid, refund the sale from Sales with a return.",
+    voidReasonLabel: "Reason",
+    voidReasonHelp: "Required. It stays on the voucher's record, e.g. \xABsold to the wrong customer\xBB.",
+    errorVoidGrant: "Could not void the voucher"
   },
   errors: {
     "services.category_unavailable": "That category is not available: it does not exist in this business or it has been deleted.",
@@ -4405,7 +4452,12 @@ var en_default = {
     "services.redemption_not_found": "That voucher session does not exist in this business.",
     "services.redemption_not_settled": "That voucher session was never paid, so there is nothing to give back. Release the hold instead.",
     "services.redemption_already_refunded": "That voucher session was already given back on another return.",
-    "services.redemption_not_refundable": "That voucher session cannot be given back right now."
+    "services.redemption_not_refundable": "That voucher session cannot be given back right now.",
+    "services.grant_not_found": "That voucher sale does not exist in this business.",
+    "services.grant_already_voided": "That voucher was already voided.",
+    "services.grant_in_use": "That voucher was already used: it cannot be voided.",
+    "services.grant_void_reason_required": "Say why this voucher is being voided: the reason stays on its record.",
+    "services.grant_not_voidable": "That voucher cannot be voided right now: it was used or voided in the meantime. Reload the list and try again."
   }
 };
 
@@ -5466,6 +5518,15 @@ var ErpServicesPackages = class extends i3 {
     this.orphansTotal = 0;
     this.orphansLoading = false;
     this.orphansError = "";
+    this.grantsOf = null;
+    this.grants = [];
+    this.grantsTotal = 0;
+    this.grantsLoading = false;
+    this.grantsError = "";
+    this.voidTarget = null;
+    this.voidReason = "";
+    this.voiding = false;
+    this.voidError = "";
     this.onLocaleChange = () => this.requestUpdate();
   }
   static {
@@ -5519,6 +5580,9 @@ var ErpServicesPackages = class extends i3 {
       // it is: the movements behind a balance. Read-only — returning a session is `sales`' return
       // flow, not a button on the catalogue screen.
       ...can3("services.view_package_balance") ? [{ id: "movements", label: t5("ui.actionMovements"), icon: "time-outline" }] : [],
+      // Who bought this voucher (services#82) — the same permission, because it shows the same
+      // balances; voiding one of those sales asks for its own permission on top.
+      ...can3("services.view_package_balance") ? [{ id: "grants", label: t5("ui.actionGrants"), icon: "people-outline" }] : [],
       ...can3("services.delete_package") ? [{ id: "delete", label: t5("ui.actionDelete"), icon: "trash-outline", color: "danger" }] : []
     ];
   }
@@ -5615,6 +5679,8 @@ var ErpServicesPackages = class extends i3 {
       this.editTitleInHeader = table?.shadowRoot?.querySelector('[role="dialog"]')?.getAttribute("aria-label") === title;
     } else if (actionId === "movements" && can3("services.view_package_balance")) {
       await this.openMovements(p4);
+    } else if (actionId === "grants" && can3("services.view_package_balance")) {
+      await this.openGrants(p4);
     } else if (actionId === "delete" && can3("services.delete_package")) {
       this.deleteTarget = p4;
       this.pageError = "";
@@ -5698,6 +5764,81 @@ var ErpServicesPackages = class extends i3 {
       this.orphansError = domainMessage(e6, erplora3().locale, erplora3().t(CATALOG3, "ui.errorOrphans"));
     } finally {
       this.orphansLoading = false;
+    }
+  }
+  /** Open the sales of a voucher (services#82) from its FIRST page — same contract as the ledger:
+   *  a page at a time, three states painted, a reopening reads again instead of stacking. */
+  async openGrants(p4) {
+    this.grantsOf = { id: p4.id, name: p4.name };
+    this.voidTarget = null;
+    await this.reloadGrants();
+  }
+  async reloadGrants() {
+    this.grants = [];
+    this.grantsTotal = 0;
+    this.grantsError = "";
+    await this.loadGrantsPage();
+  }
+  async loadMoreGrants() {
+    if (this.grantsLoading || this.grants.length >= this.grantsTotal) return;
+    await this.loadGrantsPage();
+  }
+  async loadGrantsPage() {
+    const target = this.grantsOf;
+    if (!target) return;
+    this.grantsLoading = true;
+    this.grantsError = "";
+    try {
+      const page = await erplora3().queryPage("services.packages.grants", {
+        offset: this.grants.length,
+        params: { package_id: target.id }
+      });
+      if (this.grantsOf !== target) return;
+      this.grants = [...this.grants, ...page?.rows ?? []];
+      this.grantsTotal = page?.total ?? this.grants.length;
+    } catch (e6) {
+      if (this.grantsOf !== target) return;
+      this.grantsError = domainMessage(e6, erplora3().locale, erplora3().t(CATALOG3, "ui.errorGrants"));
+    } finally {
+      if (this.grantsOf === target) this.grantsLoading = false;
+    }
+  }
+  closeGrants() {
+    this.grantsOf = null;
+    this.voidTarget = null;
+  }
+  /** Ask to void a sale: the sheet swaps its list for the confirmation, reason still blank. */
+  askVoid(grant) {
+    this.voidTarget = grant;
+    this.voidReason = "";
+    this.voidError = "";
+  }
+  cancelVoid() {
+    this.voidTarget = null;
+    this.voidError = "";
+  }
+  /**
+   * Void the sale being confirmed. The reason is mandatory — a void is an audit fact — so a blank
+   * one is not even sent (the handler refuses it too). On success the list is READ AGAIN rather
+   * than patched: the server is who says what the sale looks like now. A refusal stays on the
+   * confirmation, where the person is looking, with the module's own sentence for its code.
+   */
+  async confirmVoid() {
+    const target = this.voidTarget;
+    const reason = this.voidReason.trim();
+    if (!target || !reason || this.voiding || !can3("services.void_grant")) return;
+    this.voiding = true;
+    this.voidError = "";
+    try {
+      await erplora3().command("services.packages.void_grant", { grant_id: target.grant_id, reason });
+      if (this.voidTarget !== target) return;
+      this.voidTarget = null;
+      await this.reloadGrants();
+    } catch (e6) {
+      if (this.voidTarget !== target) return;
+      this.voidError = domainMessage(e6, erplora3().locale, erplora3().t(CATALOG3, "ui.errorVoidGrant"));
+    } finally {
+      this.voiding = false;
     }
   }
   /** Back to a clean CREATE form. */
@@ -5901,6 +6042,60 @@ var ErpServicesPackages = class extends i3 {
       </ion-content>
     </ion-modal>`;
   }
+  renderGrant(g3) {
+    const t5 = (k2, p4) => erplora3().t(CATALOG3, k2, p4);
+    const voided = g3.status === "voided";
+    const voidable = Number(g3.can_void) === 1 && can3("services.void_grant");
+    return b2`<ion-item class="movement">
+      <ion-label class="ion-text-wrap">
+        <h3>
+          <ok-status-pill size="sm" tone=${voided ? "neutral" : "success"}>${t5(`ui.grantStatus.${g3.status}`)}</ok-status-pill>
+          ${t5("ui.movementCustomer")}: ${g3.customer_id}
+        </h3>
+        <p>
+          ${this.stamp(g3.granted_at)} · ${erplora3().formatMoney(Number(g3.amount_cents) || 0)}
+          · ${g3.max_uses == null ? t5("ui.grantUsesUnlimited", { used: Number(g3.used) || 0 }) : t5("ui.grantUses", { used: Number(g3.used) || 0, remaining: Number(g3.remaining) || 0 })}
+          ${g3.sale_id ? b2` · ${t5("ui.movementSale")}: ${g3.sale_id}` : A}
+        </p>
+        ${voided ? b2`<p class="refund">${t5("ui.grantVoidedBy", { who: g3.voided_by ?? "\u2014", when: this.stamp(g3.voided_at) })}${g3.void_reason ? b2` · ${g3.void_reason}` : A}</p>` : A}
+      </ion-label>
+      ${voidable ? b2`<ion-button slot="end" size="small" fill="clear" data-testid=${`services-packages-grant-void-${g3.grant_id}`} style=${ionTone("text", "danger")} @click=${() => this.askVoid(g3)}>${t5("ui.actionVoidGrant")}</ion-button>` : A}
+    </ion-item>`;
+  }
+  renderVoidConfirm(g3) {
+    const t5 = (k2, p4) => erplora3().t(CATALOG3, k2, p4);
+    return b2`<p>${t5("ui.voidGrantHint", { customer: g3.customer_id, amount: erplora3().formatMoney(Number(g3.amount_cents) || 0) })}</p>
+      <ion-textarea data-testid="services-packages-grant-void-reason" fill="outline" mode="md" label-placement="floating" label=${t5("ui.voidReasonLabel")} helper-text=${t5("ui.voidReasonHelp")} auto-grow maxlength="500" .value=${this.voidReason} @ionInput=${(e6) => this.voidReason = String(e6.target.value ?? "")}></ion-textarea>
+      ${this.voidError ? b2`<ok-inline-feedback data-testid="services-packages-grant-void-error" tone="danger" icon="alert-circle-outline">${this.voidError}</ok-inline-feedback>` : A}
+      <ion-button class="ion-margin-top" expand="block" data-testid="services-packages-grant-void-submit" style=${ionTone("solid", "danger")} ?disabled=${this.voiding || !this.voidReason.trim()} @click=${() => this.confirmVoid()}>
+        ${this.voiding ? t5("ui.btnVoiding") : t5("ui.actionVoidGrant")}
+      </ion-button>
+      <ion-button expand="block" fill="outline" data-testid="services-packages-grant-void-cancel" ?disabled=${this.voiding} @click=${() => this.cancelVoid()}>${t5("ui.btnCancel")}</ion-button>`;
+  }
+  renderGrants() {
+    const t5 = (k2, p4) => erplora3().t(CATALOG3, k2, p4);
+    const confirming = this.voidTarget;
+    return b2`<ion-modal .isOpen=${!!this.grantsOf} @ionModalDidDismiss=${() => this.closeGrants()}>
+      <ion-header class="ion-no-border">
+        <ion-toolbar>
+          <ion-title>${confirming ? t5("ui.voidGrantTitle") : t5("ui.grantsTitle")}</ion-title>
+          <ion-buttons slot="end">
+            <ion-button data-testid="services-packages-grants-close" @click=${() => this.closeGrants()}>${t5("ui.btnClose")}</ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="ion-padding">
+        <!-- Self-styled: ion-modal is reparented to <body>, this component's CSS does not reach it. -->
+        ${confirming ? this.renderVoidConfirm(confirming) : b2`<p><b>${this.grantsOf?.name ?? ""}</b> — ${t5("ui.grantsHint")}</p>
+            ${this.grantsError ? b2`<ok-inline-feedback data-testid="services-packages-grants-error" tone="danger" icon="alert-circle-outline">${this.grantsError}</ok-inline-feedback>` : A}
+            ${this.grants.length === 0 ? this.grantsLoading ? b2`<ok-inline-feedback data-testid="services-packages-grants-loading" tone="neutral" icon="time-outline">${t5("ui.loading")}</ok-inline-feedback>` : this.grantsError ? A : b2`<ok-inline-feedback data-testid="services-packages-grants-empty" tone="neutral" icon="information-circle-outline">${t5("ui.emptyGrants")}</ok-inline-feedback>` : b2`<ion-list lines="full">${this.grants.map((g3) => this.renderGrant(g3))}</ion-list>
+                  ${this.grants.length < this.grantsTotal ? b2`<p class="more">${t5("ui.grantsCount", { shown: this.grants.length, total: this.grantsTotal })}</p>
+                        <ion-button expand="block" fill="clear" data-testid="services-packages-grants-more" ?disabled=${this.grantsLoading} @click=${() => this.loadMoreGrants()}>
+                          ${this.grantsLoading ? t5("ui.loading") : t5("ui.grantsMore")}
+                        </ion-button>` : A}`}`}
+      </ion-content>
+    </ion-modal>`;
+  }
   renderLines() {
     const t5 = (k2) => erplora3().t(CATALOG3, k2);
     return b2`<p class="lines-title">${t5("ui.packageLinesTitle")}</p>
@@ -5960,6 +6155,7 @@ var ErpServicesPackages = class extends i3 {
       ${this.renderDeleteConfirm()}
       ${this.renderMovements()}
       ${this.renderOrphans()}
+      ${this.renderGrants()}
     </div>`;
   }
 };
@@ -6020,6 +6216,33 @@ __decorateClass([
 __decorateClass([
   r5()
 ], ErpServicesPackages.prototype, "orphansError", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "grantsOf", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "grants", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "grantsTotal", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "grantsLoading", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "grantsError", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "voidTarget", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "voidReason", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "voiding", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "voidError", 2);
 define("erp-services-packages", ErpServicesPackages);
 
 // ui/components/erp-services-session-refund/erp-services-session-refund.ts

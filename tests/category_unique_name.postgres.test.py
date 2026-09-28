@@ -141,7 +141,14 @@ def main() -> int:
         e if isinstance(e, str) else e["file"]
         for e in MANIFEST["migrations"]["postgres"]
     ]
-    check("017 is the last declared postgres migration", MIGRATION, declared[-1])
+    # Declared and on top of 016 — not «the last one»: every later migration
+    # (018_grant_void, services#82) would otherwise break this battery.
+    check("017 is declared", True, MIGRATION in declared)
+    check(
+        "017 comes right after 016",
+        "migrations/postgres/016_named_gate_constraints.sql",
+        declared[declared.index(MIGRATION) - 1] if MIGRATION in declared else None,
+    )
     for name in ("services.categories.create", "services.categories.update"):
         cmd = MANIFEST["commands"][name]
         check(

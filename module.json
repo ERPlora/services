@@ -38,7 +38,8 @@
     "services.hold_package",
     "services.settle_package",
     "services.refund_package",
-    "services.view_orphan_grant"
+    "services.view_orphan_grant",
+    "services.void_grant"
   ],
   "role_permissions": {
     "admin": [
@@ -70,7 +71,8 @@
       "services.settle_package",
       "services.refund_package",
       "services.grant_package",
-      "services.view_orphan_grant"
+      "services.view_orphan_grant",
+      "services.void_grant"
     ],
     "employee": [
       "services.view_service",
@@ -157,7 +159,8 @@
         "kind": "contract",
         "since": "1.5.44"
       },
-      "migrations/postgres/017_category_name_gate.sql"
+      "migrations/postgres/017_category_name_gate.sql",
+      "migrations/postgres/018_grant_void.sql"
     ]
   },
   "queries": {
@@ -391,6 +394,52 @@
       },
       "ai": {
         "description": "Lists the vouchers (bonos) whose customer was deleted or anonymised, with the sessions and the amount still owed, so they can be refunded or transferred"
+      },
+      "expose_api": true
+    },
+    "services.packages.grants": {
+      "permission": "services.view_package_balance",
+      "sql": "queries/package_grants.sql",
+      "schema": "schemas/package_grants.json",
+      "list": {
+        "search": [
+          "customer_id"
+        ],
+        "sort": [
+          "granted_at",
+          "customer_id",
+          "status",
+          "used",
+          "remaining",
+          "amount_cents",
+          "voided_at"
+        ],
+        "default_sort": "granted_at",
+        "default_dir": "desc",
+        "filters": {
+          "status": {
+            "op": "eq"
+          },
+          "customer_id": {
+            "op": "eq"
+          },
+          "source": {
+            "op": "eq"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists, one page at a time, the vouchers (bonos) SOLD of one catalogue voucher — one row per customer purchase (grant), live or voided — with the sessions used and left, the expiry, how it was sold and, for a voided one, who voided it, when and why. can_void says whether it can still be voided (nothing spent or held). Filter by status = voided to audit the voids."
+      },
+      "expose_api": true
+    },
+    "services.packages.void_check": {
+      "permission": "services.void_grant",
+      "sql": "queries/package_void_check.sql",
+      "schema": "schemas/package_void_check.json",
+      "ai": {
+        "description": "Checks whether a sold voucher (grant) can be voided and, if not, returns the business reason (grant_not_found, already_voided or in_use) instead of the raw gate error."
       },
       "expose_api": true
     },
@@ -969,6 +1018,43 @@
         "commands/_gate_clear.sql"
       ]
     },
+    "services.packages.void_grant": {
+      "permission": "services.void_grant",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "void_grant"
+      },
+      "reads": [
+        {
+          "query": "services.packages.void_check",
+          "params": {
+            "grant_id": "payload.grant_id"
+          },
+          "required": true
+        }
+      ],
+      "schema": "schemas/package_void_grant.json",
+      "emit": [
+        "services.package.grant_voided"
+      ],
+      "ai": {
+        "description": "Voids a voucher (grant) sold BY MISTAKE — the wrong voucher, the wrong customer, or the same one rung up twice — with a mandatory reason. The grant stops being spendable everywhere and stays as an audit trail (who voided it, when, why). Refused with a domain code when nothing can be voided: services.grant_not_found, services.grant_already_voided, services.grant_in_use (a session was already spent or is held at a till — that is a balance correction, not a void) or services.grant_void_reason_required. It moves NO money: the refund of a paid voucher is the sale's rectifying invoice in sales."
+      },
+      "expose_api": true
+    },
+    "services._void_grant": {
+      "permission": "services.void_grant",
+      "sql": [
+        "commands/_void_grant.sql"
+      ],
+      "expect_rows": {
+        "op": "min",
+        "n": 1,
+        "error": "services.grant_not_voidable",
+        "message": "That voucher could not be voided: it does not exist here, it was already voided, or a session of it was just spent or held."
+      }
+    },
     "services._on_sale_completed": {
       "permission": "services.settle_package",
       "handler": {
@@ -1077,6 +1163,7 @@
     "emits": [
       "services.package.created",
       "services.package.deleted",
+      "services.package.grant_voided",
       "services.package.granted",
       "services.package.held",
       "services.package.hold_released",

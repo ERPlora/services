@@ -213,7 +213,28 @@
     "orphanExpired": "Expired",
     "orphanCustomerRef": "Customer reference",
     "orphansCount": "{shown} of {total}",
-    "orphansMore": "Load more"
+    "orphansMore": "Load more",
+    "actionGrants": "Sold vouchers",
+    "grantsTitle": "Sold vouchers",
+    "grantsHint": "every customer who bought this voucher, with the sessions used and left. A sale nothing was used from can be voided.",
+    "emptyGrants": "Nobody has bought this voucher yet.",
+    "errorGrants": "Could not load the sold vouchers",
+    "grantsCount": "Showing {shown} of {total}",
+    "grantsMore": "Load more",
+    "grantStatus": {
+      "active": "Active",
+      "voided": "Voided"
+    },
+    "grantUses": "{used} used · {remaining} left",
+    "grantUsesUnlimited": "{used} used · no limit",
+    "grantVoidedBy": "Voided by {who} on {when}",
+    "actionVoidGrant": "Void",
+    "btnVoiding": "Voiding…",
+    "voidGrantTitle": "Void this voucher?",
+    "voidGrantHint": "The voucher of customer {customer} ({amount}) stops being usable and stays in the list as voided. The money is not given back here: if it was paid, refund the sale from Sales with a return.",
+    "voidReasonLabel": "Reason",
+    "voidReasonHelp": "Required. It stays on the voucher's record, e.g. «sold to the wrong customer».",
+    "errorVoidGrant": "Could not void the voucher"
   },
   "errors": {
     "services.category_unavailable": "That category is not available: it does not exist in this business or it has been deleted.",
@@ -237,6 +258,11 @@
     "services.redemption_not_found": "That voucher session does not exist in this business.",
     "services.redemption_not_settled": "That voucher session was never paid, so there is nothing to give back. Release the hold instead.",
     "services.redemption_already_refunded": "That voucher session was already given back on another return.",
-    "services.redemption_not_refundable": "That voucher session cannot be given back right now."
+    "services.redemption_not_refundable": "That voucher session cannot be given back right now.",
+    "services.grant_not_found": "That voucher sale does not exist in this business.",
+    "services.grant_already_voided": "That voucher was already voided.",
+    "services.grant_in_use": "That voucher was already used: it cannot be voided.",
+    "services.grant_void_reason_required": "Say why this voucher is being voided: the reason stays on its record.",
+    "services.grant_not_voidable": "That voucher cannot be voided right now: it was used or voided in the meantime. Reload the list and try again."
   }
 }

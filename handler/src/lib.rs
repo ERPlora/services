@@ -95,6 +95,15 @@ pub fn refund_redemption(input: Json<erplora_guest_sdk::Input>) -> FnResult<Json
     }
 }
 
+#[cfg(feature = "guest")]
+#[plugin_fn]
+pub fn void_grant(input: Json<erplora_guest_sdk::Input>) -> FnResult<Json<Output>> {
+    match void_grant_pure(input.into_inner().into_value()) {
+        Ok(out) => Ok(Json(out)),
+        Err(msg) => Err(WithReturnCode::new(Error::msg(msg), 1)),
+    }
+}
+
 // ── helpers de tipos (mismo criterio que el handler de sales) ───────────────
 
 // El DINERO lo redondea `erplora_guest_sdk::money` (ADR-0123): unidad mínima, HALF_UP, uno solo
@@ -1201,6 +1210,94 @@ fn refund_refusal_for(reason: &str) -> DomainError {
     }
 }
 
+/// The read that decides whether a sold voucher may be voided (services#82).
+const READ_VOID_CHECK: &str = "services.packages.void_check";
+
+/// Logic of `services.packages.void_grant` — voiding a voucher sold BY MISTAKE (services#82): the
+/// wrong voucher, the wrong customer, or the same one rung up twice.
+///
+/// The host preloads `services.packages.void_check`, `required`; that read — the hub's own rows —
+/// is the authority on whether this grant may be voided and on WHY not. The payload only says
+/// which grant the operator picked and why; a handler that took its word for the rest would let a
+/// caller void any voucher by asking. It fails closed: with no read, nothing is voided.
+///
+/// What it adds over the declarative path is the NAMED refusal (`services.grant_in_use` tells the
+/// operator to correct the balance instead; `services.grant_already_voided` that someone was
+/// faster). `commands/_void_grant.sql` repeats every condition inside the transaction and the
+/// manifest's `expect_rows` rolls a race back as `services.grant_not_voidable`, so the read stays
+/// advisory.
+///
+/// 🔴 The reason is MANDATORY and travels trimmed: a void is an audit fact (who, when, WHY), and
+/// a blank one is refused with `services.grant_void_reason_required` before anything is read.
+///
+/// 🔴 No money moves here. Refunding what a mistaken sale charged is `sales`' rectificativa; this
+/// only takes back the sessions, which is the half this module owns.
+pub fn void_grant_pure(input: Value) -> Result<Output, String> {
+    let payload = input.get("payload").cloned().unwrap_or(Value::Null);
+    let grant_id = str_field(&payload, "grant_id").trim().to_string();
+    let reason = str_field(&payload, "reason").trim().to_string();
+
+    if grant_id.is_empty() {
+        return Ok(Output::new().with_error(void_refusal_for("")));
+    }
+    if reason.is_empty() {
+        return Ok(Output::new().with_error(redeem_refusal(
+            "services.grant_void_reason_required",
+            "Say why this voucher is being voided: the reason stays on its record.",
+        )));
+    }
+
+    let row = match input.pointer(format!("/context/reads/{READ_VOID_CHECK}/0").as_str()) {
+        Some(value) if !value.is_null() => value.clone(),
+        _ => return Ok(Output::new().with_error(void_refusal_for(""))),
+    };
+    // The read must be about THIS grant; one answering for another is a broken contract.
+    if str_field(&row, "grant_id").trim() != grant_id {
+        return Ok(Output::new().with_error(void_refusal_for("")));
+    }
+    if !flag_is(&row, "voidable") {
+        return Ok(Output::new().with_error(void_refusal_for(&str_field(&row, "reason"))));
+    }
+
+    let mut p = Map::new();
+    p.insert("grant_id".into(), json!(grant_id));
+    p.insert("reason".into(), json!(reason));
+
+    Ok(Output::new()
+        .with_operation(Operation::sql("services._void_grant", p))
+        .with_result(json!({
+            "voided": true,
+            "grant_id": grant_id,
+            "package_id": row.get("package_id").cloned().unwrap_or(Value::Null),
+            "customer_id": row.get("customer_id").cloned().unwrap_or(Value::Null),
+            "reason": reason,
+        })))
+}
+
+/// `reason` of `services.packages.void_check` → the domain error the caller receives. The closed
+/// set comes from that query; anything else fails CLOSED with the generic refusal — the same code
+/// the manifest's `expect_rows` raises when a race lands the void on zero rows.
+fn void_refusal_for(reason: &str) -> DomainError {
+    match reason.trim() {
+        "grant_not_found" => redeem_refusal(
+            "services.grant_not_found",
+            "That voucher sale does not exist in this business.",
+        ),
+        "already_voided" => redeem_refusal(
+            "services.grant_already_voided",
+            "That voucher was already voided.",
+        ),
+        "in_use" => redeem_refusal(
+            "services.grant_in_use",
+            "That voucher was already used: it cannot be voided.",
+        ),
+        _ => redeem_refusal(
+            "services.grant_not_voidable",
+            "That voucher cannot be voided right now.",
+        ),
+    }
+}
+
 /// An INTEGER flag of a query row (`CASE … THEN 1 ELSE 0`), read whatever shape the driver chose.
 /// Postgres drivers may hand a `0/1` back as a number, a bool or text, and all three say the same.
 fn flag_is(row: &Value, key: &str) -> bool {
@@ -2266,6 +2363,129 @@ mod tests {
             out.error.as_ref().map(|e| e.code.as_str()),
             Some("services.redemption_not_refundable"),
             "a read that answers about ANOTHER redemption is not an authorisation for this one"
+        );
+        assert!(out.operations.is_empty());
+    }
+
+    // ── services#82 — voiding a voucher sold by mistake ───────────────────────────────────────
+    //
+    // The payload names WHICH grant the operator wants voided and WHY; whether it may be voided is
+    // decided by `services.packages.void_check` — the hub's own rows. The reason is mandatory: a
+    // void with nothing behind it cannot be audited.
+
+    fn void_payload() -> Value {
+        json!({ "grant_id": "gr-1", "reason": "  Sold to the wrong customer  " })
+    }
+
+    fn void_input(check_row: Option<Value>, payload: Value) -> Value {
+        let mut reads = Map::new();
+        if let Some(row) = check_row {
+            reads.insert(READ_VOID_CHECK.into(), json!([row]));
+        }
+        json!({
+            "payload": payload,
+            "context": { "new_ids": ["unused-1"], "reads": Value::Object(reads) }
+        })
+    }
+
+    fn voidable_row() -> Value {
+        json!({
+            "grant_id": "gr-1",
+            "package_id": "pkg-1",
+            "customer_id": "cus-1",
+            "used": 0,
+            "voidable": 1,
+            "reason": ""
+        })
+    }
+
+    #[test]
+    fn an_unused_grant_is_voided_with_its_trimmed_reason() {
+        let out = void_grant_pure(void_input(Some(voidable_row()), void_payload())).unwrap();
+        assert!(out.error.is_none(), "a voidable grant must go through, got {out:?}");
+        assert_eq!(out.operations.len(), 1);
+        let op = &out.operations[0];
+        assert_eq!(op.command, "services._void_grant");
+        assert_eq!(op.params["grant_id"], json!("gr-1"));
+        assert_eq!(op.params["reason"], json!("Sold to the wrong customer"));
+        let result = out.result.unwrap();
+        assert_eq!(result["voided"], json!(true));
+        assert_eq!(result["grant_id"], json!("gr-1"));
+        assert_eq!(result["package_id"], json!("pkg-1"));
+        assert_eq!(result["customer_id"], json!("cus-1"));
+    }
+
+    /// The business reason reaches the caller with its own code, never the raw zero-rows gate.
+    #[test]
+    fn the_void_refusal_names_its_reason() {
+        for (reason, code) in [
+            ("grant_not_found", "services.grant_not_found"),
+            ("already_voided", "services.grant_already_voided"),
+            ("in_use", "services.grant_in_use"),
+            ("something_new", "services.grant_not_voidable"),
+        ] {
+            let mut row = voidable_row();
+            row["voidable"] = json!(0);
+            row["reason"] = json!(reason);
+            let out = void_grant_pure(void_input(Some(row), void_payload())).unwrap();
+            assert_eq!(
+                out.error.as_ref().map(|e| e.code.as_str()),
+                Some(code),
+                "reason {reason} must reach the caller as {code}"
+            );
+            assert!(out.operations.is_empty());
+        }
+    }
+
+    /// 🔴 A void with a blank reason does not exist: nothing to audit.
+    #[test]
+    fn a_void_without_a_reason_is_refused() {
+        for blank in ["", "   "] {
+            let mut payload = void_payload();
+            payload["reason"] = json!(blank);
+            let out = void_grant_pure(void_input(Some(voidable_row()), payload)).unwrap();
+            assert_eq!(
+                out.error.as_ref().map(|e| e.code.as_str()),
+                Some("services.grant_void_reason_required"),
+                "reason {blank:?} must refuse"
+            );
+            assert!(out.operations.is_empty());
+        }
+    }
+
+    /// Fail-closed: without the read there is nothing to verify against, so nothing is voided.
+    #[test]
+    fn without_the_read_nothing_is_voided() {
+        let out = void_grant_pure(void_input(None, void_payload())).unwrap();
+        assert_eq!(
+            out.error.as_ref().map(|e| e.code.as_str()),
+            Some("services.grant_not_voidable")
+        );
+        assert!(out.operations.is_empty());
+    }
+
+    /// 🔴 The read, not the payload, decides WHICH grant is voided.
+    #[test]
+    fn the_read_and_not_the_payload_decides_which_grant_is_voided() {
+        let mut row = voidable_row();
+        row["grant_id"] = json!("gr-OTHER");
+        let out = void_grant_pure(void_input(Some(row), void_payload())).unwrap();
+        assert_eq!(
+            out.error.as_ref().map(|e| e.code.as_str()),
+            Some("services.grant_not_voidable"),
+            "a read that answers about ANOTHER grant is not an authorisation for this one"
+        );
+        assert!(out.operations.is_empty());
+    }
+
+    #[test]
+    fn a_void_without_a_grant_id_is_refused() {
+        let mut payload = void_payload();
+        payload["grant_id"] = json!(" ");
+        let out = void_grant_pure(void_input(Some(voidable_row()), payload)).unwrap();
+        assert_eq!(
+            out.error.as_ref().map(|e| e.code.as_str()),
+            Some("services.grant_not_voidable")
         );
         assert!(out.operations.is_empty());
     }

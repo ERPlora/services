@@ -34,6 +34,8 @@ versión instalada y cita la de TU versión, no la de la última publicada. En i
 | command | `services.packages.create` (WASM) / `.update` / `.delete` | los `*_package` |
 | command | `services.packages.grant` (WASM + **gate**) — la COMPRA: quién, qué bono, cuándo, en qué venta y por cuánto | `grant_package` |
 | command | `services.packages.redeem` (WASM + **gate**, rechaza con código de dominio: `package_no_grant` / `package_no_uses_left` / `package_expired` / `package_not_found`) | `redeem_package` |
+| command | `services.packages.void_grant` (WASM, lee `services.packages.void_check`) — ANULA una concesión vendida por error, con motivo obligatorio; solo si no se ha gastado ni retenido ninguna sesión (services#82). Rechaza con `grant_not_found` / `grant_already_voided` / `grant_in_use` / `grant_void_reason_required` | `void_grant` (admin + manager) |
+| query | `services.packages.grants` — bonos VENDIDOS de un bono (paginada), vivos y anulados con su rastro | `view_package_balance` |
 | command | `services.settings.update` | `manage_settings` (solo admin) |
 | emite | `services.service.*`, `services.package.*` (incl. `services.package.granted` y `.redeemed`) | — |
 | escucha | — | — |

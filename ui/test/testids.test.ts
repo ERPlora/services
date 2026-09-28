@@ -101,7 +101,7 @@ const COVERED: Record<
     tables: ['services-categories-table'],
   },
   // Packages and vouchers (`/m/services/packages`): the table, the package panel with its lines,
-  // the voucher movements and the orphan grants.
+  // the voucher movements, the orphan grants and the sold vouchers with their void.
   'components/erp-services-packages/erp-services-packages.ts': {
     prefix: 'services-packages-',
     contract: [
@@ -115,6 +115,15 @@ const COVERED: Record<
       'services-packages-fixed-price',
       'services-packages-form',
       'services-packages-form-error',
+      'services-packages-grant-void-cancel',
+      'services-packages-grant-void-error',
+      'services-packages-grant-void-reason',
+      'services-packages-grant-void-submit',
+      'services-packages-grants-close',
+      'services-packages-grants-empty',
+      'services-packages-grants-error',
+      'services-packages-grants-loading',
+      'services-packages-grants-more',
       'services-packages-lines-fixed',
       'services-packages-load-error',
       'services-packages-max-uses',
@@ -142,6 +151,8 @@ const COVERED: Record<
       'services-packages-line-sessions-',
       // A refunded movement past its expiry, keyed by the redemption it belongs to.
       'services-packages-movement-refund-expired-',
+      // «Void» on one sold voucher, keyed by its grant (services#82).
+      'services-packages-grant-void-',
     ],
     tables: ['services-packages-table'],
   },
