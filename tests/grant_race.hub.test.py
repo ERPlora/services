@@ -17,12 +17,18 @@ The first door is the till's own SQL, run by hand in the hub's database and left
 `/api/command`, from a thread. The battery checks that the command is still waiting, commits the
 till, and reads what the command answered and what the database kept.
 
+The hub's database is the one the HARNESS hands over in `ERPLORA_HUB_PSQL` (services#134): both
+runners that start a hub for a battery — `erplora test --against-hub` (module-toolkit#405) and the
+hub's CI `scripts/ci/run-module-hub-batteries.sh` (hub#2367) — set it to a psql session on the
+database that hub writes to. The battery never guesses it, and without it the battery fails.
+
 Usage: `erplora test <dir> --against-hub [dev|stable|sha256:…]` (module-toolkit#110), and the hub's
 CI runs it through `scripts/ci/run-module-hub-batteries.sh` against a native kernel (services#130).
 Never on its own: without a runtime it fails, it does not skip.
 """
 
 import os
+import shlex
 import subprocess
 import sys
 import threading
@@ -30,9 +36,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 from typing import NamedTuple
-from urllib.parse import urlparse
 
-import hub_harness
 from hub_harness import Hub, balance_of, catalog_service, create_package, grant, tag
 from pg_harness import script_for
 
@@ -42,98 +46,53 @@ SETTLE_TIMEOUT = 30
 
 
 class HubDatabase(NamedTuple):
-    """Where THIS run's hub writes: a Postgres container and the database inside it."""
+    """A psql session on the database THIS run's hub writes to, as the harness hands it over."""
 
-    container: str
-    name: str
+    words: tuple[str, ...]
+
+    @classmethod
+    def from_env(cls, env=os.environ) -> "HubDatabase":
+        words = tuple(shlex.split(env.get("ERPLORA_HUB_PSQL", "")))
+        if not words:
+            print(
+                "grant_race.hub: hub_psql_missing — ERPLORA_HUB_PSQL is empty. The runner that "
+                "starts the hub (`erplora test --against-hub`, or the hub's "
+                "`run-module-hub-batteries.sh`) hands over a psql session on its database; "
+                "without it this is NOT a skip, it is a failure."
+            )
+            sys.exit(1)
+        return cls(words)
 
     def psql(self, *args: str) -> list[str]:
-        return [
-            "docker",
-            "exec",
-            "-i",
-            self.container,
-            "psql",
-            "-U",
-            "postgres",
-            "-d",
-            self.name,
-            *args,
-        ]
+        return [*self.words, *args]
+
+    def open_session(self) -> list[str]:
+        """The session that keeps a till's transaction open. The handed-over words carry
+        `-v ON_ERROR_STOP=1`, and with it psql EXITS at the first failing statement read from
+        stdin: a till that failed would die before its COMMIT and the battery would read a broken
+        pipe instead of the till's error. psql applies `-v` in order, so this one wins."""
+        return self.psql("-v", "ON_ERROR_STOP=0")
 
 
-def _psql_rows(container: str, database: str, sql: str) -> list[str] | None:
-    """The rows of `sql`, or None when the database cannot answer it (no such table there)."""
+def prove_hub_database(db: HubDatabase, hub: Hub, probe_package_id: str) -> None:
+    """The handed-over database holds the package THIS run just created through `/api/command`,
+    under this hub's `hub_id`. Acting on any other database would prove nothing (the till's SQL
+    would lock a voucher the hub never reads)."""
     done = subprocess.run(
-        HubDatabase(container, database).psql("-tAc", sql),
+        db.psql(
+            "-tAc",
+            "SELECT count(*) FROM services_package "
+            f"WHERE id = '{probe_package_id}' AND hub_id = '{hub.hub_id}'",
+        ),
         capture_output=True,
         text=True,
     )
-    if done.returncode != 0:
-        return None
-    return [line for line in done.stdout.splitlines() if line]
-
-
-def candidate_containers() -> list[str]:
-    """The Postgres containers the hub of this run may be writing to, in the two topologies that
-    run this battery (services#130):
-
-      * `erplora test --against-hub` starts the hub inside the network namespace of its scratch
-        Postgres and publishes the hub's port on THAT container, so the container whose ports
-        carry the port of `ERPLORA_HUB_BASE_URL` is the hub's database container;
-      * the hub's CI (`scripts/ci/run-module-hub-batteries.sh`, «e2e con módulos reales») boots a
-        NATIVE `erplora-server` on a scratch database of the job's Postgres service container,
-        which it names in `ERPLORA_PG_CONTAINER` / `PG_CONTAINER` — no container publishes the
-        hub's port there."""
-    port = urlparse(hub_harness.BASE).port
-    out = subprocess.run(
-        ["docker", "ps", "--format", "{{.Names}}\t{{.Ports}}"],
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout
-    found = [
-        line.split("\t")[0]
-        for line in out.splitlines()
-        if f":{port}->" in line.split("\t", 1)[-1]
-    ]
-    for var in ("ERPLORA_PG_CONTAINER", "PG_CONTAINER"):
-        name = os.environ.get(var, "").strip()
-        if name and name not in found:
-            found.append(name)
-    return found
-
-
-def hub_database(hub: Hub, probe_package_id: str) -> HubDatabase:
-    """The database of THIS run's hub, proved by a row the hub itself just wrote.
-
-    Among every database of every candidate container, the one holding the package this run
-    created through `/api/command` — under this hub's `hub_id` — is the database the runtime
-    writes to. Anything but exactly one match is a failure: acting on the wrong database would
-    prove nothing (the till's SQL would lock a voucher the hub never reads)."""
-    containers = candidate_containers()
-    matches = []
-    for container in containers:
-        databases = _psql_rows(
-            container,
-            "postgres",
-            "SELECT datname FROM pg_database WHERE NOT datistemplate",
-        )
-        for database in databases or []:
-            rows = _psql_rows(
-                container,
-                database,
-                "SELECT count(*) FROM services_package "
-                f"WHERE id = '{probe_package_id}' AND hub_id = '{hub.hub_id}'",
-            )
-            if rows == ["1"]:
-                matches.append(HubDatabase(container, database))
-    if len(matches) != 1:
+    found = done.stdout.strip() if done.returncode == 0 else done.stderr.strip()
+    if found != "1":
         raise AssertionError(
-            f"expected ONE database holding package {probe_package_id} of hub {hub.hub_id} "
-            f"(the hub's database), found {matches} in containers {containers}"
+            f"ERPLORA_HUB_PSQL does not open this hub's database: package {probe_package_id} "
+            f"of hub {hub.hub_id} → {found!r}"
         )
-    return matches[0]
 
 
 class OpenTransaction:
@@ -141,7 +100,7 @@ class OpenTransaction:
 
     def __init__(self, db: HubDatabase):
         self.proc = subprocess.Popen(
-            db.psql(),
+            db.open_session(),
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -168,6 +127,7 @@ class OpenTransaction:
         self.proc.stdin.flush()
         self.proc.stdin.close()
         self.proc.wait(timeout=30)
+        self.output = self.proc.stdout.read() or ""
         return (self.proc.stderr.read() or "").strip()
 
     def kill(self) -> None:
@@ -200,7 +160,7 @@ def parked(db: HubDatabase, condition: str) -> int:
         scalar(
             db,
             "SELECT count(*) FROM pg_stat_activity "
-            f"WHERE datname = '{db.name}' AND pid <> pg_backend_pid() AND {condition}",
+            f"WHERE datname = current_database() AND pid <> pg_backend_pid() AND {condition}",
         )
     )
 
@@ -259,6 +219,29 @@ def hold_sql(grant_id: str, service_id: str) -> tuple[str, dict]:
         "line_ref": "l1",
         "note": "",
     }
+
+
+def test_0_a_failing_till_statement_is_read_not_a_dead_session(
+    hub: Hub, db: HubDatabase
+) -> None:
+    print("\n0 · a till statement fails inside the open session → its error is read, psql goes on")
+    session = OpenTransaction(db)
+    try:
+        try:
+            session.proc.stdin.write("BEGIN;\nSELECT 1/0;\n")
+            session.proc.stdin.flush()
+            error = session.commit()
+        except OSError as exc:
+            error, session.output = f"session died: {exc!r}", ""
+    finally:
+        session.kill()
+    hub.check("the till's error reaches the battery", "division by zero" in error, True)
+    # The till's COMMIT still reached psql: an aborted transaction answers it with ROLLBACK.
+    hub.check(
+        "the session lived to read the till's COMMIT",
+        [session.proc.returncode, "ROLLBACK" in session.output],
+        [0, True],
+    )
 
 
 def test_1_the_void_waits_for_the_till_and_is_refused(hub: Hub, db: HubDatabase) -> None:
@@ -378,7 +361,7 @@ def test_3_the_till_waits_for_the_void_and_spends_nothing(hub: Hub, db: HubDatab
     )
 
 
-def last_session_race(hub: Hub, db: str, label: str, late: str) -> None:
+def last_session_race(hub: Hub, db: HubDatabase, label: str, late: str) -> None:
     """services#128: another till holds the LAST session of a voucher and has not committed yet;
     the late door (`late`, the chair's redeem or the till's hold) arrives, waits, and loses."""
     customer = tag(f"cust-last-{label}")
@@ -416,21 +399,24 @@ def last_session_race(hub: Hub, db: str, label: str, late: str) -> None:
     )
 
 
-def test_4_the_chair_loses_the_last_session_to_a_till(hub: Hub, db: str) -> None:
+def test_4_the_chair_loses_the_last_session_to_a_till(hub: Hub, db: HubDatabase) -> None:
     print("\n4 · a till holds the LAST session when the chair redeems it → «no sessions left»")
     last_session_race(hub, db, "chair", "redeem")
 
 
-def test_5_a_till_loses_the_last_session_to_another_till(hub: Hub, db: str) -> None:
+def test_5_a_till_loses_the_last_session_to_another_till(hub: Hub, db: HubDatabase) -> None:
     print("\n5 · two tills cover a line with the LAST session → the late one reads «no sessions left»")
     last_session_race(hub, db, "till", "hold")
 
 
 def main() -> int:
+    # Before the hub: a battery without the database has nothing to race on.
+    db = HubDatabase.from_env()
     hub = Hub("grant_race.hub", needs=("taxes", "services"))
-    # A voucher written through the hub's own API is what proves which database is the hub's.
-    db = hub_database(hub, create_package(hub, tag("Bono sonda"), 1, None))
+    # A voucher written through the hub's own API proves the handed-over database is the hub's.
+    prove_hub_database(db, hub, create_package(hub, tag("Bono sonda"), 1, None))
     for test in (
+        test_0_a_failing_till_statement_is_read_not_a_dead_session,
         test_1_the_void_waits_for_the_till_and_is_refused,
         test_2_a_correction_waits_for_the_till_and_is_refused,
         test_3_the_till_waits_for_the_void_and_spends_nothing,
