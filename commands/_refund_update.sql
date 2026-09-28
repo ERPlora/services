@@ -39,11 +39,16 @@ UPDATE services_package_redemption AS r
        refund_note = COALESCE(:refund_note, ''),
        refund_expired = CASE
            WHEN g.validity_days IS NOT NULL
-                AND erp_dt(:now) > erp_dateadd(g.granted_at, g.validity_days, 'days')
+                AND erp_dt(:now) > erp_dateadd(g.granted_at, (g.validity_days + COALESCE(adj.days_delta, 0)), 'days')
            THEN 1 ELSE 0 END,
        updated_by = :current_user_id,
        updated_at = :now
   FROM services_package_grant g
+  LEFT JOIN (SELECT hub_id, grant_id, CAST(SUM(uses_delta) AS BIGINT) AS uses_delta, CAST(SUM(days_delta) AS BIGINT) AS days_delta
+               FROM services_package_grant_adjustment
+              WHERE is_deleted = 0
+              GROUP BY hub_id, grant_id) adj
+         ON adj.grant_id = g.id AND adj.hub_id = g.hub_id
  WHERE r.id = :redemption_id
    AND r.hub_id = :hub_id
    AND g.id = r.grant_id

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "services.packages.adjust_check params",
+  "description": "Read-only pre-check of adjusting a sold voucher (services#118): does :grant_id exist here and is it live? Returns the business reason (grant_not_found | already_voided), and whether it can take sessions (can_add_uses: it has a session limit) and days (can_extend: it expires). It does not mutate; the transactional authority is still services.packages.adjust_grant.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["grant_id"],
+  "properties": {
+    "grant_id": { "type": "string", "minLength": 1, "description": "Id of the grant to adjust." }
+  }
+}

@@ -181,8 +181,26 @@ the list is then read again. A refusal (someone spent a session in the meantime,
 voided) is shown on the confirmation itself, with its own sentence.
 
 Voiding moves **no money**: if the voucher was paid, refund the sale from Sales with a return. A
-voucher that was already used cannot be voided — adding a courtesy session or extending it
-(services#118) and correcting its balance (services#119) are separate doors that do not exist yet.
+voucher that was already used cannot be voided; correcting its balance (services#119) is a separate
+door that does not exist yet.
+
+### A courtesy on a sold voucher: more sessions, a later expiry (services#118)
+
+Each row also shows the **expiry** («Expires …» / «Never expires») and, when something was given
+after the sale, «Given afterwards: +N session(s), +N day(s)». The sessions left and the expiry
+already include those courtesies.
+
+A **live** sale that has a session limit or an expiry shows an «Adjust» button to whoever has
+`services.adjust_grant` (admin and manager). It swaps the list for a small form: **sessions to add**
+(only on a voucher with a session limit, up to 100), **days to extend** (only on one that expires,
+up to 366), a mandatory **reason**, and a preview of what the customer will have afterwards. The
+button stays disabled until there is a reason and something to add. Confirming runs
+`services.packages.adjust_grant` and reads the list again; a refusal (voided in the meantime) stays
+on the form. An expired or fully used voucher can be adjusted too — that is exactly when a salon
+gives the extra month or the session on the house.
+
+The purchase is **never rewritten**: the courtesy is a movement of its own, and «Movements» shows it
+as **Courtesy** with what was given, by whom and why. No money moves and no document is issued.
 
 ### Pay a line with a voucher (`erp-services-voucher-tender`)
 

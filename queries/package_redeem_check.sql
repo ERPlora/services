@@ -20,9 +20,18 @@
 -- would otherwise be indistinguishable to the handler, which fails closed on a missing read and
 -- would turn every unknown id into the generic refusal instead of the honest one.
 WITH grant_row AS (
-    SELECT id, package_id, customer_id, max_uses, validity_days, granted_at
-    FROM services_package_grant
-    WHERE id = :grant_id AND hub_id = :hub_id AND is_deleted = 0
+    -- The terms are the grant's snapshot PLUS its live adjustments (services#118, migration 019):
+    -- a gifted session or a later expiry is spendable here exactly as it is at the gated write.
+    SELECT g.id, g.package_id, g.customer_id, g.granted_at,
+           g.max_uses + COALESCE(adj.uses_delta, 0)      AS max_uses,
+           g.validity_days + COALESCE(adj.days_delta, 0) AS validity_days
+    FROM services_package_grant g
+    LEFT JOIN (SELECT hub_id, grant_id, CAST(SUM(uses_delta) AS BIGINT) AS uses_delta, CAST(SUM(days_delta) AS BIGINT) AS days_delta
+                 FROM services_package_grant_adjustment
+                WHERE is_deleted = 0
+                GROUP BY hub_id, grant_id) adj
+           ON adj.grant_id = g.id AND adj.hub_id = g.hub_id
+    WHERE g.id = :grant_id AND g.hub_id = :hub_id AND g.is_deleted = 0
 ),
 pkg AS (
     SELECT p.id

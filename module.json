@@ -39,7 +39,8 @@
     "services.settle_package",
     "services.refund_package",
     "services.view_orphan_grant",
-    "services.void_grant"
+    "services.void_grant",
+    "services.adjust_grant"
   ],
   "role_permissions": {
     "admin": [
@@ -72,7 +73,8 @@
       "services.refund_package",
       "services.grant_package",
       "services.view_orphan_grant",
-      "services.void_grant"
+      "services.void_grant",
+      "services.adjust_grant"
     ],
     "employee": [
       "services.view_service",
@@ -160,7 +162,8 @@
         "since": "1.5.44"
       },
       "migrations/postgres/017_category_name_gate.sql",
-      "migrations/postgres/018_grant_void.sql"
+      "migrations/postgres/018_grant_void.sql",
+      "migrations/postgres/019_grant_adjustment.sql"
     ]
   },
   "queries": {
@@ -440,6 +443,15 @@
       "schema": "schemas/package_void_check.json",
       "ai": {
         "description": "Checks whether a sold voucher (grant) can be voided and, if not, returns the business reason (grant_not_found, already_voided or in_use) instead of the raw gate error."
+      },
+      "expose_api": true
+    },
+    "services.packages.adjust_check": {
+      "permission": "services.adjust_grant",
+      "sql": "queries/package_adjust_check.sql",
+      "schema": "schemas/package_adjust_check.json",
+      "ai": {
+        "description": "Checks whether a sold voucher (grant) can be given more sessions or a later expiry and, if not, returns the business reason (grant_not_found or already_voided); can_add_uses says it has a session limit and can_extend that it expires."
       },
       "expose_api": true
     },
@@ -1055,6 +1067,43 @@
         "message": "That voucher could not be voided: it does not exist here, it was already voided, or a session of it was just spent or held."
       }
     },
+    "services.packages.adjust_grant": {
+      "permission": "services.adjust_grant",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "adjust_grant"
+      },
+      "reads": [
+        {
+          "query": "services.packages.adjust_check",
+          "params": {
+            "grant_id": "payload.grant_id"
+          },
+          "required": true
+        }
+      ],
+      "schema": "schemas/package_adjust_grant.json",
+      "emit": [
+        "services.package.grant_adjusted"
+      ],
+      "ai": {
+        "description": "Gives a voucher a customer already bought (a grant) more sessions and/or a later expiry, as a courtesy — «one more session on the house», «extended a month because we were closed» — with a mandatory reason. It is written as a movement (who, when, why, how much) that shows in the voucher's movements; the purchase itself is never rewritten. It revives an expired or used-up voucher. Refused with a domain code: services.grant_not_found, services.grant_already_voided, services.grant_adjust_empty (nothing to add), services.grant_unlimited (sessions on a voucher with no session limit), services.grant_no_expiry (days on a voucher that never expires) or services.grant_adjust_reason_required. It moves NO money and issues no fiscal document: a gifted session has no consideration."
+      },
+      "expose_api": true
+    },
+    "services._adjust_grant": {
+      "permission": "services.adjust_grant",
+      "sql": [
+        "commands/_adjust_grant.sql"
+      ],
+      "expect_rows": {
+        "op": "min",
+        "n": 1,
+        "error": "services.grant_not_adjustable",
+        "message": "That voucher could not be adjusted: it does not exist here, it was voided, or it cannot take what was asked."
+      }
+    },
     "services._on_sale_completed": {
       "permission": "services.settle_package",
       "handler": {
@@ -1163,6 +1212,7 @@
     "emits": [
       "services.package.created",
       "services.package.deleted",
+      "services.package.grant_adjusted",
       "services.package.grant_voided",
       "services.package.granted",
       "services.package.held",

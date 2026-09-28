@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "services.packages.adjust_grant params",
+  "description": "Gives a SOLD voucher more sessions and/or a later expiry as a courtesy (services#118): «one more session on the house», «extended a month because we were closed». It is written as a movement with who, when and why; the purchase itself is never rewritten. Sessions only on a voucher with a session limit, days only on one that expires. It moves NO money and issues no fiscal document.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["grant_id", "reason"],
+  "properties": {
+    "grant_id": { "type": "string", "minLength": 1, "description": "Id of the grant (the voucher purchase) being adjusted." },
+    "uses_delta": { "type": "integer", "minimum": 0, "maximum": 100, "default": 0, "description": "Sessions added to what the customer has left." },
+    "days_delta": { "type": "integer", "minimum": 0, "maximum": 366, "default": 0, "description": "Days the expiry moves later." },
+    "reason": { "type": "string", "minLength": 1, "maxLength": 500, "pattern": "\\S", "description": "Why, in the operator's words. Mandatory: it stays in the voucher's movements." }
+  }
+}

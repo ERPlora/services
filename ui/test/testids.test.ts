@@ -115,6 +115,13 @@ const COVERED: Record<
       'services-packages-fixed-price',
       'services-packages-form',
       'services-packages-form-error',
+      'services-packages-grant-adjust-cancel',
+      'services-packages-grant-adjust-days',
+      'services-packages-grant-adjust-error',
+      'services-packages-grant-adjust-preview',
+      'services-packages-grant-adjust-reason',
+      'services-packages-grant-adjust-submit',
+      'services-packages-grant-adjust-uses',
       'services-packages-grant-void-cancel',
       'services-packages-grant-void-error',
       'services-packages-grant-void-reason',
@@ -153,6 +160,8 @@ const COVERED: Record<
       'services-packages-movement-refund-expired-',
       // «Void» on one sold voucher, keyed by its grant (services#82).
       'services-packages-grant-void-',
+      // «Adjust» on one sold voucher, keyed by its grant (services#118).
+      'services-packages-grant-adjust-',
     ],
     tables: ['services-packages-table'],
   },

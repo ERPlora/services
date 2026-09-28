@@ -104,6 +104,15 @@ pub fn void_grant(input: Json<erplora_guest_sdk::Input>) -> FnResult<Json<Output
     }
 }
 
+#[cfg(feature = "guest")]
+#[plugin_fn]
+pub fn adjust_grant(input: Json<erplora_guest_sdk::Input>) -> FnResult<Json<Output>> {
+    match adjust_grant_pure(input.into_inner().into_value()) {
+        Ok(out) => Ok(Json(out)),
+        Err(msg) => Err(WithReturnCode::new(Error::msg(msg), 1)),
+    }
+}
+
 // ── helpers de tipos (mismo criterio que el handler de sales) ───────────────
 
 // El DINERO lo redondea `erplora_guest_sdk::money` (ADR-0123): unidad mínima, HALF_UP, uno solo
@@ -1298,6 +1307,138 @@ fn void_refusal_for(reason: &str) -> DomainError {
     }
 }
 
+/// The read that decides whether a sold voucher may take more sessions or days (services#118).
+const READ_ADJUST_CHECK: &str = "services.packages.adjust_check";
+
+/// Most sessions / days ONE courtesy may add (services#118) — what the screen promises («up to 100»,
+/// «up to 366») and `commands/_adjust_grant.sql` repeats. Past it the amount is a typo: ten million
+/// days is a date no later read of the voucher can compute.
+const ADJUST_MAX_USES: i64 = 100;
+const ADJUST_MAX_DAYS: i64 = 366;
+
+/// Logic of `services.packages.adjust_grant` — a courtesy on a SOLD voucher (services#118): «one
+/// more session on the house», «extended a month because we were closed».
+///
+/// It writes a MOVEMENT (`services_package_grant_adjustment`) and never rewrites the purchase: the
+/// grant's `max_uses` / `validity_days` stay the snapshot of what was sold (ADR-0390) and every
+/// reader adds the live movements on top. The deltas are signed in the table so the balance
+/// correction (services#119) can reuse it; THIS door only adds and refuses a negative amount with
+/// `services.grant_adjust_invalid`.
+///
+/// Same shape as `void_grant`: the payload says which grant, how much and why; the `required` read
+/// `services.packages.adjust_check` — the hub's own rows — decides whether it exists, is live, and
+/// can take sessions (it has a limit) or days (it expires). No read, nothing written.
+/// `commands/_adjust_grant.sql` repeats every condition and `expect_rows` rolls a race back as
+/// `services.grant_not_adjustable`.
+///
+/// 🔴 The reason is MANDATORY and travels trimmed: a gift nobody explains is not audited.
+pub fn adjust_grant_pure(input: Value) -> Result<Output, String> {
+    let payload = input.get("payload").cloned().unwrap_or(Value::Null);
+    let grant_id = str_field(&payload, "grant_id").trim().to_string();
+    let reason = str_field(&payload, "reason").trim().to_string();
+
+    if grant_id.is_empty() {
+        return Ok(Output::new().with_error(adjust_refusal_for("")));
+    }
+    if reason.is_empty() {
+        return Ok(Output::new().with_error(redeem_refusal(
+            "services.grant_adjust_reason_required",
+            "Say why this voucher is being adjusted: the reason stays on its record.",
+        )));
+    }
+    let (uses_delta, days_delta) = match (
+        parse_int(payload.get("uses_delta")),
+        parse_int(payload.get("days_delta")),
+    ) {
+        (Ok(u), Ok(d))
+            if (0..=ADJUST_MAX_USES).contains(&u.unwrap_or(0))
+                && (0..=ADJUST_MAX_DAYS).contains(&d.unwrap_or(0)) =>
+        {
+            (u.unwrap_or(0), d.unwrap_or(0))
+        }
+        _ => {
+            return Ok(Output::new().with_error(redeem_refusal(
+                "services.grant_adjust_invalid",
+                "Sessions to add must be a whole number from 0 to 100, and days from 0 to 366.",
+            )))
+        }
+    };
+    if uses_delta == 0 && days_delta == 0 {
+        return Ok(Output::new().with_error(redeem_refusal(
+            "services.grant_adjust_empty",
+            "Add at least one session or one day.",
+        )));
+    }
+
+    let row = match input.pointer(format!("/context/reads/{READ_ADJUST_CHECK}/0").as_str()) {
+        Some(value) if !value.is_null() => value.clone(),
+        _ => return Ok(Output::new().with_error(adjust_refusal_for(""))),
+    };
+    // The read must be about THIS grant; one answering for another is a broken contract.
+    if str_field(&row, "grant_id").trim() != grant_id {
+        return Ok(Output::new().with_error(adjust_refusal_for("")));
+    }
+    let refused = str_field(&row, "reason");
+    if !refused.trim().is_empty() {
+        return Ok(Output::new().with_error(adjust_refusal_for(&refused)));
+    }
+    if uses_delta > 0 && !flag_is(&row, "can_add_uses") {
+        return Ok(Output::new().with_error(redeem_refusal(
+            "services.grant_unlimited",
+            "That voucher has no session limit: there are no sessions to add.",
+        )));
+    }
+    if days_delta > 0 && !flag_is(&row, "can_extend") {
+        return Ok(Output::new().with_error(redeem_refusal(
+            "services.grant_no_expiry",
+            "That voucher never expires: there is no expiry to extend.",
+        )));
+    }
+
+    let adjustment_id = input
+        .pointer("/context/new_ids/0")
+        .map(as_str)
+        .filter(|id| !id.trim().is_empty())
+        .ok_or_else(|| "services.packages.adjust_grant: the host gave no new id".to_string())?;
+
+    let mut p = Map::new();
+    p.insert("adjustment_id".into(), json!(adjustment_id));
+    p.insert("grant_id".into(), json!(grant_id));
+    p.insert("uses_delta".into(), json!(uses_delta));
+    p.insert("days_delta".into(), json!(days_delta));
+    p.insert("reason".into(), json!(reason));
+
+    Ok(Output::new()
+        .with_operation(Operation::sql("services._adjust_grant", p))
+        .with_result(json!({
+            "adjusted": true,
+            "grant_id": grant_id,
+            "package_id": row.get("package_id").cloned().unwrap_or(Value::Null),
+            "customer_id": row.get("customer_id").cloned().unwrap_or(Value::Null),
+            "uses_delta": uses_delta,
+            "days_delta": days_delta,
+        })))
+}
+
+/// `reason` of `services.packages.adjust_check` → the domain error. Anything outside the closed
+/// set fails CLOSED with the code the manifest's `expect_rows` raises on zero rows.
+fn adjust_refusal_for(reason: &str) -> DomainError {
+    match reason.trim() {
+        "grant_not_found" => redeem_refusal(
+            "services.grant_not_found",
+            "That voucher sale does not exist in this business.",
+        ),
+        "already_voided" => redeem_refusal(
+            "services.grant_already_voided",
+            "That voucher was already voided.",
+        ),
+        _ => redeem_refusal(
+            "services.grant_not_adjustable",
+            "That voucher cannot be adjusted right now.",
+        ),
+    }
+}
+
 /// An INTEGER flag of a query row (`CASE … THEN 1 ELSE 0`), read whatever shape the driver chose.
 /// Postgres drivers may hand a `0/1` back as a number, a bool or text, and all three say the same.
 fn flag_is(row: &Value, key: &str) -> bool {
@@ -2488,5 +2629,213 @@ mod tests {
             Some("services.grant_not_voidable")
         );
         assert!(out.operations.is_empty());
+    }
+
+    // ── services#118 — a courtesy on a sold voucher: more sessions, a later expiry ───────────────
+    //
+    // The payload says WHICH grant, how much and WHY; whether the grant exists here, is live and can
+    // take sessions (it has a limit) or days (it expires) is decided by `services.packages.
+    // adjust_check` — the hub's own rows. The reason is mandatory: a gift nobody explains is not
+    // audited.
+
+    fn adjust_payload() -> Value {
+        json!({ "grant_id": "gr-1", "uses_delta": 1, "days_delta": 30, "reason": "  We were closed  " })
+    }
+
+    fn adjust_input(check_row: Option<Value>, payload: Value) -> Value {
+        let mut reads = Map::new();
+        if let Some(row) = check_row {
+            reads.insert(READ_ADJUST_CHECK.into(), json!([row]));
+        }
+        json!({
+            "payload": payload,
+            "context": { "new_ids": ["adj-1"], "reads": Value::Object(reads) }
+        })
+    }
+
+    fn adjustable_row() -> Value {
+        json!({
+            "grant_id": "gr-1",
+            "package_id": "pkg-1",
+            "customer_id": "cus-1",
+            "can_add_uses": 1,
+            "can_extend": 1,
+            "reason": ""
+        })
+    }
+
+    fn adjust_code(out: &Output) -> Option<&str> {
+        out.error.as_ref().map(|e| e.code.as_str())
+    }
+
+    #[test]
+    fn a_live_grant_takes_sessions_and_days_as_one_movement() {
+        let out = adjust_grant_pure(adjust_input(Some(adjustable_row()), adjust_payload())).unwrap();
+        assert!(out.error.is_none(), "an adjustable grant must go through, got {out:?}");
+        assert_eq!(out.operations.len(), 1);
+        let op = &out.operations[0];
+        assert_eq!(op.command, "services._adjust_grant");
+        assert_eq!(op.params["adjustment_id"], json!("adj-1"));
+        assert_eq!(op.params["grant_id"], json!("gr-1"));
+        assert_eq!(op.params["uses_delta"], json!(1));
+        assert_eq!(op.params["days_delta"], json!(30));
+        assert_eq!(op.params["reason"], json!("We were closed"));
+        let result = out.result.unwrap();
+        assert_eq!(result["adjusted"], json!(true));
+        assert_eq!(result["grant_id"], json!("gr-1"));
+        assert_eq!(result["package_id"], json!("pkg-1"));
+        assert_eq!(result["customer_id"], json!("cus-1"));
+        assert_eq!(result["uses_delta"], json!(1));
+        assert_eq!(result["days_delta"], json!(30));
+    }
+
+    /// Either half alone is a whole adjustment; the missing one travels as 0, never as NULL.
+    #[test]
+    fn one_half_alone_is_enough_and_the_other_travels_as_zero() {
+        let out = adjust_grant_pure(adjust_input(
+            Some(adjustable_row()),
+            json!({ "grant_id": "gr-1", "uses_delta": "2", "reason": "Birthday" }),
+        ))
+        .unwrap();
+        assert!(out.error.is_none(), "got {out:?}");
+        assert_eq!(out.operations[0].params["uses_delta"], json!(2));
+        assert_eq!(out.operations[0].params["days_delta"], json!(0));
+    }
+
+    /// The business reason reaches the caller with its own code, never the raw zero-rows gate.
+    #[test]
+    fn the_adjust_refusal_names_its_reason() {
+        for (reason, code) in [
+            ("grant_not_found", "services.grant_not_found"),
+            ("already_voided", "services.grant_already_voided"),
+            ("something_new", "services.grant_not_adjustable"),
+        ] {
+            let mut row = adjustable_row();
+            row["reason"] = json!(reason);
+            let out = adjust_grant_pure(adjust_input(Some(row), adjust_payload())).unwrap();
+            assert_eq!(adjust_code(&out), Some(code), "reason {reason} must reach the caller as {code}");
+            assert!(out.operations.is_empty());
+        }
+    }
+
+    /// Sessions on a voucher with no session limit, or days on one that never expires, add nothing
+    /// to «forever» — refused with a code that says which half, not silently dropped.
+    #[test]
+    fn a_half_the_voucher_cannot_take_is_refused_by_name() {
+        let mut unlimited = adjustable_row();
+        unlimited["can_add_uses"] = json!(0);
+        let out = adjust_grant_pure(adjust_input(Some(unlimited.clone()), adjust_payload())).unwrap();
+        assert_eq!(adjust_code(&out), Some("services.grant_unlimited"));
+        assert!(out.operations.is_empty());
+        let days_only = json!({ "grant_id": "gr-1", "days_delta": 7, "reason": "Closed" });
+        let out = adjust_grant_pure(adjust_input(Some(unlimited), days_only)).unwrap();
+        assert!(out.error.is_none(), "an unlimited voucher can still be extended, got {out:?}");
+
+        let mut forever = adjustable_row();
+        forever["can_extend"] = json!("0");
+        let out = adjust_grant_pure(adjust_input(Some(forever.clone()), adjust_payload())).unwrap();
+        assert_eq!(adjust_code(&out), Some("services.grant_no_expiry"));
+        assert!(out.operations.is_empty());
+        let uses_only = json!({ "grant_id": "gr-1", "uses_delta": 1, "reason": "Gift" });
+        let out = adjust_grant_pure(adjust_input(Some(forever), uses_only)).unwrap();
+        assert!(out.error.is_none(), "a voucher that never expires can still take a session, got {out:?}");
+    }
+
+    #[test]
+    fn an_adjustment_that_adds_nothing_is_refused() {
+        for payload in [
+            json!({ "grant_id": "gr-1", "reason": "Nothing" }),
+            json!({ "grant_id": "gr-1", "uses_delta": 0, "days_delta": 0, "reason": "Nothing" }),
+            json!({ "grant_id": "gr-1", "uses_delta": "", "days_delta": null, "reason": "Nothing" }),
+        ] {
+            let out = adjust_grant_pure(adjust_input(Some(adjustable_row()), payload.clone())).unwrap();
+            assert_eq!(adjust_code(&out), Some("services.grant_adjust_empty"), "payload {payload}");
+            assert!(out.operations.is_empty());
+        }
+    }
+
+    /// Taking sessions or days AWAY is the balance correction (services#119), not a courtesy: this
+    /// door only adds, and says so instead of writing a negative movement.
+    #[test]
+    fn a_negative_or_unreadable_amount_is_refused() {
+        for payload in [
+            json!({ "grant_id": "gr-1", "uses_delta": -1, "reason": "Oops" }),
+            json!({ "grant_id": "gr-1", "uses_delta": 2, "days_delta": -1, "reason": "Oops" }),
+            json!({ "grant_id": "gr-1", "uses_delta": "two", "reason": "Oops" }),
+        ] {
+            let out = adjust_grant_pure(adjust_input(Some(adjustable_row()), payload.clone())).unwrap();
+            assert_eq!(adjust_code(&out), Some("services.grant_adjust_invalid"), "payload {payload}");
+            assert!(out.operations.is_empty());
+        }
+    }
+
+    /// The screen promises «up to 100» sessions and «up to 366» days per adjustment: past that it is
+    /// a typo (ten million days is a date no later read can compute), refused before any write.
+    #[test]
+    fn an_amount_past_the_limit_is_refused_and_the_limit_itself_goes_through() {
+        for payload in [
+            json!({ "grant_id": "gr-1", "uses_delta": 101, "reason": "Typo" }),
+            json!({ "grant_id": "gr-1", "days_delta": 367, "reason": "Typo" }),
+            json!({ "grant_id": "gr-1", "uses_delta": 1, "days_delta": 10_000_000, "reason": "Typo" }),
+        ] {
+            let out = adjust_grant_pure(adjust_input(Some(adjustable_row()), payload.clone())).unwrap();
+            assert_eq!(adjust_code(&out), Some("services.grant_adjust_invalid"), "payload {payload}");
+            assert!(out.operations.is_empty());
+        }
+        let limit = json!({ "grant_id": "gr-1", "uses_delta": 100, "days_delta": 366, "reason": "Closed" });
+        let out = adjust_grant_pure(adjust_input(Some(adjustable_row()), limit)).unwrap();
+        assert!(out.error.is_none(), "the limit itself is a valid adjustment, got {out:?}");
+    }
+
+    /// 🔴 A courtesy with a blank reason does not exist: nothing to audit.
+    #[test]
+    fn an_adjustment_without_a_reason_is_refused() {
+        for blank in ["", "   "] {
+            let mut payload = adjust_payload();
+            payload["reason"] = json!(blank);
+            let out = adjust_grant_pure(adjust_input(Some(adjustable_row()), payload)).unwrap();
+            assert_eq!(adjust_code(&out), Some("services.grant_adjust_reason_required"), "reason {blank:?}");
+            assert!(out.operations.is_empty());
+        }
+    }
+
+    /// Fail-closed: without the read there is nothing to verify against, so nothing is written.
+    #[test]
+    fn without_the_read_nothing_is_adjusted() {
+        let out = adjust_grant_pure(adjust_input(None, adjust_payload())).unwrap();
+        assert_eq!(adjust_code(&out), Some("services.grant_not_adjustable"));
+        assert!(out.operations.is_empty());
+    }
+
+    /// 🔴 The read, not the payload, decides WHICH grant is adjusted.
+    #[test]
+    fn the_read_and_not_the_payload_decides_which_grant_is_adjusted() {
+        let mut row = adjustable_row();
+        row["grant_id"] = json!("gr-OTHER");
+        let out = adjust_grant_pure(adjust_input(Some(row), adjust_payload())).unwrap();
+        assert_eq!(adjust_code(&out), Some("services.grant_not_adjustable"));
+        assert!(out.operations.is_empty());
+    }
+
+    #[test]
+    fn an_adjustment_without_a_grant_id_is_refused() {
+        let mut payload = adjust_payload();
+        payload["grant_id"] = json!(" ");
+        let out = adjust_grant_pure(adjust_input(Some(adjustable_row()), payload.clone())).unwrap();
+        assert_eq!(adjust_code(&out), Some("services.grant_not_adjustable"));
+        assert!(out.operations.is_empty());
+        // Even a read that echoes the same blank id does not make a blank id adjustable.
+        let mut blank_row = adjustable_row();
+        blank_row["grant_id"] = json!("");
+        let out = adjust_grant_pure(adjust_input(Some(blank_row), payload)).unwrap();
+        assert_eq!(adjust_code(&out), Some("services.grant_not_adjustable"));
+        assert!(out.operations.is_empty());
+    }
+
+    #[test]
+    fn without_a_host_id_the_adjustment_is_an_error_not_a_guess() {
+        let mut input = adjust_input(Some(adjustable_row()), adjust_payload());
+        input["context"]["new_ids"] = json!([]);
+        assert!(adjust_grant_pure(input).is_err());
     }
 }

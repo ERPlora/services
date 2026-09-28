@@ -21,9 +21,12 @@
   no balance screen will show. Of 17 products surveyed **not one** documents an answer to this, so
   there is no prior art to copy and ours has to be designed (services#81).
 - **A voucher sold by mistake can be voided, but a used one cannot be corrected.** Voiding
-  (`services.packages.void_grant`, services#82) only works while nothing has been spent from it. No
-  door yet adds a courtesy session or extends the deadline (services#118), or corrects the balance of
-  a voucher that was already used (services#119).
+  (`services.packages.void_grant`, services#82) only works while nothing has been spent from it.
+  «Adjust» (`services.packages.adjust_grant`, services#118) only ADDS — sessions to a voucher with a
+  limit, days to one that expires, up to 100 sessions / 366 days per movement. Taking sessions or
+  days away, or correcting the balance of a voucher that was already used, is services#119.
+- **A courtesy cannot be undone from the screen.** Once given, the movement stays; the way back is
+  the balance correction of services#119.
 - **Voiding and redeeming the same voucher at the very same instant can both succeed.** The void
   re-checks inside its own transaction that nothing is spent or held, which closes every ordinary
   case; two tills racing on the same millisecond are not serialised against each other (services#120).
@@ -104,6 +107,7 @@ A refused redemption rolls the whole transaction back — no ledger row, no even
 | Redeem one use of a package | `services.redeem_package` |
 | See a customer's package balance, a voucher's movements and its sold vouchers | `services.view_package_balance` |
 | Void a voucher sold by mistake | `services.void_grant` (admin and manager only) |
+| Give a sold voucher more sessions or a later expiry | `services.adjust_grant` (admin and manager only) |
 | Change the module settings | `services.manage_settings` |
 
 By role: **admin** has everything. **manager** has everything except the three deletes and

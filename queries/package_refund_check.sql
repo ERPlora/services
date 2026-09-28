@@ -44,8 +44,16 @@ WITH target AS (
      WHERE id = :redemption_id AND hub_id = :hub_id
 ),
 grant_row AS (
-    SELECT g.id, g.max_uses, g.validity_days, g.granted_at
+    SELECT g.id,
+           g.max_uses + COALESCE(adj.uses_delta, 0)      AS max_uses,
+           g.validity_days + COALESCE(adj.days_delta, 0) AS validity_days,
+           g.granted_at
       FROM services_package_grant g
+      LEFT JOIN (SELECT hub_id, grant_id, CAST(SUM(uses_delta) AS BIGINT) AS uses_delta, CAST(SUM(days_delta) AS BIGINT) AS days_delta
+                   FROM services_package_grant_adjustment
+                  WHERE is_deleted = 0
+                  GROUP BY hub_id, grant_id) adj
+             ON adj.grant_id = g.id AND adj.hub_id = g.hub_id
      WHERE g.hub_id = :hub_id
        AND g.id = (SELECT grant_id FROM target)
 ),

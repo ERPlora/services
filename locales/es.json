@@ -184,7 +184,7 @@
     },
     "actionMovements": "Movimientos",
     "movementsTitle": "Movimientos del bono",
-    "movementsHint": "todas las sesiones de este bono: reservadas, entregadas, liberadas, caducadas y devueltas.",
+    "movementsHint": "todas las sesiones de este bono: reservadas, entregadas, liberadas, caducadas y devueltas, y las cortesías regaladas después.",
     "movementsMore": "Cargar más",
     "movementsCount": "Se muestran {shown} de {total}",
     "movementCustomer": "Cliente",
@@ -201,7 +201,8 @@
       "consumed": "Entregada",
       "released": "Liberada",
       "refunded": "Devuelta",
-      "expired": "Caducada"
+      "expired": "Caducada",
+      "adjusted": "Cortesía"
     },
     "openOrphans": "Bonos sin cliente",
     "orphansTitle": "Bonos sin cliente",
@@ -217,7 +218,7 @@
     "orphansMore": "Cargar más",
     "actionGrants": "Bonos vendidos",
     "grantsTitle": "Bonos vendidos",
-    "grantsHint": "cada cliente que ha comprado este bono, con las sesiones usadas y las que le quedan. Una venta de la que no se ha usado nada se puede anular.",
+    "grantsHint": "todos los clientes que han comprado este bono, con las sesiones usadas y las que quedan. A un bono vivo se le pueden regalar sesiones o alargar la caducidad; una venta de la que no se ha usado nada se puede anular.",
     "emptyGrants": "Nadie ha comprado este bono todavía.",
     "errorGrants": "No se han podido cargar los bonos vendidos",
     "grantsCount": "Se muestran {shown} de {total}",
@@ -236,7 +237,23 @@
     "voidReasonLabel": "Motivo",
     "voidReasonHelp": "Obligatorio. Queda en el registro del bono, p. ej. «vendido al cliente equivocado».",
     "errorVoidGrant": "No se ha podido anular el bono",
-    "nameLoading": "Cargando nombre…"
+    "nameLoading": "Cargando nombre…",
+    "grantExpires": "Caduca el {when}",
+    "grantNoExpiry": "No caduca",
+    "grantAdjusted": "Regalado después: +{uses} sesión(es), +{days} día(s)",
+    "actionAdjustGrant": "Ajustar",
+    "adjustGrantTitle": "Ajustar este bono",
+    "adjustGrantHint": "Regala al cliente {customer} sesiones extra o alarga la caducidad sin cobrar. Queda en los movimientos del bono con quién, cuándo y por qué.",
+    "adjustUsesLabel": "Sesiones que se añaden",
+    "adjustUsesHelp": "Quedan {remaining}. Hasta 100.",
+    "adjustDaysLabel": "Días que se alarga",
+    "adjustDaysHelp": "Ahora caduca el {when}. Hasta 366.",
+    "adjustReasonHelp": "Obligatorio. Queda en el registro del bono, p. ej. «cerramos en agosto».",
+    "adjustPreview": "Tras el ajuste: quedan {remaining} sesión(es) · caduca el {when}",
+    "adjustPreviewUnlimited": "sin límite de",
+    "errorAdjustGrant": "No se pudo ajustar el bono",
+    "movementAdjusted": "+{uses} sesión(es) · +{days} día(s)",
+    "movementAdjustedBy": "Regalado por {who}"
   },
   "errors": {
     "services.category_unavailable": "Esa categoría no está disponible: no existe en este negocio o se ha eliminado.",
@@ -265,6 +282,12 @@
     "services.grant_already_voided": "Ese bono ya estaba anulado.",
     "services.grant_in_use": "Ese bono ya se ha usado: no se puede anular.",
     "services.grant_void_reason_required": "Indica por qué se anula este bono: el motivo queda en su registro.",
-    "services.grant_not_voidable": "Ese bono no se puede anular ahora: se ha usado o anulado mientras tanto. Recarga la lista y vuelve a intentarlo."
+    "services.grant_not_voidable": "Ese bono no se puede anular ahora: se ha usado o anulado mientras tanto. Recarga la lista y vuelve a intentarlo.",
+    "services.grant_adjust_reason_required": "Indica por qué se ajusta este bono: el motivo queda en su registro.",
+    "services.grant_adjust_invalid": "Las sesiones que se añaden tienen que ser un número entero de 0 a 100, y los días, de 0 a 366.",
+    "services.grant_adjust_empty": "Añade al menos una sesión o un día.",
+    "services.grant_unlimited": "Ese bono no tiene límite de sesiones: no hay sesiones que añadir.",
+    "services.grant_no_expiry": "Ese bono no caduca: no hay caducidad que alargar.",
+    "services.grant_not_adjustable": "Ese bono no se puede ajustar ahora: se ha anulado mientras tanto. Recarga la lista y vuelve a intentarlo."
   }
 }

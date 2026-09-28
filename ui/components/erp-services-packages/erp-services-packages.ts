@@ -71,7 +71,13 @@ interface Movement {
   refund_note: string;
   refund_expired: number;
   release_reason: string;
-  movement: 'held' | 'consumed' | 'released' | 'expired' | 'refunded' | string;
+  /** services#118: an `adjusted` movement is a courtesy, not a session — who gave it, how much, why.
+   *  0/'' on a session. */
+  created_by?: string | null;
+  uses_delta?: number;
+  days_delta?: number;
+  adjust_reason?: string;
+  movement: 'held' | 'consumed' | 'released' | 'expired' | 'refunded' | 'adjusted' | string;
 }
 
 /** Row of `services.services.list` (the selector of the lines). */
@@ -225,6 +231,13 @@ interface SoldGrant {
   voided_by: string | null;
   void_reason: string;
   can_void: number;
+  /** services#118: `max_uses`, `remaining` and `expires_at` already include the courtesies given
+   *  after the sale; these say how much of it was given, and `can_adjust` is the query's rule for
+   *  offering «Adjust» (live, with a session limit or an expiry to move). */
+  expires_at?: string | null;
+  adjusted_uses?: number;
+  adjusted_days?: number;
+  can_adjust?: number;
 }
 
 export class ErpServicesPackages extends LitElement {
@@ -296,6 +309,13 @@ export class ErpServicesPackages extends LitElement {
   @state() voidReason = '';
   @state() voiding = false;
   @state() voidError = '';
+  /** Sale being adjusted (services#118): the sheet shows the courtesy form instead of the list. */
+  @state() adjustTarget: SoldGrant | null = null;
+  @state() adjustUses = '';
+  @state() adjustDays = '';
+  @state() adjustReason = '';
+  @state() adjusting = false;
+  @state() adjustError = '';
 
   private ctrl!: ListController<Package>;
   private unsub?: () => void;
@@ -522,7 +542,10 @@ export class ErpServicesPackages extends LitElement {
       const rows = page?.rows ?? [];
       this.movements = [...this.movements, ...rows];
       this.movementsTotal = page?.total ?? this.movements.length;
-      this.resolveNames(rows.map((m) => m.customer_id), rows.map((m) => m.refunded_by));
+      this.resolveNames(
+        rows.map((m) => m.customer_id),
+        rows.map((m) => (m.movement === 'adjusted' ? m.created_by ?? null : m.refunded_by)),
+      );
     } catch (e) {
       if (this.movementsOf !== target) return; // pm#459: another opening owns the sheet now
       this.movementsError = domainMessage(e, erplora().locale, erplora().t(CATALOG, 'ui.errorMovements'));
@@ -577,6 +600,7 @@ export class ErpServicesPackages extends LitElement {
     this.grantsOf = { id: p.id, name: p.name };
     this.forgetNames();
     this.voidTarget = null;
+    this.adjustTarget = null;
     await this.reloadGrants();
   }
 
@@ -688,10 +712,12 @@ export class ErpServicesPackages extends LitElement {
   private closeGrants(): void {
     this.grantsOf = null;
     this.voidTarget = null;
+    this.adjustTarget = null;
   }
 
   /** Ask to void a sale: the sheet swaps its list for the confirmation, reason still blank. */
   askVoid(grant: SoldGrant): void {
+    this.adjustTarget = null;
     this.voidTarget = grant;
     this.voidReason = '';
     this.voidError = '';
@@ -724,6 +750,74 @@ export class ErpServicesPackages extends LitElement {
       this.voidError = domainMessage(e, erplora().locale, erplora().t(CATALOG, 'ui.errorVoidGrant'));
     } finally {
       this.voiding = false;
+    }
+  }
+
+  /** Ask to adjust a sale (services#118): the sheet swaps its list for the courtesy form, blank. */
+  askAdjust(grant: SoldGrant): void {
+    this.voidTarget = null;
+    this.adjustTarget = grant;
+    this.adjustUses = '';
+    this.adjustDays = '';
+    this.adjustReason = '';
+    this.adjustError = '';
+  }
+
+  cancelAdjust(): void {
+    this.adjustTarget = null;
+    this.adjustError = '';
+  }
+
+  /**
+   * What the form would send: whole numbers, 0 for a blank field AND for a half the voucher cannot
+   * take (no sessions on an unlimited voucher, no days on one that never expires — the field is not
+   * even painted, but a value typed for another sale must not travel). `null` when a field is not a
+   * whole number from 0 to its limit (100 sessions, 366 days) or nothing is added: the button stays
+   * disabled.
+   */
+  private adjustAmounts(): { uses: number; days: number } | null {
+    const target = this.adjustTarget;
+    if (!target) return null;
+    const read = (raw: string, allowed: boolean, max: number): number | null => {
+      if (!allowed) return 0;
+      const text = raw.trim();
+      if (!text) return 0;
+      return /^\d+$/.test(text) && Number(text) <= max ? Number(text) : null;
+    };
+    // The limits the helper texts promise («up to 100», «up to 366»); the handler and the write repeat them.
+    const uses = read(this.adjustUses, target.max_uses != null, 100);
+    const days = read(this.adjustDays, target.expires_at != null, 366);
+    if (uses === null || days === null || uses + days === 0) return null;
+    return { uses, days };
+  }
+
+  /**
+   * Give the courtesy. The reason is mandatory and something must be added — a blank form is not
+   * even sent (the handler refuses it too). On success the list is READ AGAIN: the server says what
+   * the voucher is worth now. A refusal stays on the form with the module's own sentence.
+   */
+  async confirmAdjust(): Promise<void> {
+    const target = this.adjustTarget;
+    const reason = this.adjustReason.trim();
+    const amounts = this.adjustAmounts();
+    if (!target || !reason || !amounts || this.adjusting || !can('services.adjust_grant')) return;
+    this.adjusting = true;
+    this.adjustError = '';
+    try {
+      await erplora().command('services.packages.adjust_grant', {
+        grant_id: target.grant_id,
+        uses_delta: amounts.uses,
+        days_delta: amounts.days,
+        reason,
+      });
+      if (this.adjustTarget !== target) return;
+      this.adjustTarget = null;
+      await this.reloadGrants();
+    } catch (e) {
+      if (this.adjustTarget !== target) return;
+      this.adjustError = domainMessage(e, erplora().locale, erplora().t(CATALOG, 'ui.errorAdjustGrant'));
+    } finally {
+      this.adjusting = false;
     }
   }
 
@@ -826,6 +920,13 @@ export class ErpServicesPackages extends LitElement {
     </ion-modal>`;
   }
 
+  /** A day (an expiry), in the hub's locale. */
+  private day(value: string | null | undefined): string {
+    if (!value) return '—';
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString(erplora().locale, { dateStyle: 'short' });
+  }
+
   /** A movement's date, in the hub's locale. An unparseable or absent stamp prints as «—». */
   private stamp(value: string | null): string {
     if (!value) return '—';
@@ -845,6 +946,7 @@ export class ErpServicesPackages extends LitElement {
       case 'expired':
         return 'neutral';
       case 'held':
+      case 'adjusted':
         return 'info';
       default:
         return 'success';
@@ -854,6 +956,18 @@ export class ErpServicesPackages extends LitElement {
   private renderMovement(m: Movement) {
     const t = (k: string, p?: Record<string, unknown>): string => erplora().t(CATALOG, k, p);
     const refunded = m.movement === 'refunded';
+    if (m.movement === 'adjusted') {
+      return html`<ion-item class="movement">
+        <ion-label class="ion-text-wrap">
+          <h3>
+            <ok-status-pill size="sm" tone=${this.movementTone(m.movement)}>${t('ui.movement.adjusted')}</ok-status-pill>
+            ${t('ui.movementAdjusted', { uses: Number(m.uses_delta) || 0, days: Number(m.days_delta) || 0 })}
+          </h3>
+          <p>${this.stamp(m.redeemed_at)} · ${t('ui.movementCustomer')}: ${this.customerLabel(m.customer_id)}</p>
+          <p class="refund">${t('ui.movementAdjustedBy', { who: this.userLabel(m.created_by ?? null) })}${m.adjust_reason ? html` · ${m.adjust_reason}` : nothing}</p>
+        </ion-label>
+      </ion-item>`;
+    }
     return html`<ion-item class="movement">
       <ion-label class="ion-text-wrap">
         <h3>
@@ -976,6 +1090,10 @@ export class ErpServicesPackages extends LitElement {
     const voided = g.status === 'voided';
     // `can_void` comes from the query; the permission decides whether this person sees the button.
     const voidable = Number(g.can_void) === 1 && can('services.void_grant');
+    // Same for «Adjust» (services#118): `can_adjust` from the query, the permission from the person.
+    const adjustable = Number(g.can_adjust) === 1 && can('services.adjust_grant');
+    const giftedUses = Number(g.adjusted_uses) || 0;
+    const giftedDays = Number(g.adjusted_days) || 0;
     return html`<ion-item class="movement">
       <ion-label class="ion-text-wrap">
         <h3>
@@ -989,14 +1107,60 @@ export class ErpServicesPackages extends LitElement {
             : t('ui.grantUses', { used: Number(g.used) || 0, remaining: Number(g.remaining) || 0 })}
           ${g.sale_id ? html` · ${t('ui.movementSale')}: ${g.sale_id}` : nothing}
         </p>
+        <p>
+          ${g.expires_at ? t('ui.grantExpires', { when: this.day(g.expires_at) }) : t('ui.grantNoExpiry')}
+          ${giftedUses || giftedDays ? html` · ${t('ui.grantAdjusted', { uses: giftedUses, days: giftedDays })}` : nothing}
+        </p>
         ${voided
           ? html`<p class="refund">${t('ui.grantVoidedBy', { who: this.userLabel(g.voided_by), when: this.stamp(g.voided_at) })}${g.void_reason ? html` · ${g.void_reason}` : nothing}</p>`
           : nothing}
       </ion-label>
+      ${adjustable
+        ? html`<ion-button slot="end" size="small" fill="clear" data-testid=${`services-packages-grant-adjust-${g.grant_id}`} @click=${() => this.askAdjust(g)}>${t('ui.actionAdjustGrant')}</ion-button>`
+        : nothing}
       ${voidable
         ? html`<ion-button slot="end" size="small" fill="clear" data-testid=${`services-packages-grant-void-${g.grant_id}`} style=${ionTone('text', 'danger')} @click=${() => this.askVoid(g)}>${t('ui.actionVoidGrant')}</ion-button>`
         : nothing}
     </ion-item>`;
+  }
+
+  /** The courtesy form (services#118): only the halves the voucher can take, a mandatory reason, and
+   *  a preview of what the customer will have — the server re-computes it, this is for the eye. */
+  private renderAdjustForm(g: SoldGrant) {
+    const t = (k: string, p?: Record<string, unknown>): string => erplora().t(CATALOG, k, p);
+    const amounts = this.adjustAmounts();
+    const hasLimit = g.max_uses != null;
+    const expires = g.expires_at != null;
+    const newRemaining = hasLimit ? (Number(g.remaining) || 0) + (amounts?.uses ?? 0) : null;
+    let newExpiry: string | null = null;
+    if (expires) {
+      const d = new Date(String(g.expires_at));
+      if (!Number.isNaN(d.getTime())) {
+        d.setUTCDate(d.getUTCDate() + (amounts?.days ?? 0));
+        newExpiry = d.toISOString();
+      }
+    }
+    return html`<p>${t('ui.adjustGrantHint', { customer: this.customerLabel(g.customer_id) })}</p>
+      ${hasLimit
+        ? html`<ion-input data-testid="services-packages-grant-adjust-uses" class="ion-margin-top" fill="outline" mode="md" label-placement="floating" label=${t('ui.adjustUsesLabel')} helper-text=${t('ui.adjustUsesHelp', { remaining: Number(g.remaining) || 0 })} type="number" inputmode="numeric" min="0" max="100" step="1" .value=${this.adjustUses} @ionInput=${(e: any) => (this.adjustUses = String(e.target.value ?? ''))}></ion-input>`
+        : nothing}
+      ${expires
+        ? html`<ion-input data-testid="services-packages-grant-adjust-days" class="ion-margin-top" fill="outline" mode="md" label-placement="floating" label=${t('ui.adjustDaysLabel')} helper-text=${t('ui.adjustDaysHelp', { when: this.day(g.expires_at) })} type="number" inputmode="numeric" min="0" max="366" step="1" .value=${this.adjustDays} @ionInput=${(e: any) => (this.adjustDays = String(e.target.value ?? ''))}></ion-input>`
+        : nothing}
+      <ion-textarea data-testid="services-packages-grant-adjust-reason" class="ion-margin-top" fill="outline" mode="md" label-placement="floating" label=${t('ui.voidReasonLabel')} helper-text=${t('ui.adjustReasonHelp')} auto-grow maxlength="500" .value=${this.adjustReason} @ionInput=${(e: any) => (this.adjustReason = String(e.target.value ?? ''))}></ion-textarea>
+      <ok-inline-feedback data-testid="services-packages-grant-adjust-preview" tone="info" icon="gift-outline">
+        ${t('ui.adjustPreview', {
+          remaining: newRemaining == null ? t('ui.adjustPreviewUnlimited') : newRemaining,
+          when: newExpiry ? this.day(newExpiry) : t('ui.grantNoExpiry'),
+        })}
+      </ok-inline-feedback>
+      ${this.adjustError
+        ? html`<ok-inline-feedback data-testid="services-packages-grant-adjust-error" tone="danger" icon="alert-circle-outline">${this.adjustError}</ok-inline-feedback>`
+        : nothing}
+      <ion-button class="ion-margin-top" expand="block" data-testid="services-packages-grant-adjust-submit" ?disabled=${this.adjusting || !amounts || !this.adjustReason.trim()} @click=${() => this.confirmAdjust()}>
+        ${this.adjusting ? t('ui.btnSaving') : t('ui.actionAdjustGrant')}
+      </ion-button>
+      <ion-button expand="block" fill="outline" data-testid="services-packages-grant-adjust-cancel" ?disabled=${this.adjusting} @click=${() => this.cancelAdjust()}>${t('ui.btnCancel')}</ion-button>`;
   }
 
   private renderVoidConfirm(g: SoldGrant) {
@@ -1015,10 +1179,11 @@ export class ErpServicesPackages extends LitElement {
   private renderGrants() {
     const t = (k: string, p?: Record<string, unknown>): string => erplora().t(CATALOG, k, p);
     const confirming = this.voidTarget;
+    const adjusting = this.adjustTarget;
     return html`<ion-modal .isOpen=${!!this.grantsOf} @ionModalDidDismiss=${() => this.closeGrants()}>
       <ion-header class="ion-no-border">
         <ion-toolbar>
-          <ion-title>${confirming ? t('ui.voidGrantTitle') : t('ui.grantsTitle')}</ion-title>
+          <ion-title>${confirming ? t('ui.voidGrantTitle') : adjusting ? t('ui.adjustGrantTitle') : t('ui.grantsTitle')}</ion-title>
           <ion-buttons slot="end">
             <ion-button data-testid="services-packages-grants-close" @click=${() => this.closeGrants()}>${t('ui.btnClose')}</ion-button>
           </ion-buttons>
@@ -1028,6 +1193,8 @@ export class ErpServicesPackages extends LitElement {
         <!-- Self-styled: ion-modal is reparented to <body>, this component's CSS does not reach it. -->
         ${confirming
           ? this.renderVoidConfirm(confirming)
+          : adjusting
+          ? this.renderAdjustForm(adjusting)
           : html`<p><b>${this.grantsOf?.name ?? ''}</b> — ${t('ui.grantsHint')}</p>
             ${this.grantsError
               ? html`<ok-inline-feedback data-testid="services-packages-grants-error" tone="danger" icon="alert-circle-outline">${this.grantsError}</ok-inline-feedback>`

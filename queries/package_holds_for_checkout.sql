@@ -52,18 +52,23 @@ SELECT
     r.redeemed_at   AS redeemed_at,
     r.expires_at    AS hold_expires_at,
     r.note          AS note,
-    g.max_uses      AS max_uses,
+    (g.max_uses + COALESCE(adj.uses_delta, 0)) AS max_uses,
     CASE WHEN g.max_uses IS NULL THEN 1 ELSE 0 END          AS is_unlimited,
     CASE WHEN g.max_uses IS NULL THEN NULL
-         ELSE g.max_uses - (
+         ELSE (g.max_uses + COALESCE(adj.uses_delta, 0)) - (
             SELECT COUNT(*) FROM services_package_redemption u
              WHERE u.hub_id = :hub_id AND u.grant_id = r.grant_id AND u.is_deleted = 0
                AND (u.expires_at IS NULL OR erp_dt(:now) < erp_dt(u.expires_at))
          ) END                                              AS remaining_after,
     CASE WHEN g.validity_days IS NULL THEN NULL
-         ELSE erp_dateadd(g.granted_at, g.validity_days, 'days') END AS expires_at
+         ELSE erp_dateadd(g.granted_at, (g.validity_days + COALESCE(adj.days_delta, 0)), 'days') END AS expires_at
 FROM services_package_redemption r
 JOIN services_package_grant g ON g.id = r.grant_id AND g.hub_id = r.hub_id
+LEFT JOIN (SELECT hub_id, grant_id, CAST(SUM(uses_delta) AS BIGINT) AS uses_delta, CAST(SUM(days_delta) AS BIGINT) AS days_delta
+             FROM services_package_grant_adjustment
+            WHERE is_deleted = 0
+            GROUP BY hub_id, grant_id) adj
+       ON adj.grant_id = g.id AND adj.hub_id = g.hub_id
 JOIN services_package p ON p.id = r.package_id AND p.hub_id = r.hub_id
 LEFT JOIN services_service s ON s.id = r.service_id AND s.hub_id = r.hub_id
 WHERE r.hub_id = :hub_id
