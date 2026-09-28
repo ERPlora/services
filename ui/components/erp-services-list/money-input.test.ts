@@ -240,8 +240,9 @@ describe('the service price is read by the shared money-input piece (pm#521)', (
     expect(el.newPrice).toBe('12.500');
   });
 
-  // inventory-wt-521: `type="number"` DROPS a pasted «1.250,50» in a real browser before any reader
-  // sees it. The field must stay text with the decimal keyboard.
+  // A `type="number"` field does not hand the reader what was pasted: on the cash_register bench
+  // (pm#521) «1.250,50» pasted there reached the command as 125 (1,25 €). The field must stay text
+  // with the decimal keyboard, so money-input reads exactly what the person typed.
   it('the price field is a text field with the decimal keyboard, never type=number', async () => {
     const el = await mount();
     const field = priceField(el)!;
