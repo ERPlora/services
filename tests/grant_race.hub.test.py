@@ -17,16 +17,19 @@ The first door is the till's own SQL, run by hand in the hub's database and left
 `/api/command`, from a thread. The battery checks that the command is still waiting, commits the
 till, and reads what the command answered and what the database kept.
 
-Usage: `erplora test <dir> --against-hub [dev|stable|sha256:…]` (module-toolkit#110). Never on its
-own: without a runtime it fails, it does not skip.
+Usage: `erplora test <dir> --against-hub [dev|stable|sha256:…]` (module-toolkit#110), and the hub's
+CI runs it through `scripts/ci/run-module-hub-batteries.sh` against a native kernel (services#130).
+Never on its own: without a runtime it fails, it does not skip.
 """
 
+import os
 import subprocess
 import sys
 import threading
 import time
 import uuid
 from datetime import datetime, timezone
+from typing import NamedTuple
 from urllib.parse import urlparse
 
 import hub_harness
@@ -38,13 +41,50 @@ from pg_harness import script_for
 SETTLE_TIMEOUT = 30
 
 
-def hub_database_container() -> str:
-    """The Postgres container of THIS run's hub.
+class HubDatabase(NamedTuple):
+    """Where THIS run's hub writes: a Postgres container and the database inside it."""
 
-    `--against-hub` starts the hub inside the network namespace of its scratch Postgres and
-    publishes the hub's port on THAT container, so the container whose ports carry the port of
-    `ERPLORA_HUB_BASE_URL` is the database the runtime writes to. Anything but exactly one match is
-    a failure: acting on the wrong database would prove nothing."""
+    container: str
+    name: str
+
+    def psql(self, *args: str) -> list[str]:
+        return [
+            "docker",
+            "exec",
+            "-i",
+            self.container,
+            "psql",
+            "-U",
+            "postgres",
+            "-d",
+            self.name,
+            *args,
+        ]
+
+
+def _psql_rows(container: str, database: str, sql: str) -> list[str] | None:
+    """The rows of `sql`, or None when the database cannot answer it (no such table there)."""
+    done = subprocess.run(
+        HubDatabase(container, database).psql("-tAc", sql),
+        capture_output=True,
+        text=True,
+    )
+    if done.returncode != 0:
+        return None
+    return [line for line in done.stdout.splitlines() if line]
+
+
+def candidate_containers() -> list[str]:
+    """The Postgres containers the hub of this run may be writing to, in the two topologies that
+    run this battery (services#130):
+
+      * `erplora test --against-hub` starts the hub inside the network namespace of its scratch
+        Postgres and publishes the hub's port on THAT container, so the container whose ports
+        carry the port of `ERPLORA_HUB_BASE_URL` is the hub's database container;
+      * the hub's CI (`scripts/ci/run-module-hub-batteries.sh`, «e2e con módulos reales») boots a
+        NATIVE `erplora-server` on a scratch database of the job's Postgres service container,
+        which it names in `ERPLORA_PG_CONTAINER` / `PG_CONTAINER` — no container publishes the
+        hub's port there."""
     port = urlparse(hub_harness.BASE).port
     out = subprocess.run(
         ["docker", "ps", "--format", "{{.Names}}\t{{.Ports}}"],
@@ -57,30 +97,51 @@ def hub_database_container() -> str:
         for line in out.splitlines()
         if f":{port}->" in line.split("\t", 1)[-1]
     ]
-    if len(found) != 1:
-        raise AssertionError(
-            f"expected ONE container publishing port {port} (the hub's database), found {found}"
+    for var in ("ERPLORA_PG_CONTAINER", "PG_CONTAINER"):
+        name = os.environ.get(var, "").strip()
+        if name and name not in found:
+            found.append(name)
+    return found
+
+
+def hub_database(hub: Hub, probe_package_id: str) -> HubDatabase:
+    """The database of THIS run's hub, proved by a row the hub itself just wrote.
+
+    Among every database of every candidate container, the one holding the package this run
+    created through `/api/command` — under this hub's `hub_id` — is the database the runtime
+    writes to. Anything but exactly one match is a failure: acting on the wrong database would
+    prove nothing (the till's SQL would lock a voucher the hub never reads)."""
+    containers = candidate_containers()
+    matches = []
+    for container in containers:
+        databases = _psql_rows(
+            container,
+            "postgres",
+            "SELECT datname FROM pg_database WHERE NOT datistemplate",
         )
-    return found[0]
+        for database in databases or []:
+            rows = _psql_rows(
+                container,
+                database,
+                "SELECT count(*) FROM services_package "
+                f"WHERE id = '{probe_package_id}' AND hub_id = '{hub.hub_id}'",
+            )
+            if rows == ["1"]:
+                matches.append(HubDatabase(container, database))
+    if len(matches) != 1:
+        raise AssertionError(
+            f"expected ONE database holding package {probe_package_id} of hub {hub.hub_id} "
+            f"(the hub's database), found {matches} in containers {containers}"
+        )
+    return matches[0]
 
 
 class OpenTransaction:
     """A psql session on the hub's database with a transaction left open on purpose."""
 
-    def __init__(self, container: str):
-        self.container = container
+    def __init__(self, db: HubDatabase):
         self.proc = subprocess.Popen(
-            [
-                "docker",
-                "exec",
-                "-i",
-                container,
-                "psql",
-                "-U",
-                "postgres",
-                "-d",
-                "postgres",
-            ],
+            db.psql(),
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -114,21 +175,9 @@ class OpenTransaction:
             self.proc.kill()
 
 
-def scalar(container: str, sql: str) -> str:
+def scalar(db: HubDatabase, sql: str) -> str:
     return subprocess.run(
-        [
-            "docker",
-            "exec",
-            "-i",
-            container,
-            "psql",
-            "-U",
-            "postgres",
-            "-d",
-            "postgres",
-            "-tAc",
-            sql,
-        ],
+        db.psql("-tAc", sql),
         capture_output=True,
         text=True,
         check=True,
@@ -146,17 +195,17 @@ def in_background(hub: Hub, name: str, payload: dict) -> tuple[threading.Thread,
     return worker, answer
 
 
-def parked(db: str, condition: str) -> int:
+def parked(db: HubDatabase, condition: str) -> int:
     return int(
         scalar(
             db,
             "SELECT count(*) FROM pg_stat_activity "
-            f"WHERE datname = 'postgres' AND pid <> pg_backend_pid() AND {condition}",
+            f"WHERE datname = '{db.name}' AND pid <> pg_backend_pid() AND {condition}",
         )
     )
 
 
-def settle(db: str, condition: str, done=lambda: False) -> None:
+def settle(db: HubDatabase, condition: str, done=lambda: False) -> None:
     """Poll until a backend of the hub's database meets `condition` (or `done()` says the other
     side already finished). 🔴 Not a fixed sleep: on a loaded machine `docker exec` can take longer
     than any sleep to start psql, the command then locks the voucher FIRST and the race read is
@@ -169,7 +218,7 @@ def settle(db: str, condition: str, done=lambda: False) -> None:
     raise TimeoutError(f"the hub's database never reached: {condition}")
 
 
-def race(hub: Hub, db: str, till: tuple[str, dict], command: tuple[str, dict]) -> dict:
+def race(hub: Hub, db: HubDatabase, till: tuple[str, dict], command: tuple[str, dict]) -> dict:
     """The till's SQL runs first and stays uncommitted; the command arrives; the till commits."""
     other_till = OpenTransaction(db)
     try:
@@ -212,7 +261,7 @@ def hold_sql(grant_id: str, service_id: str) -> tuple[str, dict]:
     }
 
 
-def test_1_the_void_waits_for_the_till_and_is_refused(hub: Hub, db: str) -> None:
+def test_1_the_void_waits_for_the_till_and_is_refused(hub: Hub, db: HubDatabase) -> None:
     print(
         "\n1 · a till is holding a session when the void arrives → the void waits and is refused"
     )
@@ -251,7 +300,7 @@ def test_1_the_void_waits_for_the_till_and_is_refused(hub: Hub, db: str) -> None
     )
 
 
-def test_2_a_correction_waits_for_the_till_and_is_refused(hub: Hub, db: str) -> None:
+def test_2_a_correction_waits_for_the_till_and_is_refused(hub: Hub, db: HubDatabase) -> None:
     print(
         "\n2 · a till takes the LAST session while a correction of −1 arrives → refused"
     )
@@ -295,7 +344,7 @@ def test_2_a_correction_waits_for_the_till_and_is_refused(hub: Hub, db: str) -> 
     )
 
 
-def test_3_the_till_waits_for_the_void_and_spends_nothing(hub: Hub, db: str) -> None:
+def test_3_the_till_waits_for_the_void_and_spends_nothing(hub: Hub, db: HubDatabase) -> None:
     print(
         "\n3 · the void is mid-transaction when a session is spent at the chair → nothing spent"
     )
@@ -331,7 +380,8 @@ def test_3_the_till_waits_for_the_void_and_spends_nothing(hub: Hub, db: str) -> 
 
 def main() -> int:
     hub = Hub("grant_race.hub", needs=("taxes", "services"))
-    db = hub_database_container()
+    # A voucher written through the hub's own API is what proves which database is the hub's.
+    db = hub_database(hub, create_package(hub, tag("Bono sonda"), 1, None))
     for test in (
         test_1_the_void_waits_for_the_till_and_is_refused,
         test_2_a_correction_waits_for_the_till_and_is_refused,
