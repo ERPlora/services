@@ -184,7 +184,7 @@
     },
     "actionMovements": "Movimientos",
     "movementsTitle": "Movimientos del bono",
-    "movementsHint": "todas las sesiones de este bono: reservadas, entregadas, liberadas, caducadas y devueltas, y las cortesías regaladas después.",
+    "movementsHint": "todas las sesiones de este bono: reservadas, entregadas, liberadas, caducadas y devueltas, y las cortesías regaladas y las correcciones hechas después.",
     "movementsMore": "Cargar más",
     "movementsCount": "Se muestran {shown} de {total}",
     "movementCustomer": "Cliente",
