@@ -297,8 +297,9 @@ def concurrent_holds(
     """Two tills spend the LAST session at the same time. How many rows survive?
 
     Both sessions are opened for real and interleaved: A inserts and stays UNCOMMITTED while B
-    inserts the same use ordinal. With the guard in the schema B blocks on the unique index and
-    fails the moment A commits — one row, one session, one winner. With a check-then-act guard
+    inserts the same use ordinal. With the guards in the schema B blocks — on the grant's row
+    since services#120, on the unique index before — and fails the moment A commits: one row, one
+    session, one winner. With a check-then-act guard
     both snapshots read «one left» and BOTH rows land: the voucher is spent twice, which is
     Odoo#79235 verbatim.
 
@@ -503,10 +504,16 @@ def main() -> int:
         racy_grant = seed_grant(db, racy, "cus-race")
         live, err = concurrent_holds(db, racy, cut, "cus-race", racy_grant)
         check("only ONE till got the last session", 1, live)
+        # Since services#120 the two holds of ONE grant queue on the grant's row, so B no longer
+        # reaches the unique index: it waits, recounts, finds no session left and the gate
+        # refuses it. The index still stands behind it for the case the lock cannot serialize
+        # (two grants of the same voucher and customer share one numbering, migration 013).
         check(
             "the loser was refused by the database",
             True,
-            "services_package_redemption" in err or "unique" in err.lower(),
+            "services_package_redemption" in err
+            or "unique" in err.lower()
+            or "services__gate" in err,
         )
 
         print(

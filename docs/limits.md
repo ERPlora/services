@@ -29,12 +29,14 @@
   there is no way to bring an expiry forward.
 - **A movement is never deleted.** A courtesy given by mistake is undone with a correction of the
   same size, and both stay in «Movements» with who and why.
-- **A correction and a redemption at the very same instant can both pass the floor.** The write
-  re-counts what is spent inside its own transaction, which closes every ordinary case; two tills
-  racing on the same millisecond are not serialised against each other (services#120).
-- **Voiding and redeeming the same voucher at the very same instant can both succeed.** The void
-  re-checks inside its own transaction that nothing is spent or held, which closes every ordinary
-  case; two tills racing on the same millisecond are not serialised against each other (services#120).
+- **Two people acting on the same voucher at the same instant are served one after the other.**
+  Voiding, correcting, holding a session at the till and spending one at the chair queue on the
+  voucher (services#120): the second waits for the first and then applies its own rule to what the
+  first did. A void that arrives while a till is using a session is refused as
+  `services.grant_not_voidable`, a correction that would leave fewer sessions than spent as
+  `services.grant_not_adjustable`, and a till that arrives after a void or a correction spends
+  nothing. The till that loses that race is told only that the operation could not be completed,
+  not why (services#128).
 - **A customer's name needs `customers` and the permission to see customers.** «Sold vouchers», the
   movements ledger and the void confirmation name the customer through `customers.get` (services#121).
   Without the `customers` module, without `customers.view_customer`, or once the customer sheet was

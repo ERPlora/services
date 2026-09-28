@@ -106,6 +106,11 @@ def main() -> int:
             # still sitting on. Put it after the INSERT and the session is reclaimed one statement
             # too late — the redemption would already have been refused.
             "commands/hold_expire.sql",
+            # 🔴 Its OWN statement before the guarded INSERT (services#120): it locks the grant
+            # row so a void or a correction of the same voucher waits for this redemption (or
+            # the other way round) and the guard below reads a fresh snapshot. Folded into the
+            # INSERT it would not queue the guard's subqueries — grant_race.postgres proves it.
+            "commands/_grant_lock.sql",
             "commands/_redeem_insert.sql",
             "commands/_redeem_assert.sql",
             "commands/_gate_clear.sql",
@@ -146,7 +151,9 @@ def main() -> int:
         for code in codes:
             sentence = errors.get(code)
             if not isinstance(sentence, str) or not sentence.strip():
-                failures.append(f"locales/{lang}.json: `{code}` is missing from `errors`")
+                failures.append(
+                    f"locales/{lang}.json: `{code}` is missing from `errors`"
+                )
                 print(f"  FAIL: locales/{lang}.json errors.{code} = {sentence!r}")
             else:
                 print(f"  ok: locales/{lang}.json errors.{code}")
