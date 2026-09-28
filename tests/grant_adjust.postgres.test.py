@@ -916,9 +916,28 @@ def a_correction_takes_sessions_away(
     )
 
     held = grant(db, pkg, "cus-fix-held")
-    hold(db, held, svc, "order-fix-held")
+    held_id = hold(db, held, svc, "order-fix-held")
     check("a live hold is spent: one left", 1, uses_left(db, held))
     check("… so taking two writes nothing", 0, adjust(db, held, uses=-2))
+    # The very instant a hold expires it is no longer spent — the same `now < expires_at` as
+    # `services.packages.balance` — so the floor never disagrees with the balance on screen.
+    deadline = db.scalar(
+        f"SELECT expires_at FROM services_package_redemption WHERE id = '{held_id}'"
+    )
+    check("at its deadline a hold is not spent: two left", 2, uses_left(db, held, now=deadline))
+    check(
+        "… the balance agrees",
+        2,
+        balance_of(db, held, "cus-fix-held", now=deadline)["remaining"],
+    )
+    at_deadline = grant(db, pkg, "cus-fix-deadline")
+    edge_hold = hold(db, at_deadline, svc, "order-fix-deadline")
+    edge = db.scalar(f"SELECT expires_at FROM services_package_redemption WHERE id = '{edge_hold}'")
+    check(
+        "… and the write takes both at that very instant",
+        1,
+        adjust(db, at_deadline, uses=-2, reason="Imported wrong", now=edge),
+    )
     tomorrow_plus = "2026-08-20T10:00:00Z"
     check(
         "an EXPIRED hold is not spent: two left once its deadline passed",
@@ -933,6 +952,8 @@ def a_correction_takes_sessions_away(
 
     big = grant(db, pkg, "cus-fix-big")
     adjust(db, big, uses=100)
+    check("102 left: taking 101 at once is past the limit, not the floor", 102, uses_left(db, big))
+    check("… and writes nothing", 0, adjust(db, big, uses=-101))
     check("exactly 100 sessions can be taken at once", 1, adjust(db, big, uses=-100))
 
     unlimited = grant(db, unlimited_pkg, "cus-fix-unlimited")

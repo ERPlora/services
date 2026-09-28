@@ -481,6 +481,28 @@ describe('correcting the balance of a sold voucher', () => {
     expect(submit().hasAttribute('disabled')).toBe(true);
   });
 
+  it('never takes more than 100 at once, even with more left (the limit the server repeats)', async () => {
+    const el = await mount();
+    await open(el);
+    el.askAdjust({ ...LIVE, max_uses: 150, remaining: 150 });
+    await el.updateComplete;
+    pick(el, 'remove');
+    el.adjustReason = 'Imported wrong';
+    const submit = () => hook(el, 'services-packages-grant-adjust-submit') as HTMLElement;
+    const uses = () => hook(el, 'services-packages-grant-adjust-uses') as HTMLElement & { max?: unknown };
+
+    el.adjustUses = '101';
+    await el.updateComplete;
+    expect(submit().hasAttribute('disabled')).toBe(true);
+    await el.confirmAdjust();
+    expect(sent).toEqual([]);
+    expect(String(uses().getAttribute('max'))).toBe('100');
+
+    el.adjustUses = '100';
+    await el.updateComplete;
+    expect(submit().hasAttribute('disabled')).toBe(false);
+  });
+
   it('a correction can travel with an extension', async () => {
     const el = await mount();
     await open(el);
