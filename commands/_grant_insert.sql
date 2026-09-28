@@ -54,9 +54,11 @@ WHERE p.id = :package_id AND p.hub_id = :hub_id AND p.is_deleted = 0 AND p.is_ac
   -- still passes on the no-op, and `uq_services_grant_sale_ref` (migration 013) settles the race
   -- between two deliveries that reach the check at the same moment. A manual grant carries no ref,
   -- so the condition is inert for it — an operator granting the same voucher twice on purpose is
-  -- selling two vouchers, which is exactly what two grants mean.
+  -- selling two vouchers, which is exactly what two grants mean. A VOIDED grant still holds its
+  -- ref (services#82): voiding a voucher sold by mistake must not let a redelivery sell it again,
+  -- so this looks at every grant of the hub, soft-deleted ones included.
   AND NOT EXISTS (
     SELECT 1 FROM services_package_grant g
-     WHERE g.hub_id = :hub_id AND g.is_deleted = 0
+     WHERE g.hub_id = :hub_id
        AND g.sale_ref <> '' AND g.sale_ref = COALESCE(:sale_ref, '')
   );

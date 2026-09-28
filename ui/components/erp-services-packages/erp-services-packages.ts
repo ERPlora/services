@@ -181,6 +181,31 @@ interface OrphanGrant {
   is_expired: number;
 }
 
+/**
+ * Row of `services.packages.grants` — one voucher SOLD of a catalogue voucher, live or voided
+ * (services#82).
+ *
+ * `status` and `can_void` are the QUERY's own derived fields: whether a sale may still be voided is
+ * the same rule `_void_grant.sql` enforces (live, nothing spent or held), and a screen that
+ * recomputed it from `used` would be a second copy free to drift from it.
+ */
+interface SoldGrant {
+  grant_id: string;
+  package_id: string;
+  customer_id: string;
+  granted_at: string | null;
+  sale_id: string | null;
+  amount_cents: number;
+  max_uses: number | null;
+  used: number;
+  remaining: number | null;
+  status: 'active' | 'voided' | string;
+  voided_at: string | null;
+  voided_by: string | null;
+  void_reason: string;
+  can_void: number;
+}
+
 export class ErpServicesPackages extends LitElement {
   static styles = css`
     :host { display: flex; flex-direction: column; height: 100%; min-height: 0; font-family: system-ui, sans-serif; color: var(--ion-text-color, #1c1b18); }
@@ -229,6 +254,18 @@ export class ErpServicesPackages extends LitElement {
   @state() orphansLoading = false;
   @state() orphansError = '';
 
+  /** Voucher whose SALES are listed (services#82); `null` = the sheet is closed. */
+  @state() grantsOf: { id: string; name: string } | null = null;
+  @state() grants: SoldGrant[] = [];
+  @state() grantsTotal = 0;
+  @state() grantsLoading = false;
+  @state() grantsError = '';
+  /** Sale being voided: the sheet shows its confirmation instead of the list. */
+  @state() voidTarget: SoldGrant | null = null;
+  @state() voidReason = '';
+  @state() voiding = false;
+  @state() voidError = '';
+
   private ctrl!: ListController<Package>;
   private unsub?: () => void;
 
@@ -272,6 +309,9 @@ export class ErpServicesPackages extends LitElement {
       // it is: the movements behind a balance. Read-only — returning a session is `sales`' return
       // flow, not a button on the catalogue screen.
       ...(can('services.view_package_balance') ? [{ id: 'movements', label: t('ui.actionMovements'), icon: 'time-outline' }] : []),
+      // Who bought this voucher (services#82) — the same permission, because it shows the same
+      // balances; voiding one of those sales asks for its own permission on top.
+      ...(can('services.view_package_balance') ? [{ id: 'grants', label: t('ui.actionGrants'), icon: 'people-outline' }] : []),
       ...(can('services.delete_package') ? [{ id: 'delete', label: t('ui.actionDelete'), icon: 'trash-outline', color: 'danger' }] : []),
     ];
   }
@@ -399,6 +439,8 @@ export class ErpServicesPackages extends LitElement {
       this.editTitleInHeader = table?.shadowRoot?.querySelector('[role="dialog"]')?.getAttribute('aria-label') === title;
     } else if (actionId === 'movements' && can('services.view_package_balance')) {
       await this.openMovements(p);
+    } else if (actionId === 'grants' && can('services.view_package_balance')) {
+      await this.openGrants(p);
     } else if (actionId === 'delete' && can('services.delete_package')) {
       this.deleteTarget = p;
       this.pageError = '';
@@ -492,6 +534,89 @@ export class ErpServicesPackages extends LitElement {
       this.orphansError = domainMessage(e, erplora().locale, erplora().t(CATALOG, 'ui.errorOrphans'));
     } finally {
       this.orphansLoading = false;
+    }
+  }
+
+  /** Open the sales of a voucher (services#82) from its FIRST page — same contract as the ledger:
+   *  a page at a time, three states painted, a reopening reads again instead of stacking. */
+  private async openGrants(p: Package): Promise<void> {
+    this.grantsOf = { id: p.id, name: p.name };
+    this.voidTarget = null;
+    await this.reloadGrants();
+  }
+
+  private async reloadGrants(): Promise<void> {
+    this.grants = [];
+    this.grantsTotal = 0;
+    this.grantsError = '';
+    await this.loadGrantsPage();
+  }
+
+  async loadMoreGrants(): Promise<void> {
+    if (this.grantsLoading || this.grants.length >= this.grantsTotal) return;
+    await this.loadGrantsPage();
+  }
+
+  private async loadGrantsPage(): Promise<void> {
+    const target = this.grantsOf;
+    if (!target) return;
+    this.grantsLoading = true;
+    this.grantsError = '';
+    try {
+      const page = await erplora().queryPage<SoldGrant>('services.packages.grants', {
+        offset: this.grants.length,
+        params: { package_id: target.id },
+      });
+      if (this.grantsOf !== target) return; // pm#459: another opening owns the sheet now
+      this.grants = [...this.grants, ...(page?.rows ?? [])];
+      this.grantsTotal = page?.total ?? this.grants.length;
+    } catch (e) {
+      if (this.grantsOf !== target) return;
+      this.grantsError = domainMessage(e, erplora().locale, erplora().t(CATALOG, 'ui.errorGrants'));
+    } finally {
+      if (this.grantsOf === target) this.grantsLoading = false;
+    }
+  }
+
+  private closeGrants(): void {
+    this.grantsOf = null;
+    this.voidTarget = null;
+  }
+
+  /** Ask to void a sale: the sheet swaps its list for the confirmation, reason still blank. */
+  askVoid(grant: SoldGrant): void {
+    this.voidTarget = grant;
+    this.voidReason = '';
+    this.voidError = '';
+  }
+
+  cancelVoid(): void {
+    this.voidTarget = null;
+    this.voidError = '';
+  }
+
+  /**
+   * Void the sale being confirmed. The reason is mandatory — a void is an audit fact — so a blank
+   * one is not even sent (the handler refuses it too). On success the list is READ AGAIN rather
+   * than patched: the server is who says what the sale looks like now. A refusal stays on the
+   * confirmation, where the person is looking, with the module's own sentence for its code.
+   */
+  async confirmVoid(): Promise<void> {
+    const target = this.voidTarget;
+    const reason = this.voidReason.trim();
+    if (!target || !reason || this.voiding || !can('services.void_grant')) return;
+    this.voiding = true;
+    this.voidError = '';
+    try {
+      await erplora().command('services.packages.void_grant', { grant_id: target.grant_id, reason });
+      if (this.voidTarget !== target) return;
+      this.voidTarget = null;
+      await this.reloadGrants();
+    } catch (e) {
+      if (this.voidTarget !== target) return;
+      this.voidError = domainMessage(e, erplora().locale, erplora().t(CATALOG, 'ui.errorVoidGrant'));
+    } finally {
+      this.voiding = false;
     }
   }
 
@@ -739,6 +864,84 @@ export class ErpServicesPackages extends LitElement {
     </ion-modal>`;
   }
 
+  private renderGrant(g: SoldGrant) {
+    const t = (k: string, p?: Record<string, unknown>): string => erplora().t(CATALOG, k, p);
+    const voided = g.status === 'voided';
+    // `can_void` comes from the query; the permission decides whether this person sees the button.
+    const voidable = Number(g.can_void) === 1 && can('services.void_grant');
+    return html`<ion-item class="movement">
+      <ion-label class="ion-text-wrap">
+        <h3>
+          <ok-status-pill size="sm" tone=${voided ? 'neutral' : 'success'}>${t(`ui.grantStatus.${g.status}`)}</ok-status-pill>
+          ${t('ui.movementCustomer')}: ${g.customer_id}
+        </h3>
+        <p>
+          ${this.stamp(g.granted_at)} · ${erplora().formatMoney(Number(g.amount_cents) || 0)}
+          · ${g.max_uses == null
+            ? t('ui.grantUsesUnlimited', { used: Number(g.used) || 0 })
+            : t('ui.grantUses', { used: Number(g.used) || 0, remaining: Number(g.remaining) || 0 })}
+          ${g.sale_id ? html` · ${t('ui.movementSale')}: ${g.sale_id}` : nothing}
+        </p>
+        ${voided
+          ? html`<p class="refund">${t('ui.grantVoidedBy', { who: g.voided_by ?? '—', when: this.stamp(g.voided_at) })}${g.void_reason ? html` · ${g.void_reason}` : nothing}</p>`
+          : nothing}
+      </ion-label>
+      ${voidable
+        ? html`<ion-button slot="end" size="small" fill="clear" data-testid=${`services-packages-grant-void-${g.grant_id}`} style=${ionTone('text', 'danger')} @click=${() => this.askVoid(g)}>${t('ui.actionVoidGrant')}</ion-button>`
+        : nothing}
+    </ion-item>`;
+  }
+
+  private renderVoidConfirm(g: SoldGrant) {
+    const t = (k: string, p?: Record<string, unknown>): string => erplora().t(CATALOG, k, p);
+    return html`<p>${t('ui.voidGrantHint', { customer: g.customer_id, amount: erplora().formatMoney(Number(g.amount_cents) || 0) })}</p>
+      <ion-textarea data-testid="services-packages-grant-void-reason" fill="outline" mode="md" label-placement="floating" label=${t('ui.voidReasonLabel')} helper-text=${t('ui.voidReasonHelp')} auto-grow maxlength="500" .value=${this.voidReason} @ionInput=${(e: any) => (this.voidReason = String(e.target.value ?? ''))}></ion-textarea>
+      ${this.voidError
+        ? html`<ok-inline-feedback data-testid="services-packages-grant-void-error" tone="danger" icon="alert-circle-outline">${this.voidError}</ok-inline-feedback>`
+        : nothing}
+      <ion-button class="ion-margin-top" expand="block" data-testid="services-packages-grant-void-submit" style=${ionTone('solid', 'danger')} ?disabled=${this.voiding || !this.voidReason.trim()} @click=${() => this.confirmVoid()}>
+        ${this.voiding ? t('ui.btnVoiding') : t('ui.actionVoidGrant')}
+      </ion-button>
+      <ion-button expand="block" fill="outline" data-testid="services-packages-grant-void-cancel" ?disabled=${this.voiding} @click=${() => this.cancelVoid()}>${t('ui.btnCancel')}</ion-button>`;
+  }
+
+  private renderGrants() {
+    const t = (k: string, p?: Record<string, unknown>): string => erplora().t(CATALOG, k, p);
+    const confirming = this.voidTarget;
+    return html`<ion-modal .isOpen=${!!this.grantsOf} @ionModalDidDismiss=${() => this.closeGrants()}>
+      <ion-header class="ion-no-border">
+        <ion-toolbar>
+          <ion-title>${confirming ? t('ui.voidGrantTitle') : t('ui.grantsTitle')}</ion-title>
+          <ion-buttons slot="end">
+            <ion-button data-testid="services-packages-grants-close" @click=${() => this.closeGrants()}>${t('ui.btnClose')}</ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="ion-padding">
+        <!-- Self-styled: ion-modal is reparented to <body>, this component's CSS does not reach it. -->
+        ${confirming
+          ? this.renderVoidConfirm(confirming)
+          : html`<p><b>${this.grantsOf?.name ?? ''}</b> — ${t('ui.grantsHint')}</p>
+            ${this.grantsError
+              ? html`<ok-inline-feedback data-testid="services-packages-grants-error" tone="danger" icon="alert-circle-outline">${this.grantsError}</ok-inline-feedback>`
+              : nothing}
+            ${this.grants.length === 0
+              ? this.grantsLoading
+                ? html`<ok-inline-feedback data-testid="services-packages-grants-loading" tone="neutral" icon="time-outline">${t('ui.loading')}</ok-inline-feedback>`
+                : this.grantsError
+                  ? nothing
+                  : html`<ok-inline-feedback data-testid="services-packages-grants-empty" tone="neutral" icon="information-circle-outline">${t('ui.emptyGrants')}</ok-inline-feedback>`
+              : html`<ion-list lines="full">${this.grants.map((g) => this.renderGrant(g))}</ion-list>
+                  ${this.grants.length < this.grantsTotal
+                    ? html`<p class="more">${t('ui.grantsCount', { shown: this.grants.length, total: this.grantsTotal })}</p>
+                        <ion-button expand="block" fill="clear" data-testid="services-packages-grants-more" ?disabled=${this.grantsLoading} @click=${() => this.loadMoreGrants()}>
+                          ${this.grantsLoading ? t('ui.loading') : t('ui.grantsMore')}
+                        </ion-button>`
+                    : nothing}`}`}
+      </ion-content>
+    </ion-modal>`;
+  }
+
   private renderLines() {
     const t = (k: string): string => erplora().t(CATALOG, k);
     return html`<p class="lines-title">${t('ui.packageLinesTitle')}</p>
@@ -809,6 +1012,7 @@ export class ErpServicesPackages extends LitElement {
       ${this.renderDeleteConfirm()}
       ${this.renderMovements()}
       ${this.renderOrphans()}
+      ${this.renderGrants()}
     </div>`;
   }
 }

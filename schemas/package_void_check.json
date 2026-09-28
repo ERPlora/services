@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "services.packages.void_check params",
+  "description": "Read-only pre-check of voiding a sold voucher (services#82): can :grant_id be voided? Returns voidable (0/1), the business reason (grant_not_found | already_voided | in_use) and the sessions spent or held. It does not mutate; the transactional authority is still services.packages.void_grant.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["grant_id"],
+  "properties": {
+    "grant_id": { "type": "string", "minLength": 1, "description": "Id of the grant to void." }
+  }
+}

@@ -162,6 +162,25 @@ and refund, and answering all of it in one response is a ceiling nobody sees unt
 been running a while. Newest movement first; a caller may also filter by customer, by kind of
 movement (`movement = refunded` is the audit of what the salon gave back) or by date.
 
+### The vouchers sold, and voiding one sold by mistake (`erp-services-packages` → «Sold vouchers»)
+
+The row action next to «Movements», gated by the same `services.view_package_balance`. It lists every
+customer who bought that voucher — one row per purchase (grant), newest first, a page at a time with
+«Load more» — with the date, the amount, the sessions used and left, the sale it came from and a
+status pill: **Active** or **Voided**. A voided sale stays in the list with who voided it, when and
+why: that is its trail. Loading, empty and error are painted.
+
+A sale **nothing has been spent from** (no delivered session and none held at a till) shows a «Void»
+button to whoever has `services.void_grant` (admin and manager). It swaps the list for a
+confirmation that asks for a **reason** — mandatory, the button stays disabled until there is one —
+and warns that the money is not given back there. Confirming runs `services.packages.void_grant`;
+the list is then read again. A refusal (someone spent a session in the meantime, it was already
+voided) is shown on the confirmation itself, with its own sentence.
+
+Voiding moves **no money**: if the voucher was paid, refund the sale from Sales with a return. A
+voucher that was already used cannot be voided — adding a courtesy session or extending it
+(services#118) and correcting its balance (services#119) are separate doors that do not exist yet.
+
 ### Pay a line with a voucher (`erp-services-voucher-tender`)
 
 The component the till mounts on the checkout line (slot `sales.pos.tender`). It is the only screen

@@ -13,7 +13,8 @@
 -- done, forever. The second branch passes exactly that case and nothing else: it needs a NON-EMPTY
 -- ref, so a manual grant that inserted nothing (unknown or archived voucher) still fails and still
 -- rolls back. Same shape as `_refund_assert.sql`: idempotence lives in the statements, not in an
--- `IF`, and it is keyed on the document rather than on the row count.
+-- `IF`, and it is keyed on the document rather than on the row count. A VOIDED grant counts too
+-- (services#82): the INSERT skips its ref, so the redelivery must pass here as well.
 --
 -- `ok` is INTEGER: EXISTS() is boolean in Postgres (which refuses to insert it into an INTEGER) and
 -- integer in SQLite, so it is wrapped in CASE … THEN 1 ELSE 0 END — portable in both dialects
@@ -23,6 +24,6 @@ SELECT 'package_granted',
        CASE WHEN EXISTS (SELECT 1 FROM services_package_grant
                           WHERE id = :grant_id AND hub_id = :hub_id)
               OR EXISTS (SELECT 1 FROM services_package_grant
-                          WHERE hub_id = :hub_id AND is_deleted = 0
+                          WHERE hub_id = :hub_id
                             AND sale_ref <> '' AND sale_ref = COALESCE(:sale_ref, ''))
             THEN 1 ELSE 0 END;

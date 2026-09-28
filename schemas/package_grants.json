@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "services.packages.grants params",
+  "description": "Vouchers SOLD of one catalogue voucher (services#82): one row per customer purchase, live or voided, with sessions used and remaining, expiry and, if voided, who, when and why. It is a PAGINATED query: the list engine vocabulary (limit/offset/sort/dir/search and the f_<column> filters) travels in the same payload, which is why the schema stays OPEN. The hub_id scope is injected by the runtime (§2.5).",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["package_id"],
+  "properties": {
+    "package_id": { "type": "string", "minLength": 1, "description": "Id of the catalogue voucher whose sales are listed." }
+  }
+}

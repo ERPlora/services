@@ -214,7 +214,28 @@
     "orphanExpired": "Caducado",
     "orphanCustomerRef": "Referencia del cliente",
     "orphansCount": "{shown} de {total}",
-    "orphansMore": "Cargar más"
+    "orphansMore": "Cargar más",
+    "actionGrants": "Bonos vendidos",
+    "grantsTitle": "Bonos vendidos",
+    "grantsHint": "cada cliente que ha comprado este bono, con las sesiones usadas y las que le quedan. Una venta de la que no se ha usado nada se puede anular.",
+    "emptyGrants": "Nadie ha comprado este bono todavía.",
+    "errorGrants": "No se han podido cargar los bonos vendidos",
+    "grantsCount": "Se muestran {shown} de {total}",
+    "grantsMore": "Cargar más",
+    "grantStatus": {
+      "active": "Activo",
+      "voided": "Anulado"
+    },
+    "grantUses": "{used} usadas · quedan {remaining}",
+    "grantUsesUnlimited": "{used} usadas · sin límite",
+    "grantVoidedBy": "Anulado por {who} el {when}",
+    "actionVoidGrant": "Anular",
+    "btnVoiding": "Anulando…",
+    "voidGrantTitle": "¿Anular este bono?",
+    "voidGrantHint": "El bono del cliente {customer} ({amount}) deja de poder usarse y queda en la lista como anulado. El dinero no se devuelve aquí: si se cobró, devuelve la venta desde Ventas con una devolución.",
+    "voidReasonLabel": "Motivo",
+    "voidReasonHelp": "Obligatorio. Queda en el registro del bono, p. ej. «vendido al cliente equivocado».",
+    "errorVoidGrant": "No se ha podido anular el bono"
   },
   "errors": {
     "services.category_unavailable": "Esa categoría no está disponible: no existe en este negocio o se ha eliminado.",
@@ -238,6 +259,11 @@
     "services.redemption_not_found": "Esa sesión del bono no existe en este negocio.",
     "services.redemption_not_settled": "Esa sesión del bono nunca se cobró, así que no hay nada que devolver. Lo que procede es liberar la reserva.",
     "services.redemption_already_refunded": "Esa sesión del bono ya se devolvió en otra devolución.",
-    "services.redemption_not_refundable": "Esa sesión del bono no se puede devolver ahora mismo."
+    "services.redemption_not_refundable": "Esa sesión del bono no se puede devolver ahora mismo.",
+    "services.grant_not_found": "Esa venta de bono no existe en este negocio.",
+    "services.grant_already_voided": "Ese bono ya estaba anulado.",
+    "services.grant_in_use": "Ese bono ya se ha usado: no se puede anular.",
+    "services.grant_void_reason_required": "Indica por qué se anula este bono: el motivo queda en su registro.",
+    "services.grant_not_voidable": "Ese bono no se puede anular ahora: se ha usado o anulado mientras tanto. Recarga la lista y vuelve a intentarlo."
   }
 }

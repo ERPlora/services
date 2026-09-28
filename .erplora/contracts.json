@@ -5,6 +5,7 @@
     "queries": [
       "services.categories.list",
       "services.packages.get",
+      "services.packages.grants",
       "services.packages.holds_for_checkout",
       "services.packages.list",
       "services.packages.orphans",
@@ -28,6 +29,7 @@
       "services.packages.refund_redemption",
       "services.packages.release_hold",
       "services.packages.update",
+      "services.packages.void_grant",
       "services.services.create",
       "services.services.delete",
       "services.services.restore",

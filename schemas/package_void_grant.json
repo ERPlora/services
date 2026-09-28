@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "services.packages.void_grant params",
+  "description": "Voids a voucher SOLD BY MISTAKE (the wrong voucher, to the wrong customer or rung up twice), services#82. The voucher can no longer be spent anywhere and the row stays as a trail: who voided it, when and why. Only a voucher with no session spent or held can be voided; once it has been used, the way out is correcting the balance. It moves NO money: refunding what was charged is the sales credit note.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["grant_id", "reason"],
+  "properties": {
+    "grant_id": { "type": "string", "minLength": 1, "description": "Id of the grant (the voucher purchase) being voided." },
+    "reason": { "type": "string", "minLength": 1, "maxLength": 500, "pattern": "\\S", "description": "Why it is voided, in the operator's words. Mandatory: it stays in the audit trail." }
+  }
+}

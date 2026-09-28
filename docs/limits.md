@@ -20,8 +20,16 @@
   cross-module foreign key (the module contract), so a deleted or merged customer leaves grants that
   no balance screen will show. Of 17 products surveyed **not one** documents an answer to this, so
   there is no prior art to copy and ours has to be designed (services#81).
-- **A grant cannot be corrected or revoked.** No door adjusts the sessions, extends the deadline or
-  voids a voucher sold by mistake (services#82).
+- **A voucher sold by mistake can be voided, but a used one cannot be corrected.** Voiding
+  (`services.packages.void_grant`, services#82) only works while nothing has been spent from it. No
+  door yet adds a courtesy session or extends the deadline (services#118), or corrects the balance of
+  a voucher that was already used (services#119).
+- **Voiding and redeeming the same voucher at the very same instant can both succeed.** The void
+  re-checks inside its own transaction that nothing is spent or held, which closes every ordinary
+  case; two tills racing on the same millisecond are not serialised against each other (services#120).
+- **The voucher sheets show the customer's id, not their name.** «Sold vouchers», the movements
+  ledger and the void confirmation print the customer id and the id of whoever voided a sale; tell the
+  sales apart by date and amount until names are resolved (services#121).
 
 ## Errors you will actually see
 
@@ -38,6 +46,11 @@
 | `package_not_found` | The grant is real but its voucher template is archived or inactive | Reactivate the package, or check the id |
 | `no_uses_left` | The sessions **of that grant** are already consumed | Sell another one — a second grant of the same voucher is a normal, supported case |
 | `expired` | The validity window has passed since the **purchase** | The voucher is spent; a new one is needed |
+| `services.grant_void_reason_required` | A void was sent with no reason | Say why it is voided: the reason stays on its record |
+| `services.grant_in_use` | A session of that voucher was already delivered or is held at a till | It cannot be voided; release the hold first, or correct it another way |
+| `services.grant_already_voided` | Someone voided it before you | Nothing to do — reload the list |
+| `services.grant_not_found` | That sold voucher does not exist in this hub | Check the id — nothing was changed |
+| `services.grant_not_voidable` | Between the check and the write, the voucher was used or voided | Reload the list and try again |
 
 A refused redemption rolls the whole transaction back — no ledger row, no event.
 
@@ -87,7 +100,8 @@ A refused redemption rolls the whole transaction back — no ledger row, no even
 | Delete a package | `services.delete_package` |
 | Grant a voucher to a customer (and what the till's `sale.completed` listener needs) | `services.grant_package` |
 | Redeem one use of a package | `services.redeem_package` |
-| See a customer's package balance | `services.view_package_balance` |
+| See a customer's package balance, a voucher's movements and its sold vouchers | `services.view_package_balance` |
+| Void a voucher sold by mistake | `services.void_grant` (admin and manager only) |
 | Change the module settings | `services.manage_settings` |
 
 By role: **admin** has everything. **manager** has everything except the three deletes and

@@ -30,7 +30,10 @@ MUST_NOT = [
     # manager+admin here, and this is the same authority through another door). The cashier holds
     # and settles; a refund carries a document and an author. Pinned here so it cannot be widened
     # by accident.
-    "services.refund_package"
+    "services.refund_package",
+    # services#82 — voiding a voucher sold by mistake undoes a sale's entitlement: manager+admin,
+    # like `sales.void_sale`, never the person who rang it up.
+    "services.void_grant"
 ]
 
 errors = []
@@ -42,6 +45,8 @@ else:
     for p in MUST_NOT:
         if p in grants: errors.append(f"cashier must not get {p}")
     if "*" in grants: errors.append("cashier must never get *")
+    for p in MUST_NOT:
+        if p not in m["permissions"]: errors.append(f"{p} is pinned away from the cashier but the module does not declare it")
     for p in grants:
         if p not in m["permissions"]: errors.append(f"cashier is granted {p}, which this module does not declare")
 for e in errors: print("FAIL:", e)
