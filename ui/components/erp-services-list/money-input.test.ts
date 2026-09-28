@@ -5,7 +5,7 @@
 //
 //     «1.250,50»   -> 0        the price the table prints two centimetres away, saved FREE
 //     «1,250.50»   -> 0        the same amount written the English way
-//     «12abc»      -> 1200     letters glued to the figure cleaned away
+//     «12abc»      -> 0        unreadable (`Number` gives NaN), saved as 0 without a word
 //     «1.250»      -> 125      1250 or 1,25? guessed as 1,25 without a word
 //
 // What this module decides on top of the shared reading: an EMPTY price is 0 (the column is
@@ -264,5 +264,10 @@ describe('the service price is read by the shared money-input piece (pm#521)', (
     expect(el.formError).toContain('ui.errNotAnAmount');
     expect(await createTyped(el, '1.250')).toBeUndefined();
     expect(el.formError).toContain('ui.errAmbiguousAmount');
+    // The EDIT door writes its own refusal: the same method call, the same readings.
+    expect(await updateTyped(el, '1.250')).toBeUndefined();
+    expect(el.formError).toContain('ui.errAmbiguousAmount');
+    expect(el.formError).toContain('"grouped":"1250,00"');
+    expect(el.formError).toContain('"decimal":"1,25"');
   });
 });

@@ -6,7 +6,7 @@
 //
 //     closed price «1.250,50»      -> 0        the voucher sold for nothing
 //     fixed discount «1.250,50»    -> 0        the discount silently dropped
-//     «12abc»                      -> 1200     letters glued to the figure cleaned away
+//     «12abc»                      -> 0        unreadable (`Number` gives NaN), saved as 0 without a word
 //     reopening 12345,50 €         -> «12345.5» a dot and one decimal in a Spanish hub
 //
 // What this module decides on top of the shared reading:
@@ -202,6 +202,19 @@ describe('the FIXED discount of a voucher is read by the shared money-input piec
     const el = await mount();
     expect(await createTyped(el, { discountType: 'fixed', discountValue: '1.250' })).toBeUndefined();
     expect(el.formError).toContain('ui.errAmbiguousAmount');
+    // rv-combos-26: the readings were only checked on one field; the discount must quote them too.
+    expect(el.formError).toContain('"typed":"1.250"');
+    expect(el.formError).toContain('"grouped":"1250,00"');
+    expect(el.formError).toContain('"decimal":"1,25"');
+  });
+
+  it('a hub in another currency cleans ITS code off both money fields («KWD 12» → 12000)', async () => {
+    Object.assign(client(), { currency: 'KWD', currencyDecimals: 3, locale: 'en' });
+    const el = await mount();
+    const sent = await createTyped(el, { discountType: 'fixed', discountValue: 'KWD 1', fixedPrice: 'KWD 12' });
+    expect(el.formError).toBe('');
+    expect(sent?.fixed_price).toBe(12000);
+    expect(sent?.discount_amount_cents).toBe(1000);
   });
 
   it.each(NEGATIVE)('a negative fixed discount «%s» is refused in words', async (typed) => {
@@ -311,5 +324,7 @@ describe('reopening and leaving the money fields (pm#521)', () => {
     const el = await mount();
     expect(await createTyped(el, { fixedPrice: '1.250' })).toBeUndefined();
     expect(el.formError).toContain('ui.errAmbiguousAmount');
+    expect(await createTyped(el, { discountType: 'fixed', discountValue: '12abc' })).toBeUndefined();
+    expect(el.formError).toContain('ui.errNotAnAmount');
   });
 });
