@@ -1140,7 +1140,7 @@ export class ErpServicesPackages extends LitElement {
     }
     return html`<p>${t('ui.adjustGrantHint', { customer: this.customerLabel(g.customer_id) })}</p>
       ${hasLimit
-        ? html`<ion-input data-testid="services-packages-grant-adjust-uses" fill="outline" mode="md" label-placement="floating" label=${t('ui.adjustUsesLabel')} helper-text=${t('ui.adjustUsesHelp', { remaining: Number(g.remaining) || 0 })} type="number" inputmode="numeric" min="0" max="100" step="1" .value=${this.adjustUses} @ionInput=${(e: any) => (this.adjustUses = String(e.target.value ?? ''))}></ion-input>`
+        ? html`<ion-input data-testid="services-packages-grant-adjust-uses" class="ion-margin-top" fill="outline" mode="md" label-placement="floating" label=${t('ui.adjustUsesLabel')} helper-text=${t('ui.adjustUsesHelp', { remaining: Number(g.remaining) || 0 })} type="number" inputmode="numeric" min="0" max="100" step="1" .value=${this.adjustUses} @ionInput=${(e: any) => (this.adjustUses = String(e.target.value ?? ''))}></ion-input>`
         : nothing}
       ${expires
         ? html`<ion-input data-testid="services-packages-grant-adjust-days" class="ion-margin-top" fill="outline" mode="md" label-placement="floating" label=${t('ui.adjustDaysLabel')} helper-text=${t('ui.adjustDaysHelp', { when: this.day(g.expires_at) })} type="number" inputmode="numeric" min="0" max="366" step="1" .value=${this.adjustDays} @ionInput=${(e: any) => (this.adjustDays = String(e.target.value ?? ''))}></ion-input>`
