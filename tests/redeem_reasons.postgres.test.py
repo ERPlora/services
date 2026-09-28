@@ -366,6 +366,21 @@ def main() -> int:
         edge = seed_package(db, HUB, "Bono un día", max_uses=None, validity_days=1)
         last_day = seed_grant(db, edge, granted_at="2026-08-17T10:00:00Z")
         refused(db, "a voucher on its very last instant", lambda: refusal_alone(None, last_day), "services_redeem_not_redeemable")
+        # …and the INSERT agrees: that last instant really spends a session.
+        redeem(db, last_day)
+        check("the very last instant spends a session", "1", db.scalar(
+            f"SELECT count(*) FROM services_package_redemption WHERE grant_id = '{last_day}' AND is_deleted = 0"))
+
+        # The generic assert stays as the backstop behind the named refusal: the refusal fires on
+        # the same «nothing written» first, so only running the assert alone proves it still refuses.
+        def assert_alone():
+            from pg_harness import USER, bind
+
+            sql = (MODULE_DIR / "commands/_redeem_assert.sql").read_text()
+            params = {"redemption_id": str(uuid.uuid4()), "hub_id": HUB, "current_user_id": USER, "now": NOW}
+            db.psql([], db=db.name, stdin="BEGIN;\n" + bind(sql, params) + "\nROLLBACK;")
+
+        refused(db, "the generic assert on its own, when nothing was written", assert_alone, "package_redeemable")
 
         print("\nJ. the NEIGHBOUR's rows never change the reason given here (tenancy)")
         # Every row below lives in OTHER_HUB but points at an id of HUB — the only way a reason
