@@ -105,6 +105,10 @@ CREATE OR REPLACE FUNCTION erp_dt(text) RETURNS timestamptz
   LANGUAGE sql IMMUTABLE AS $$ SELECT $1::timestamptz $$;
 CREATE OR REPLACE FUNCTION erp_dateadd(text, integer, text) RETURNS timestamptz
   LANGUAGE sql IMMUTABLE AS $$ SELECT $1::timestamptz $$;
+-- The runtime's rewrite is textual (`(n || ' ' || unit)::interval`), so it takes ANY integer `n`:
+-- a `SUM(...)` of adjustments (services#118) is a bigint and must type here too.
+CREATE OR REPLACE FUNCTION erp_dateadd(text, bigint, text) RETURNS timestamptz
+  LANGUAGE sql IMMUTABLE AS $$ SELECT $1::timestamptz $$;
 """
 
 

@@ -47,6 +47,7 @@ from pg_harness import (
     USER,
     ScratchDb,
     container_available,
+    migration_entries,
     query_sql,
     script_for,
 )
@@ -592,8 +593,13 @@ def the_backfill_keeps_every_balance(db_name_prefix: str) -> None:
         # The subject of this section is 013's backfill, but the checks below ask
         # `services.packages.balance` — a query of the CURRENT module, which since services#77
         # reads `expires_at`. A hub never runs a query against a half-migrated schema (the runtime
-        # applies every declared migration before serving), so the mirror must not either.
-        db.apply("migrations/postgres/014_hold_deadline.sql")
+        # applies every declared migration before serving), so the mirror must not either: EVERY
+        # migration after 013 goes in (the balance reads the adjustments of services#118 too).
+        entries = migration_entries()
+        start = [rel for rel, _ in entries].index("migrations/postgres/013_package_grant.sql") + 1
+        after = entries[start:]
+        for rel, kind in after:
+            db.apply(rel, kind)
         check(
             "one legacy grant was minted for the pair (voucher, customer)",
             1,
