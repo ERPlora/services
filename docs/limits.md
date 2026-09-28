@@ -27,9 +27,11 @@
 - **Voiding and redeeming the same voucher at the very same instant can both succeed.** The void
   re-checks inside its own transaction that nothing is spent or held, which closes every ordinary
   case; two tills racing on the same millisecond are not serialised against each other (services#120).
-- **The voucher sheets show the customer's id, not their name.** «Sold vouchers», the movements
-  ledger and the void confirmation print the customer id and the id of whoever voided a sale; tell the
-  sales apart by date and amount until names are resolved (services#121).
+- **A customer's name needs `customers` and the permission to see customers.** «Sold vouchers», the
+  movements ledger and the void confirmation name the customer through `customers.get` (services#121).
+  Without the `customers` module, without `customers.view_customer`, or once the customer sheet was
+  deleted, the row shows the customer's id instead. The same goes for who voided a sale or gave a
+  session back: named from the hub's people list, the user id when that list cannot be read.
 
 ## Errors you will actually see
 
@@ -128,7 +130,8 @@ book anything — which is why installing the diary installs this module.
 
 **`customers` is referenced but not depended on.** Grants and redemptions store a customer id by
 convention, with no cross-module foreign key. That is what makes a deleted customer's grants
-invisible rather than refused — see the known gaps above.
+invisible rather than refused — see the known gaps above. The voucher sheets ask `customers.get`
+for the name on the OPTIONAL door, so a hub without `customers` still opens them, with ids.
 
 **`sales` is not depended on either, and does not know vouchers exist.** The grant listener reads one
 field of `sale.completed` — a line's `product_id`, matched against this module's own catalogue — the

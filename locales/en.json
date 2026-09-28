@@ -234,7 +234,8 @@
     "voidGrantHint": "The voucher of customer {customer} ({amount}) stops being usable and stays in the list as voided. The money is not given back here: if it was paid, refund the sale from Sales with a return.",
     "voidReasonLabel": "Reason",
     "voidReasonHelp": "Required. It stays on the voucher's record, e.g. «sold to the wrong customer».",
-    "errorVoidGrant": "Could not void the voucher"
+    "errorVoidGrant": "Could not void the voucher",
+    "nameLoading": "Loading name…"
   },
   "errors": {
     "services.category_unavailable": "That category is not available: it does not exist in this business or it has been deleted.",

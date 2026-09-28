@@ -235,7 +235,8 @@
     "voidGrantHint": "El bono del cliente {customer} ({amount}) deja de poder usarse y queda en la lista como anulado. El dinero no se devuelve aquí: si se cobró, devuelve la venta desde Ventas con una devolución.",
     "voidReasonLabel": "Motivo",
     "voidReasonHelp": "Obligatorio. Queda en el registro del bono, p. ej. «vendido al cliente equivocado».",
-    "errorVoidGrant": "No se ha podido anular el bono"
+    "errorVoidGrant": "No se ha podido anular el bono",
+    "nameLoading": "Cargando nombre…"
   },
   "errors": {
     "services.category_unavailable": "Esa categoría no está disponible: no existe en este negocio o se ha eliminado.",
