@@ -104,6 +104,15 @@ pub fn void_grant(input: Json<erplora_guest_sdk::Input>) -> FnResult<Json<Output
     }
 }
 
+#[cfg(feature = "guest")]
+#[plugin_fn]
+pub fn adjust_grant(input: Json<erplora_guest_sdk::Input>) -> FnResult<Json<Output>> {
+    match adjust_grant_pure(input.into_inner().into_value()) {
+        Ok(out) => Ok(Json(out)),
+        Err(msg) => Err(WithReturnCode::new(Error::msg(msg), 1)),
+    }
+}
+
 // ── helpers de tipos (mismo criterio que el handler de sales) ───────────────
 
 // El DINERO lo redondea `erplora_guest_sdk::money` (ADR-0123): unidad mínima, HALF_UP, uno solo
@@ -1294,6 +1303,129 @@ fn void_refusal_for(reason: &str) -> DomainError {
         _ => redeem_refusal(
             "services.grant_not_voidable",
             "That voucher cannot be voided right now.",
+        ),
+    }
+}
+
+/// The read that decides whether a sold voucher may take more sessions or days (services#118).
+const READ_ADJUST_CHECK: &str = "services.packages.adjust_check";
+
+/// Logic of `services.packages.adjust_grant` — a courtesy on a SOLD voucher (services#118): «one
+/// more session on the house», «extended a month because we were closed».
+///
+/// It writes a MOVEMENT (`services_package_grant_adjustment`) and never rewrites the purchase: the
+/// grant's `max_uses` / `validity_days` stay the snapshot of what was sold (ADR-0390) and every
+/// reader adds the live movements on top. The deltas are signed in the table so the balance
+/// correction (services#119) can reuse it; THIS door only adds and refuses a negative amount with
+/// `services.grant_adjust_invalid`.
+///
+/// Same shape as `void_grant`: the payload says which grant, how much and why; the `required` read
+/// `services.packages.adjust_check` — the hub's own rows — decides whether it exists, is live, and
+/// can take sessions (it has a limit) or days (it expires). No read, nothing written.
+/// `commands/_adjust_grant.sql` repeats every condition and `expect_rows` rolls a race back as
+/// `services.grant_not_adjustable`.
+///
+/// 🔴 The reason is MANDATORY and travels trimmed: a gift nobody explains is not audited.
+pub fn adjust_grant_pure(input: Value) -> Result<Output, String> {
+    let payload = input.get("payload").cloned().unwrap_or(Value::Null);
+    let grant_id = str_field(&payload, "grant_id").trim().to_string();
+    let reason = str_field(&payload, "reason").trim().to_string();
+
+    if grant_id.is_empty() {
+        return Ok(Output::new().with_error(adjust_refusal_for("")));
+    }
+    if reason.is_empty() {
+        return Ok(Output::new().with_error(redeem_refusal(
+            "services.grant_adjust_reason_required",
+            "Say why this voucher is being adjusted: the reason stays on its record.",
+        )));
+    }
+    let (uses_delta, days_delta) = match (
+        parse_int(payload.get("uses_delta")),
+        parse_int(payload.get("days_delta")),
+    ) {
+        (Ok(u), Ok(d)) if u.unwrap_or(0) >= 0 && d.unwrap_or(0) >= 0 => {
+            (u.unwrap_or(0), d.unwrap_or(0))
+        }
+        _ => {
+            return Ok(Output::new().with_error(redeem_refusal(
+                "services.grant_adjust_invalid",
+                "Sessions and days to add must be whole numbers, zero or more.",
+            )))
+        }
+    };
+    if uses_delta == 0 && days_delta == 0 {
+        return Ok(Output::new().with_error(redeem_refusal(
+            "services.grant_adjust_empty",
+            "Add at least one session or one day.",
+        )));
+    }
+
+    let row = match input.pointer(format!("/context/reads/{READ_ADJUST_CHECK}/0").as_str()) {
+        Some(value) if !value.is_null() => value.clone(),
+        _ => return Ok(Output::new().with_error(adjust_refusal_for(""))),
+    };
+    // The read must be about THIS grant; one answering for another is a broken contract.
+    if str_field(&row, "grant_id").trim() != grant_id {
+        return Ok(Output::new().with_error(adjust_refusal_for("")));
+    }
+    let refused = str_field(&row, "reason");
+    if !refused.trim().is_empty() {
+        return Ok(Output::new().with_error(adjust_refusal_for(&refused)));
+    }
+    if uses_delta > 0 && !flag_is(&row, "can_add_uses") {
+        return Ok(Output::new().with_error(redeem_refusal(
+            "services.grant_unlimited",
+            "That voucher has no session limit: there are no sessions to add.",
+        )));
+    }
+    if days_delta > 0 && !flag_is(&row, "can_extend") {
+        return Ok(Output::new().with_error(redeem_refusal(
+            "services.grant_no_expiry",
+            "That voucher never expires: there is no expiry to extend.",
+        )));
+    }
+
+    let adjustment_id = input
+        .pointer("/context/new_ids/0")
+        .map(as_str)
+        .filter(|id| !id.trim().is_empty())
+        .ok_or_else(|| "services.packages.adjust_grant: the host gave no new id".to_string())?;
+
+    let mut p = Map::new();
+    p.insert("adjustment_id".into(), json!(adjustment_id));
+    p.insert("grant_id".into(), json!(grant_id));
+    p.insert("uses_delta".into(), json!(uses_delta));
+    p.insert("days_delta".into(), json!(days_delta));
+    p.insert("reason".into(), json!(reason));
+
+    Ok(Output::new()
+        .with_operation(Operation::sql("services._adjust_grant", p))
+        .with_result(json!({
+            "adjusted": true,
+            "grant_id": grant_id,
+            "package_id": row.get("package_id").cloned().unwrap_or(Value::Null),
+            "customer_id": row.get("customer_id").cloned().unwrap_or(Value::Null),
+            "uses_delta": uses_delta,
+            "days_delta": days_delta,
+        })))
+}
+
+/// `reason` of `services.packages.adjust_check` → the domain error. Anything outside the closed
+/// set fails CLOSED with the code the manifest's `expect_rows` raises on zero rows.
+fn adjust_refusal_for(reason: &str) -> DomainError {
+    match reason.trim() {
+        "grant_not_found" => redeem_refusal(
+            "services.grant_not_found",
+            "That voucher sale does not exist in this business.",
+        ),
+        "already_voided" => redeem_refusal(
+            "services.grant_already_voided",
+            "That voucher was already voided.",
+        ),
+        _ => redeem_refusal(
+            "services.grant_not_adjustable",
+            "That voucher cannot be adjusted right now.",
         ),
     }
 }
