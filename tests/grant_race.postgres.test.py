@@ -310,6 +310,28 @@ def movements(db: ScratchDb, grant_id: str) -> int:
     )
 
 
+def use_indexes(db: ScratchDb, customer: str) -> list[int]:
+    """The ordinals of the customer's live sessions, over every grant of the pair."""
+    out = db.scalar(
+        "SELECT string_agg(use_index::text, ',' ORDER BY use_index) FROM services_package_redemption "
+        f"WHERE hub_id = '{HUB}' AND customer_id = '{customer}' AND is_deleted = 0"
+    )
+    return [int(x) for x in out.split(",")] if out else []
+
+
+def twin_grant_in_other_hub(db: ScratchDb, grant_id: str) -> str:
+    """A grant of ANOTHER hub carrying the same package and customer ids as `grant_id` (a forged or
+    stale pair): the only way two hubs share a pair, since ids are UUIDs."""
+    twin = str(uuid.uuid4())
+    db.scalar(
+        "INSERT INTO services_package_grant "
+        "SELECT (jsonb_populate_record(NULL::services_package_grant, to_jsonb(g) "
+        f"|| jsonb_build_object('id', '{twin}', 'hub_id', '{OTHER_HUB}'))).* "
+        f"FROM services_package_grant g WHERE g.id = '{grant_id}' RETURNING id"
+    )
+    return twin
+
+
 # ── the races ────────────────────────────────────────────────────────────────
 
 
@@ -434,6 +456,89 @@ def two_tills_on_the_last_session(db: ScratchDb, svc: str, two: str) -> None:
         check("…and exactly the voucher's 2 sessions are spent", 2, live_sessions(db, g))
 
 
+def two_twin_vouchers_of_one_customer(db: ScratchDb, svc: str, pkg: str) -> None:
+    # services#133: a customer owns TWO grants of the same package. Each is its own voucher, but
+    # the anti-double-spend ordinal (`use_index`, migration 011/013) is numbered over the PAIR
+    # (package, customer): two tills on the two grants both computed the same `MAX + 1` and the
+    # late one hit `uq_services_redemption_use` — the generic «could not complete», with sessions
+    # left on its own voucher. The late door must WAIT and then spend from its own voucher.
+    for label, first, second in (
+        ("a till holds on one, the chair redeems on the other", "hold", "redeem"),
+        ("the chair redeems on one, a till holds on the other", "redeem", "hold"),
+        ("two tills hold, one on each", "hold", "hold"),
+        ("two chairs redeem, one on each", "redeem", "redeem"),
+    ):
+        print(f"\n11 · two vouchers of the same package and customer: {label} → both spend")
+        customer = f"cus-twins-{first}-{second}"
+        g1, g2 = seed_grant(db, pkg, customer), seed_grant(db, pkg, customer)
+        door = {
+            "hold": lambda g: hold_body(g, svc),
+            "redeem": lambda g: redeem_body(g),
+        }
+        check(
+            "the late door WAITED and nothing refused it",
+            (True, None),
+            late_door(db, door[first](g1), door[second](g2)),
+        )
+        check("one session spent on the first voucher", 1, live_sessions(db, g1))
+        check("…and one on the second", 1, live_sessions(db, g2))
+        check("…each with its own ordinal", [1, 2], use_indexes(db, customer))
+
+    print("\n12 · the SAME voucher on two tills still spends it once per session left")
+    customer = "cus-twins-same"
+    g1, _g2 = seed_grant(db, pkg, customer), seed_grant(db, pkg, customer)
+    for _ in range(4):
+        db.psql([], db=db.name, stdin=script_for(*redeem_body(g1)))
+    check(
+        "the late till on the spent voucher is told NO SESSIONS ARE LEFT",
+        (True, "services_redeem_no_uses_left"),
+        late_door(db, hold_body(g1, svc), redeem_body(g1)),
+    )
+    check("…and the voucher holds exactly its 5 sessions", 5, live_sessions(db, g1))
+
+
+def another_hubs_twin_never_queues_this_hub(db: ScratchDb, svc: str, pkg: str) -> None:
+    # The queue is per pair AND per hub: a grant of another hub carrying the same package and
+    # customer ids is not a sibling of this hub's voucher. If it were, one hub's till could stall
+    # another's.
+    print(
+        "\n13 · another hub holds its twin grant (same package and customer ids) → this hub's till does not wait"
+    )
+    g = seed_grant(db, pkg, "cus-twin-tenancy")
+    twin = twin_grant_in_other_hub(db, g)
+    name, params = void_body(twin)
+    check(
+        "this hub's till did NOT wait on the other hub's twin",
+        False,
+        race(db, (name, {**params, "hub_id": OTHER_HUB}), hold_body(g, svc)),
+    )
+    check("…and it held its session", 1, live_sessions(db, g))
+
+
+def other_vouchers_never_queue(db: ScratchDb, svc: str, five: str, two: str) -> None:
+    # The queue is the PAIR, nothing wider: another voucher of the same customer, or the same
+    # voucher of another customer, shares no ordinal with this one and must not wait on it.
+    print("\n14 · a till holds on a voucher → another voucher of the SAME customer does not wait")
+    g = seed_grant(db, five, "cus-pair-a")
+    other = seed_grant(db, two, "cus-pair-a")
+    check(
+        "the till on the other package did NOT wait",
+        False,
+        race(db, hold_body(g, svc), hold_body(other, svc)),
+    )
+    check("…and it held its session", 1, live_sessions(db, other))
+
+    print("\n15 · a till holds on a voucher → the same voucher of ANOTHER customer does not wait")
+    g = seed_grant(db, five, "cus-pair-b")
+    other = seed_grant(db, five, "cus-pair-c")
+    check(
+        "the till of the other customer did NOT wait",
+        False,
+        race(db, hold_body(g, svc), redeem_body(other)),
+    )
+    check("…and it spent its session", 1, live_sessions(db, other))
+
+
 def another_hub_never_queues_behind_this_one(db: ScratchDb, svc: str, pkg: str) -> None:
     # The lock is per voucher AND per hub: a door of another hub carrying this voucher's id (a
     # forged or stale id) locks nothing here. If it did, one hub could stall another's till.
@@ -466,6 +571,9 @@ def main() -> int:
         a_correction_racing_a_till(db, svc, two)
         two_tills_on_the_last_session(db, svc, two)
         another_hub_never_queues_behind_this_one(db, svc, five)
+        two_twin_vouchers_of_one_customer(db, svc, five)
+        another_hubs_twin_never_queues_this_hub(db, svc, five)
+        other_vouchers_never_queue(db, svc, five, two)
     finally:
         db.drop()
 
