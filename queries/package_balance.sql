@@ -31,26 +31,31 @@ SELECT
   g.source                                               AS source,
   g.sale_id                                              AS sale_id,
   g.amount_cents                                         AS amount_cents,
-  g.max_uses                                             AS max_uses,
+  (g.max_uses + COALESCE(adj.uses_delta, 0))             AS max_uses,
   (SELECT COUNT(*) FROM services_package_redemption r
     WHERE r.hub_id = g.hub_id AND r.grant_id = g.id AND r.is_deleted = 0
       AND (r.expires_at IS NULL OR erp_dt(:now) < erp_dt(r.expires_at))) AS used,
   CASE WHEN g.max_uses IS NULL THEN NULL
-       ELSE g.max_uses - (SELECT COUNT(*) FROM services_package_redemption r
+       ELSE (g.max_uses + COALESCE(adj.uses_delta, 0)) - (SELECT COUNT(*) FROM services_package_redemption r
                            WHERE r.hub_id = g.hub_id AND r.grant_id = g.id
                              AND r.is_deleted = 0
                              AND (r.expires_at IS NULL
                                   OR erp_dt(:now) < erp_dt(r.expires_at))) END   AS remaining,
-  g.validity_days                                        AS validity_days,
+  (g.validity_days + COALESCE(adj.days_delta, 0))        AS validity_days,
   (SELECT MIN(r.redeemed_at) FROM services_package_redemption r
     WHERE r.hub_id = g.hub_id AND r.grant_id = g.id AND r.is_deleted = 0
       AND (r.expires_at IS NULL OR erp_dt(:now) < erp_dt(r.expires_at))) AS first_redeemed_at,
   CASE WHEN g.validity_days IS NULL THEN NULL
-       ELSE erp_dateadd(g.granted_at, g.validity_days, 'days') END        AS expires_at,
+       ELSE erp_dateadd(g.granted_at, (g.validity_days + COALESCE(adj.days_delta, 0)), 'days') END        AS expires_at,
   CASE WHEN g.validity_days IS NOT NULL
-            AND erp_dt(:now) > erp_dateadd(g.granted_at, g.validity_days, 'days')
+            AND erp_dt(:now) > erp_dateadd(g.granted_at, (g.validity_days + COALESCE(adj.days_delta, 0)), 'days')
        THEN 1 ELSE 0 END                                 AS is_expired
 FROM services_package_grant g
+LEFT JOIN (SELECT hub_id, grant_id, SUM(uses_delta) AS uses_delta, SUM(days_delta) AS days_delta
+             FROM services_package_grant_adjustment
+            WHERE is_deleted = 0
+            GROUP BY hub_id, grant_id) adj
+       ON adj.grant_id = g.id AND adj.hub_id = g.hub_id
 JOIN services_package p ON p.id = g.package_id AND p.hub_id = g.hub_id
 WHERE g.hub_id = :hub_id AND g.customer_id = :customer_id AND g.is_deleted = 0
 ORDER BY g.granted_at DESC, g.id DESC;

@@ -2489,4 +2489,188 @@ mod tests {
         );
         assert!(out.operations.is_empty());
     }
+
+    // ── services#118 — a courtesy on a sold voucher: more sessions, a later expiry ───────────────
+    //
+    // The payload says WHICH grant, how much and WHY; whether the grant exists here, is live and can
+    // take sessions (it has a limit) or days (it expires) is decided by `services.packages.
+    // adjust_check` — the hub's own rows. The reason is mandatory: a gift nobody explains is not
+    // audited.
+
+    fn adjust_payload() -> Value {
+        json!({ "grant_id": "gr-1", "uses_delta": 1, "days_delta": 30, "reason": "  We were closed  " })
+    }
+
+    fn adjust_input(check_row: Option<Value>, payload: Value) -> Value {
+        let mut reads = Map::new();
+        if let Some(row) = check_row {
+            reads.insert(READ_ADJUST_CHECK.into(), json!([row]));
+        }
+        json!({
+            "payload": payload,
+            "context": { "new_ids": ["adj-1"], "reads": Value::Object(reads) }
+        })
+    }
+
+    fn adjustable_row() -> Value {
+        json!({
+            "grant_id": "gr-1",
+            "package_id": "pkg-1",
+            "customer_id": "cus-1",
+            "can_add_uses": 1,
+            "can_extend": 1,
+            "reason": ""
+        })
+    }
+
+    fn adjust_code(out: &Output) -> Option<&str> {
+        out.error.as_ref().map(|e| e.code.as_str())
+    }
+
+    #[test]
+    fn a_live_grant_takes_sessions_and_days_as_one_movement() {
+        let out = adjust_grant_pure(adjust_input(Some(adjustable_row()), adjust_payload())).unwrap();
+        assert!(out.error.is_none(), "an adjustable grant must go through, got {out:?}");
+        assert_eq!(out.operations.len(), 1);
+        let op = &out.operations[0];
+        assert_eq!(op.command, "services._adjust_grant");
+        assert_eq!(op.params["adjustment_id"], json!("adj-1"));
+        assert_eq!(op.params["grant_id"], json!("gr-1"));
+        assert_eq!(op.params["uses_delta"], json!(1));
+        assert_eq!(op.params["days_delta"], json!(30));
+        assert_eq!(op.params["reason"], json!("We were closed"));
+        let result = out.result.unwrap();
+        assert_eq!(result["adjusted"], json!(true));
+        assert_eq!(result["grant_id"], json!("gr-1"));
+        assert_eq!(result["package_id"], json!("pkg-1"));
+        assert_eq!(result["customer_id"], json!("cus-1"));
+        assert_eq!(result["uses_delta"], json!(1));
+        assert_eq!(result["days_delta"], json!(30));
+    }
+
+    /// Either half alone is a whole adjustment; the missing one travels as 0, never as NULL.
+    #[test]
+    fn one_half_alone_is_enough_and_the_other_travels_as_zero() {
+        let out = adjust_grant_pure(adjust_input(
+            Some(adjustable_row()),
+            json!({ "grant_id": "gr-1", "uses_delta": "2", "reason": "Birthday" }),
+        ))
+        .unwrap();
+        assert!(out.error.is_none(), "got {out:?}");
+        assert_eq!(out.operations[0].params["uses_delta"], json!(2));
+        assert_eq!(out.operations[0].params["days_delta"], json!(0));
+    }
+
+    /// The business reason reaches the caller with its own code, never the raw zero-rows gate.
+    #[test]
+    fn the_adjust_refusal_names_its_reason() {
+        for (reason, code) in [
+            ("grant_not_found", "services.grant_not_found"),
+            ("already_voided", "services.grant_already_voided"),
+            ("something_new", "services.grant_not_adjustable"),
+        ] {
+            let mut row = adjustable_row();
+            row["reason"] = json!(reason);
+            let out = adjust_grant_pure(adjust_input(Some(row), adjust_payload())).unwrap();
+            assert_eq!(adjust_code(&out), Some(code), "reason {reason} must reach the caller as {code}");
+            assert!(out.operations.is_empty());
+        }
+    }
+
+    /// Sessions on a voucher with no session limit, or days on one that never expires, add nothing
+    /// to «forever» — refused with a code that says which half, not silently dropped.
+    #[test]
+    fn a_half_the_voucher_cannot_take_is_refused_by_name() {
+        let mut unlimited = adjustable_row();
+        unlimited["can_add_uses"] = json!(0);
+        let out = adjust_grant_pure(adjust_input(Some(unlimited.clone()), adjust_payload())).unwrap();
+        assert_eq!(adjust_code(&out), Some("services.grant_unlimited"));
+        assert!(out.operations.is_empty());
+        let days_only = json!({ "grant_id": "gr-1", "days_delta": 7, "reason": "Closed" });
+        let out = adjust_grant_pure(adjust_input(Some(unlimited), days_only)).unwrap();
+        assert!(out.error.is_none(), "an unlimited voucher can still be extended, got {out:?}");
+
+        let mut forever = adjustable_row();
+        forever["can_extend"] = json!("0");
+        let out = adjust_grant_pure(adjust_input(Some(forever.clone()), adjust_payload())).unwrap();
+        assert_eq!(adjust_code(&out), Some("services.grant_no_expiry"));
+        assert!(out.operations.is_empty());
+        let uses_only = json!({ "grant_id": "gr-1", "uses_delta": 1, "reason": "Gift" });
+        let out = adjust_grant_pure(adjust_input(Some(forever), uses_only)).unwrap();
+        assert!(out.error.is_none(), "a voucher that never expires can still take a session, got {out:?}");
+    }
+
+    #[test]
+    fn an_adjustment_that_adds_nothing_is_refused() {
+        for payload in [
+            json!({ "grant_id": "gr-1", "reason": "Nothing" }),
+            json!({ "grant_id": "gr-1", "uses_delta": 0, "days_delta": 0, "reason": "Nothing" }),
+            json!({ "grant_id": "gr-1", "uses_delta": "", "days_delta": null, "reason": "Nothing" }),
+        ] {
+            let out = adjust_grant_pure(adjust_input(Some(adjustable_row()), payload.clone())).unwrap();
+            assert_eq!(adjust_code(&out), Some("services.grant_adjust_empty"), "payload {payload}");
+            assert!(out.operations.is_empty());
+        }
+    }
+
+    /// Taking sessions or days AWAY is the balance correction (services#119), not a courtesy: this
+    /// door only adds, and says so instead of writing a negative movement.
+    #[test]
+    fn a_negative_or_unreadable_amount_is_refused() {
+        for payload in [
+            json!({ "grant_id": "gr-1", "uses_delta": -1, "reason": "Oops" }),
+            json!({ "grant_id": "gr-1", "uses_delta": 2, "days_delta": -1, "reason": "Oops" }),
+            json!({ "grant_id": "gr-1", "uses_delta": "two", "reason": "Oops" }),
+        ] {
+            let out = adjust_grant_pure(adjust_input(Some(adjustable_row()), payload.clone())).unwrap();
+            assert_eq!(adjust_code(&out), Some("services.grant_adjust_invalid"), "payload {payload}");
+            assert!(out.operations.is_empty());
+        }
+    }
+
+    /// 🔴 A courtesy with a blank reason does not exist: nothing to audit.
+    #[test]
+    fn an_adjustment_without_a_reason_is_refused() {
+        for blank in ["", "   "] {
+            let mut payload = adjust_payload();
+            payload["reason"] = json!(blank);
+            let out = adjust_grant_pure(adjust_input(Some(adjustable_row()), payload)).unwrap();
+            assert_eq!(adjust_code(&out), Some("services.grant_adjust_reason_required"), "reason {blank:?}");
+            assert!(out.operations.is_empty());
+        }
+    }
+
+    /// Fail-closed: without the read there is nothing to verify against, so nothing is written.
+    #[test]
+    fn without_the_read_nothing_is_adjusted() {
+        let out = adjust_grant_pure(adjust_input(None, adjust_payload())).unwrap();
+        assert_eq!(adjust_code(&out), Some("services.grant_not_adjustable"));
+        assert!(out.operations.is_empty());
+    }
+
+    /// 🔴 The read, not the payload, decides WHICH grant is adjusted.
+    #[test]
+    fn the_read_and_not_the_payload_decides_which_grant_is_adjusted() {
+        let mut row = adjustable_row();
+        row["grant_id"] = json!("gr-OTHER");
+        let out = adjust_grant_pure(adjust_input(Some(row), adjust_payload())).unwrap();
+        assert_eq!(adjust_code(&out), Some("services.grant_not_adjustable"));
+        assert!(out.operations.is_empty());
+    }
+
+    #[test]
+    fn an_adjustment_without_a_grant_id_is_refused() {
+        let mut payload = adjust_payload();
+        payload["grant_id"] = json!(" ");
+        let out = adjust_grant_pure(adjust_input(Some(adjustable_row()), payload)).unwrap();
+        assert_eq!(adjust_code(&out), Some("services.grant_not_adjustable"));
+        assert!(out.operations.is_empty());
+    }
+
+    #[test]
+    fn without_a_host_id_the_adjustment_is_an_error_not_a_guess() {
+        let mut input = adjust_input(Some(adjustable_row()), adjust_payload());
+        input["context"]["new_ids"] = json!([]);
+        assert!(adjust_grant_pure(input).is_err());
+    }
 }

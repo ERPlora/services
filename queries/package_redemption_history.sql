@@ -34,7 +34,14 @@
 --     would have handed an auditor the timeouts along with the choices;
 --   * `released` — a hold undone before the sale was paid. Nothing was owed and nobody was charged;
 --   * `consumed` — the session was delivered and the sale is settled;
---   * `held`     — the checkout is still open.
+--   * `held`     — the checkout is still open;
+--   * `adjusted` — not a session at all but a COURTESY on the purchase (services#118, migration
+--     019): sessions added (`uses_delta`) and/or days the expiry moved (`days_delta`), with who
+--     (`created_by`), when (`redeemed_at`, the ledger's instant column) and why (`adjust_reason`).
+--     It is the second branch of the UNION because it lives in its own table; the columns a
+--     session has and an adjustment does not are NULL there, and the adjustment columns are 0/''
+--     on a session. The branch is matched on `hub_id` twice — the movement and its grant — so a
+--     neighbour's row naming this grant id cannot print here.
 --
 -- `movement_seq` is the ledger's own cursor, and it exists because the list engine sorts by ONE
 -- column (`crates/runtime/src/queries.rs::run_list`): the composite order this query used to
@@ -73,6 +80,9 @@ SELECT
     r.is_deleted                            AS is_deleted,
     COALESCE(r.release_reason, '')          AS release_reason,
     r.created_by                            AS created_by,
+    0                                       AS uses_delta,
+    0                                       AS days_delta,
+    ''                                      AS adjust_reason,
     CASE
         WHEN r.refunded_at IS NOT NULL             THEN 'refunded'
         WHEN r.is_deleted = 1
@@ -86,3 +96,37 @@ FROM services_package_redemption r
 LEFT JOIN services_service s
        ON s.id = r.service_id AND s.hub_id = r.hub_id
 WHERE r.hub_id = :hub_id AND r.package_id = :package_id
+UNION ALL
+SELECT
+    a.id                                    AS redemption_id,
+    a.grant_id                              AS grant_id,
+    g.package_id                            AS package_id,
+    g.customer_id                           AS customer_id,
+    NULL                                    AS service_id,
+    NULL                                    AS service_name,
+    NULL                                    AS use_index,
+    'adjusted'                              AS status,
+    a.adjusted_at                           AS redeemed_at,
+    NULL                                    AS settled_at,
+    NULL                                    AS sale_id,
+    NULL                                    AS checkout_ref,
+    NULL                                    AS line_ref,
+    NULL                                    AS appointment_id,
+    ''                                      AS note,
+    NULL                                    AS refunded_at,
+    NULL                                    AS refunded_by,
+    NULL                                    AS refund_ref,
+    ''                                      AS refund_note,
+    0                                       AS refund_expired,
+    a.is_deleted                            AS is_deleted,
+    ''                                      AS release_reason,
+    a.created_by                            AS created_by,
+    a.uses_delta                            AS uses_delta,
+    a.days_delta                            AS days_delta,
+    a.reason                                AS adjust_reason,
+    'adjusted'                              AS movement,
+    a.adjusted_at || '|' || a.id            AS movement_seq
+FROM services_package_grant_adjustment a
+JOIN services_package_grant g
+  ON g.id = a.grant_id AND g.hub_id = a.hub_id
+WHERE a.hub_id = :hub_id AND g.package_id = :package_id AND a.is_deleted = 0

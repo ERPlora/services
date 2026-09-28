@@ -43,6 +43,11 @@ SELECT
       AND u.customer_id = g.customer_id AND u.is_deleted = 0),
   0, :current_user_id, :current_user_id, :now, :now
 FROM services_package_grant g
+LEFT JOIN (SELECT hub_id, grant_id, SUM(uses_delta) AS uses_delta, SUM(days_delta) AS days_delta
+             FROM services_package_grant_adjustment
+            WHERE is_deleted = 0
+            GROUP BY hub_id, grant_id) adj
+       ON adj.grant_id = g.id AND adj.hub_id = g.hub_id
 JOIN services_package p ON p.id = g.package_id AND p.hub_id = g.hub_id
 WHERE g.id = :grant_id AND g.hub_id = :hub_id AND g.is_deleted = 0
   AND p.is_deleted = 0 AND p.is_active = 1
@@ -51,12 +56,12 @@ WHERE g.id = :grant_id AND g.hub_id = :hub_id AND g.is_deleted = 0
   AND (
     g.max_uses IS NULL
     OR (SELECT COUNT(*) FROM services_package_redemption u
-         WHERE u.hub_id = :hub_id AND u.grant_id = g.id AND u.is_deleted = 0) < g.max_uses
+         WHERE u.hub_id = :hub_id AND u.grant_id = g.id AND u.is_deleted = 0) < (g.max_uses + COALESCE(adj.uses_delta, 0))
   )
   -- Guard 2: validity, anchored on the PURCHASE (`granted_at`) and not on the first use. Under the
   -- old anchor an unstarted voucher had no clock at all, so one bought a year ago and never touched
   -- had not expired and never would. NULL `validity_days` = no expiry.
   AND (
     g.validity_days IS NULL
-    OR erp_dt(:now) <= erp_dateadd(g.granted_at, g.validity_days, 'days')
+    OR erp_dt(:now) <= erp_dateadd(g.granted_at, (g.validity_days + COALESCE(adj.days_delta, 0)), 'days')
   );

@@ -75,8 +75,8 @@ WITH candidate AS (
         g.id            AS grant_id,
         g.package_id    AS package_id,
         p.name          AS package_name,
-        g.max_uses      AS max_uses,
-        g.validity_days AS validity_days,
+        (g.max_uses + COALESCE(adj.uses_delta, 0)) AS max_uses,
+        (g.validity_days + COALESCE(adj.days_delta, 0)) AS validity_days,
         g.granted_at    AS granted_at,
         (SELECT COUNT(*) FROM services_package_redemption r
           WHERE r.hub_id = :hub_id AND r.grant_id = g.id AND r.is_deleted = 0
@@ -85,6 +85,11 @@ WITH candidate AS (
           WHERE r.hub_id = :hub_id AND r.grant_id = g.id AND r.is_deleted = 0
             AND (r.expires_at IS NULL OR erp_dt(:now) < erp_dt(r.expires_at)))   AS first_redeemed_at
     FROM services_package_grant g
+    LEFT JOIN (SELECT hub_id, grant_id, SUM(uses_delta) AS uses_delta, SUM(days_delta) AS days_delta
+                 FROM services_package_grant_adjustment
+                WHERE is_deleted = 0
+                GROUP BY hub_id, grant_id) adj
+           ON adj.grant_id = g.id AND adj.hub_id = g.hub_id
     JOIN services_package p ON p.id = g.package_id AND p.hub_id = g.hub_id
     WHERE g.hub_id = :hub_id AND g.is_deleted = 0 AND g.customer_id = :customer_id
       AND p.is_deleted = 0 AND p.is_active = 1
