@@ -102,8 +102,11 @@ never marked exhausted — and it is the reason the guard is not an `IF`.
 Every redemption carries a **use ordinal** (`use_index`), unique per hub, voucher and customer among
 the live rows. Two tills redeeming at the same time compute the same ordinal and the unique index
 lets exactly one of them commit; the loser's whole transaction rolls back, so there is no row, no
-event and no session spent. A second index does the same for the checkout line: one line is covered
-by ONE redemption, so a double tap on «pay with voucher» cannot charge one line to two sessions.
+event and no session spent. Since services#120 every door that decides on one sold voucher — hold,
+redeem, void, correction — first locks that voucher's row, so on the same voucher the second till
+simply waits, recounts and is refused; the index stays as the guard underneath. A second index does
+the same for the checkout line: one line is covered by ONE redemption, so a double tap on «pay with
+voucher» cannot charge one line to two sessions.
 
 Both hold against raw SQL that skips the commands entirely, which is the point of putting them in
 the schema rather than in a statement.

@@ -846,6 +846,7 @@
       "permission": "services.redeem_package",
       "sql": [
         "commands/hold_expire.sql",
+        "commands/_grant_lock.sql",
         "commands/_redeem_insert.sql",
         "commands/_redeem_assert.sql",
         "commands/_gate_clear.sql"
@@ -953,6 +954,7 @@
       "permission": "services.hold_package",
       "sql": [
         "commands/hold_expire.sql",
+        "commands/_grant_lock.sql",
         "commands/_hold_insert.sql",
         "commands/_redeem_assert.sql",
         "commands/_gate_clear.sql"
@@ -1058,13 +1060,15 @@
     "services._void_grant": {
       "permission": "services.void_grant",
       "sql": [
+        "commands/_grant_lock.sql",
         "commands/_void_grant.sql"
       ],
       "expect_rows": {
         "op": "min",
         "n": 1,
         "error": "services.grant_not_voidable",
-        "message": "That voucher could not be voided: it does not exist here, it was already voided, or a session of it was just spent or held."
+        "message": "That voucher could not be voided: it does not exist here, it was already voided, or a session of it was just spent or held.",
+        "statement": "commands/_void_grant.sql"
       }
     },
     "services.packages.adjust_grant": {
@@ -1095,13 +1099,15 @@
     "services._adjust_grant": {
       "permission": "services.adjust_grant",
       "sql": [
+        "commands/_grant_lock.sql",
         "commands/_adjust_grant.sql"
       ],
       "expect_rows": {
         "op": "min",
         "n": 1,
         "error": "services.grant_not_adjustable",
-        "message": "That voucher could not be adjusted: it does not exist here, it was voided, its sessions were used in the meantime, or it cannot take what was asked."
+        "message": "That voucher could not be adjusted: it does not exist here, it was voided, its sessions were used in the meantime, or it cannot take what was asked.",
+        "statement": "commands/_adjust_grant.sql"
       }
     },
     "services._on_sale_completed": {
