@@ -23,6 +23,7 @@ pair, in both orders:
 Usage: tests/grant_race.postgres.test.py   (exit 0 = green; SKIPPED without the container)
 """
 
+import re
 import subprocess
 import sys
 import time
@@ -204,12 +205,18 @@ def settle(db: ScratchDb, sessions: int) -> None:
     raise TimeoutError(f"{sessions} session(s) never settled in {db.name}")
 
 
-def race(db: ScratchDb, first: tuple[str, dict], second: tuple[str, dict]) -> bool:
+def race(
+    db: ScratchDb,
+    first: tuple[str, dict],
+    second: tuple[str, dict],
+    refusal: dict | None = None,
+) -> bool:
     """First door runs and stays UNCOMMITTED; the second starts; then first commits, then second.
 
     Returns whether the second door was WAITING on the first when the first committed. A door that
-    fails inside its transaction (the `services__gate` CHECK of a refused hold) turns its COMMIT
-    into a ROLLBACK, exactly like the runtime's transaction."""
+    fails inside its transaction (a refused hold) turns its COMMIT into a ROLLBACK, exactly like
+    the runtime's transaction. When `refusal` is given, `refusal["second"]` receives the name of
+    the constraint that refused the second door (`None` if nothing refused it)."""
 
     def session():
         return subprocess.Popen(
@@ -248,6 +255,8 @@ def race(db: ScratchDb, first: tuple[str, dict], second: tuple[str, dict]) -> bo
         b.stdin.flush()
         b.stdin.close()
         b.wait(timeout=20)
+        if refusal is not None:
+            refusal["second"] = refused_by(b.stderr.read() or "")
     finally:
         for p in (a, b):
             if p.poll() is None:
@@ -256,6 +265,21 @@ def race(db: ScratchDb, first: tuple[str, dict], second: tuple[str, dict]) -> bo
 
 
 # ── what survived ────────────────────────────────────────────────────────────
+
+
+def refused_by(stderr: str) -> str | None:
+    """The constraint named by the FIRST error of a psql session (the later ones are only
+    «current transaction is aborted»). The runtime renames that name to the domain code the
+    caller reads (`on_unique`, hub#2081), so the name IS the reason the late till is given."""
+    m = re.search(r'violates (?:unique|check) constraint "([^"]+)"', stderr)
+    return m.group(1) if m else None
+
+
+def late_door(db: ScratchDb, first: tuple[str, dict], second: tuple[str, dict]) -> tuple[bool, str | None]:
+    """`race`, answering whether the second door waited AND what refused it."""
+    refusal: dict = {}
+    waited = race(db, first, second, refusal)
+    return waited, refusal.get("second")
 
 
 def voided(db: ScratchDb, grant_id: str) -> bool:
@@ -317,7 +341,9 @@ def the_void_first_then_a_till(db: ScratchDb, svc: str, pkg: str) -> None:
     )
     g = seed_grant(db, pkg, "cus-void-hold")
     check(
-        "the till WAITED for the void", True, race(db, void_body(g), hold_body(g, svc))
+        "the till WAITED for the void and is told the voucher is VOIDED (services#128)",
+        (True, "services_redeem_voided"),
+        late_door(db, void_body(g), hold_body(g, svc)),
     )
     check("the voucher is voided", True, voided(db, g))
     check("…and no session was held on it", 0, live_sessions(db, g))
@@ -327,7 +353,9 @@ def the_void_first_then_a_till(db: ScratchDb, svc: str, pkg: str) -> None:
     )
     g = seed_grant(db, pkg, "cus-void-redeem")
     check(
-        "the redeem WAITED for the void", True, race(db, void_body(g), redeem_body(g))
+        "the redeem WAITED for the void and is told the voucher is VOIDED (services#128)",
+        (True, "services_redeem_voided"),
+        late_door(db, void_body(g), redeem_body(g)),
     )
     check("the voucher is voided", True, voided(db, g))
     check("…and no session was spent on it", 0, live_sessions(db, g))
@@ -353,9 +381,9 @@ def a_correction_racing_a_till(db: ScratchDb, svc: str, two: str) -> None:
     g = seed_grant(db, two, "cus-fix-redeem")
     db.psql([], db=db.name, stdin=script_for(*redeem_body(g)))
     check(
-        "the redeem WAITED for the correction",
-        True,
-        race(db, correction_body(g, -1), redeem_body(g)),
+        "the redeem WAITED for the correction and is told NO SESSIONS ARE LEFT (services#128)",
+        (True, "services_redeem_no_uses_left"),
+        late_door(db, correction_body(g, -1), redeem_body(g)),
     )
     check("the correction was written", 1, movements(db, g))
     check("…and the till did NOT spend past it", 1, live_sessions(db, g))
@@ -364,9 +392,9 @@ def a_correction_racing_a_till(db: ScratchDb, svc: str, two: str) -> None:
     g = seed_grant(db, two, "cus-fix-hold")
     db.psql([], db=db.name, stdin=script_for(*redeem_body(g)))
     check(
-        "the hold WAITED for the correction",
-        True,
-        race(db, correction_body(g, -1), hold_body(g, svc)),
+        "the hold WAITED for the correction and is told NO SESSIONS ARE LEFT (services#128)",
+        (True, "services_redeem_no_uses_left"),
+        late_door(db, correction_body(g, -1), hold_body(g, svc)),
     )
     check("the correction was written", 1, movements(db, g))
     check("…and the till did NOT hold past it", 1, live_sessions(db, g))
@@ -383,6 +411,27 @@ def a_correction_racing_a_till(db: ScratchDb, svc: str, two: str) -> None:
     )
     check("both sessions are spent", 2, live_sessions(db, g))
     check("…and the correction was NOT written", 0, movements(db, g))
+
+
+def two_tills_on_the_last_session(db: ScratchDb, svc: str, two: str) -> None:
+    # services#128: the plain race of the counter — two tills, ONE session left. The loser already
+    # spent nothing before services#120; what it lacked was the REASON: it was refused by the
+    # generic gate CHECK and the cashier read «could not complete» instead of «no sessions left».
+    for label, first, second in (
+        ("a till holds it, the chair redeems it", "hold", "redeem"),
+        ("the chair redeems it, a till holds it", "redeem", "hold"),
+        ("two tills hold it", "hold", "hold"),
+    ):
+        print(f"\n10 · the last session of a voucher: {label} → the late one is told why")
+        g = seed_grant(db, two, f"cus-last-{first}-{second}")
+        db.psql([], db=db.name, stdin=script_for(*redeem_body(g)))
+        door = {"hold": lambda: hold_body(g, svc), "redeem": lambda: redeem_body(g)}
+        check(
+            "the late door WAITED and is told NO SESSIONS ARE LEFT",
+            (True, "services_redeem_no_uses_left"),
+            late_door(db, door[first](), door[second]()),
+        )
+        check("…and exactly the voucher's 2 sessions are spent", 2, live_sessions(db, g))
 
 
 def another_hub_never_queues_behind_this_one(db: ScratchDb, svc: str, pkg: str) -> None:
@@ -415,6 +464,7 @@ def main() -> int:
         a_till_first_then_the_void(db, svc, five)
         the_void_first_then_a_till(db, svc, five)
         a_correction_racing_a_till(db, svc, two)
+        two_tills_on_the_last_session(db, svc, two)
         another_hub_never_queues_behind_this_one(db, svc, five)
     finally:
         db.drop()

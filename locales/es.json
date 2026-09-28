@@ -281,6 +281,7 @@
     "services.package_needs_lines": "Un paquete necesita al menos una línea de servicio: un paquete sin líneas no se puede vender ni canjear.",
     "services.package_no_uses_left": "Este bono ya no tiene sesiones disponibles.",
     "services.package_expired": "Este bono ha caducado.",
+    "services.package_voided": "Este bono está anulado: ya no se puede usar.",
     "services.package_not_redeemable": "Este bono no se puede canjear ahora mismo.",
     "services.package_does_not_cover_service": "Este bono no cubre ese servicio. Un bono de cortes paga cortes, no el champú.",
     "services.hold_not_releasable": "Esa sesión del bono ya no se puede devolver: la venta está cobrada. Devolverla es una devolución, y va por su propia puerta.",

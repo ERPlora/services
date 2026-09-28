@@ -112,6 +112,10 @@ def main() -> int:
             # INSERT it would not queue the guard's subqueries — grant_race.postgres proves it.
             "commands/_grant_lock.sql",
             "commands/_redeem_insert.sql",
+            # services#128: right after the INSERT it guards, and BEFORE the generic assert —
+            # when the INSERT wrote nothing it refuses by the index that NAMES the reason, which
+            # the command's `on_unique` turns into the code a till can act on.
+            "commands/_redeem_refusal.sql",
             "commands/_redeem_assert.sql",
             "commands/_gate_clear.sql",
         ],
@@ -135,6 +139,36 @@ def main() -> int:
         ":redemption_id" in assert_sql and ":new_id" not in assert_sql,
     )
 
+    print("\n3b. a refusal INSIDE the transaction names its reason too (services#128)")
+    # The pre-check reads a snapshot; the till that loses a race to another till, a void or a
+    # correction passes it and is refused by the gated statements. Each reason has its own unique
+    # index in `services__redeem_gate` (migration 020), and the public door renames it.
+    refusal_indexes = {
+        "services_redeem_no_grant": "services.package_no_grant",
+        "services_redeem_voided": "services.package_voided",
+        "services_redeem_package_not_found": "services.package_not_found",
+        "services_redeem_no_uses_left": "services.package_no_uses_left",
+        "services_redeem_expired": "services.package_expired",
+        "services_redeem_does_not_cover_service": "services.package_does_not_cover_service",
+        "services_redeem_not_redeemable": "services.package_not_redeemable",
+    }
+    for door in ("services.packages.redeem", "services.packages.hold_for_line"):
+        check(f"{door} on_unique", refusal_indexes, commands.get(door, {}).get("on_unique"))
+    check(
+        "services._hold runs the same refusal right after its INSERT",
+        [
+            "commands/_hold_insert.sql",
+            "commands/_redeem_refusal.sql",
+            "commands/_redeem_assert.sql",
+        ],
+        commands.get("services._hold", {}).get("sql", [])[2:5],
+    )
+    migration = sql_of("migrations/postgres/020_redeem_refusal_gate.sql") if (
+        MODULE_DIR / "migrations/postgres/020_redeem_refusal_gate.sql"
+    ).exists() else ""
+    for index in refusal_indexes:
+        check(f"migration 020 creates the unique index {index}", True, f"UNIQUE INDEX IF NOT EXISTS {index} " in migration)
+
     print("\n4. the refusal codes exist in BOTH locales (en source + es, ADR-0055)")
     codes = [
         "services.package_no_grant",
@@ -143,6 +177,8 @@ def main() -> int:
         "services.package_expired",
         "services.package_not_found",
         "services.package_not_redeemable",
+        "services.package_voided",
+        "services.package_does_not_cover_service",
     ]
     for lang in ("en", "es"):
         errors = json.loads((MODULE_DIR / "locales" / f"{lang}.json").read_text()).get(

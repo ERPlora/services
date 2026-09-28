@@ -272,9 +272,11 @@ def void_an_unused_grant(db: ScratchDb, svc: str, pkg: str) -> None:
             {"customer_id": "cus-wrong", "service_id": svc},
         ),
     )
+    # services#128: refused AS VOIDED. It answered `no_grant` until then — «nobody sold it to this
+    # customer» — which sends the cashier to sell the voucher again instead of telling them why.
     check(
-        "the redemption pre-check refuses it",
-        "no_grant",
+        "the redemption pre-check refuses it as voided",
+        "voided",
         rows(db, "services.packages.redeem_check", {"grant_id": wrong})[0]["reason"],
     )
     refused("a redeem against the voided grant", lambda: redeem(db, wrong))

@@ -310,13 +310,13 @@ def test_3_the_till_waits_for_the_void_and_spends_nothing(hub: Hub, db: str) -> 
     )
     hub.check("the void committed", answer["till_error"], "")
     hub.check("the redeem WAITED for the void", answer["waited"], True)
-    # Refused, but not yet by name: the redeem's pre-check said yes before the void committed, so
-    # the refusal comes from the `services__gate` CHECK inside the transaction, and the kernel
-    # answers every database refusal with its generic `db` code (services#128).
-    hub.check_true(
-        "the redeem is refused, not answered ok",
-        answer["status"] != 200,
-        f"(HTTP {answer['status']}: {answer['body']})",
+    # services#128: refused BY NAME. The redeem's pre-check said yes before the void committed, so
+    # the refusal comes from inside the transaction — and it still reaches the caller as the reason
+    # it would have read one second later, not as the kernel's generic `db`.
+    hub.check(
+        "the redeem is told the voucher was VOIDED",
+        [answer["status"] != 200, code_of(answer)],
+        [True, "services.package_voided"],
     )
     hub.check(
         "no session was spent on the voided voucher",
@@ -329,6 +329,54 @@ def test_3_the_till_waits_for_the_void_and_spends_nothing(hub: Hub, db: str) -> 
     )
 
 
+def last_session_race(hub: Hub, db: str, label: str, late: str) -> None:
+    """services#128: another till holds the LAST session of a voucher and has not committed yet;
+    the late door (`late`, the chair's redeem or the till's hold) arrives, waits, and loses."""
+    customer = tag(f"cust-last-{label}")
+    service = catalog_service(hub)
+    grant_id = grant(hub, create_package(hub, tag(f"Bono último {label}"), 2, None), customer)
+    hub.run("services.packages.redeem", {"grant_id": grant_id})
+
+    command = (
+        ("services.packages.redeem", {"grant_id": grant_id})
+        if late == "redeem"
+        else (
+            "services.packages.hold_for_line",
+            {
+                "grant_id": grant_id,
+                "customer_id": customer,
+                "service_id": service,
+                "checkout_ref": tag("chk-late"),
+                "line_ref": "l1",
+            },
+        )
+    )
+    answer = race(hub, db, hold_sql(grant_id, service), command)
+    hub.check("the other till committed its hold", answer["till_error"], "")
+    hub.check(f"the {late} WAITED for the other till", answer["waited"], True)
+    hub.check(
+        f"the {late} is told the voucher has NO SESSIONS LEFT, not «could not complete»",
+        [answer["status"] != 200, code_of(answer)],
+        [True, "services.package_no_uses_left"],
+    )
+    row = balance_of(hub, customer, grant_id)
+    hub.check(
+        "exactly the voucher's 2 sessions are spent",
+        [row["max_uses"], row["remaining"]],
+        [2, 0],
+    )
+
+
+def test_4_the_chair_loses_the_last_session_to_a_till(hub: Hub, db: str) -> None:
+    print("\n4 · a till holds the LAST session when the chair redeems it → «no sessions left»")
+    last_session_race(hub, db, "chair", "redeem")
+
+
+def test_5_a_till_loses_the_last_session_to_another_till(hub: Hub, db: str) -> None:
+    print("\n5 · two tills cover a line with the LAST session → the late one reads «no sessions left»")
+    last_session_race(hub, db, "till", "hold")
+
+
 def main() -> int:
     hub = Hub("grant_race.hub", needs=("taxes", "services"))
     db = hub_database_container()
@@ -336,6 +384,8 @@ def main() -> int:
         test_1_the_void_waits_for_the_till_and_is_refused,
         test_2_a_correction_waits_for_the_till_and_is_refused,
         test_3_the_till_waits_for_the_void_and_spends_nothing,
+        test_4_the_chair_loses_the_last_session_to_a_till,
+        test_5_a_till_loses_the_last_session_to_another_till,
     ):
         try:
             test(hub, db)
@@ -343,7 +393,7 @@ def main() -> int:
             hub.failures.append(f"{test.__name__}: {exc}")
             print(f"  FAIL: {exc}")
     return hub.finish(
-        "the doors of one voucher queue in the kernel, and the late one is refused"
+        "the doors of one voucher queue in the kernel, and the late one is told why"
     )
 
 
