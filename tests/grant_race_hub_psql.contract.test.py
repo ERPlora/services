@@ -15,7 +15,9 @@ This file pins the contract without a hub (no Postgres, no runtime needed):
   3. the session that keeps the till's transaction open overrides the variable's
      `ON_ERROR_STOP=1` with `ON_ERROR_STOP=0` AFTER it (psql applies `-v` in order): with the
      variable as is, a failing till statement would kill psql before its COMMIT and the battery
-     would read a broken pipe instead of the till's error.
+     would read a broken pipe instead of the till's error;
+  4. the probe takes the handed-over database only when it holds the package this run wrote, under
+     this hub's `hub_id` — a wrong database (psql error, or no such row) is refused by name.
 
 It runs with the contract family, where no hub is started: the battery has to answer by name
 here, before it would ever reach for one. (It deliberately does not name the hub's url variable:
@@ -100,6 +102,35 @@ check(
 
 print("3 · the till's open session overrides ON_ERROR_STOP after the variable")
 check("the open session", db.open_session(), handed_words + ["-v", "ON_ERROR_STOP=0"])
+
+print(
+    "4 · the probe accepts the handed-over database only when it holds THIS hub's package"
+)
+# A stand-in psql: `sh -c <script> fake-psql <psql args…>` answers like the real one would.
+HUB_ID = "hub-a"
+PACKAGE_ID = "pkg-probe"
+probe_hub = type("ProbeHub", (), {"hub_id": HUB_ID})()
+
+
+def probe(script: str) -> str:
+    try:
+        battery.prove_hub_database(
+            battery.HubDatabase(("sh", "-c", script, "fake-psql")),
+            probe_hub,
+            PACKAGE_ID,
+        )
+    except AssertionError as exc:
+        return f"refused: {exc}"
+    return "accepted"
+
+
+holds_it = f"""case "$*" in *"id = '{PACKAGE_ID}' AND hub_id = '{HUB_ID}'"*) echo 1;; *) echo 0;; esac"""
+check("the hub's database (package + hub_id match)", probe(holds_it), "accepted")
+check("a database without the package", probe("echo 0").startswith("refused"), True)
+no_table = "echo 'ERROR:  relation \"services_package\" does not exist' >&2; exit 1"
+refused = probe(no_table)
+check("a database psql cannot query", refused.startswith("refused"), True)
+check("the refusal carries psql's error", "services_package" in refused, True)
 
 print()
 if failures:
