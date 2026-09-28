@@ -201,7 +201,8 @@
       "released": "Released",
       "refunded": "Given back",
       "expired": "Expired",
-      "adjusted": "Courtesy"
+      "adjusted": "Courtesy",
+      "corrected": "Correction"
     },
     "openOrphans": "Vouchers with no customer",
     "orphansTitle": "Vouchers with no customer",
@@ -217,7 +218,7 @@
     "orphansMore": "Load more",
     "actionGrants": "Sold vouchers",
     "grantsTitle": "Sold vouchers",
-    "grantsHint": "every customer who bought this voucher, with the sessions used and left. A live voucher can get extra sessions or a later expiry as a courtesy; a sale nothing was used from can be voided.",
+    "grantsHint": "every customer who bought this voucher, with the sessions used and left. A live voucher can get extra sessions or a later expiry as a courtesy, or have sessions removed to correct its balance; a sale nothing was used from can be voided.",
     "emptyGrants": "Nobody has bought this voucher yet.",
     "errorGrants": "Could not load the sold vouchers",
     "grantsCount": "Showing {shown} of {total}",
@@ -242,7 +243,7 @@
     "grantAdjusted": "Given afterwards: +{uses} session(s), +{days} day(s)",
     "actionAdjustGrant": "Adjust",
     "adjustGrantTitle": "Adjust this voucher",
-    "adjustGrantHint": "Give customer {customer} extra sessions or a later expiry at no charge. It is recorded in the voucher's movements with who, when and why.",
+    "adjustGrantHint": "Give customer {customer} extra sessions or a later expiry at no charge, or remove sessions to correct the balance. It is recorded in the voucher's movements with who, when and why.",
     "adjustUsesLabel": "Sessions to add",
     "adjustUsesHelp": "{remaining} left now. Up to 100.",
     "adjustDaysLabel": "Days to extend",
@@ -252,7 +253,14 @@
     "adjustPreviewUnlimited": "no limit of",
     "errorAdjustGrant": "Could not adjust the voucher",
     "movementAdjusted": "+{uses} session(s) · +{days} day(s)",
-    "movementAdjustedBy": "Given by {who}"
+    "movementAdjustedBy": "Given by {who}",
+    "grantCorrected": "Corrected afterwards: −{uses} session(s), +{days} day(s)",
+    "adjustAddSessions": "Add sessions",
+    "adjustRemoveSessions": "Remove sessions",
+    "adjustRemoveUsesLabel": "Sessions to remove",
+    "adjustRemoveUsesHelp": "{remaining} left now. You can remove up to {remaining}.",
+    "movementCorrected": "−{uses} session(s) · +{days} day(s)",
+    "movementCorrectedBy": "Corrected by {who}"
   },
   "errors": {
     "services.category_unavailable": "That category is not available: it does not exist in this business or it has been deleted.",
@@ -283,10 +291,11 @@
     "services.grant_void_reason_required": "Say why this voucher is being voided: the reason stays on its record.",
     "services.grant_not_voidable": "That voucher cannot be voided right now: it was used or voided in the meantime. Reload the list and try again.",
     "services.grant_adjust_reason_required": "Say why this voucher is being adjusted: the reason stays on its record.",
-    "services.grant_adjust_invalid": "Sessions to add must be a whole number from 0 to 100, and days from 0 to 366.",
+    "services.grant_adjust_invalid": "Sessions must be a whole number up to 100 (to add or to remove), and days from 0 to 366.",
     "services.grant_adjust_empty": "Add at least one session or one day.",
-    "services.grant_unlimited": "That voucher has no session limit: there are no sessions to add.",
+    "services.grant_unlimited": "That voucher has no session limit: there are no sessions to add or remove.",
     "services.grant_no_expiry": "That voucher never expires: there is no expiry to extend.",
-    "services.grant_not_adjustable": "That voucher cannot be adjusted right now: it was voided in the meantime. Reload the list and try again."
+    "services.grant_not_adjustable": "That voucher cannot be adjusted right now: it was voided, or its sessions used, in the meantime. Reload the list and try again.",
+    "services.grant_adjust_below_used": "You cannot take away more sessions than the customer has left."
   }
 }

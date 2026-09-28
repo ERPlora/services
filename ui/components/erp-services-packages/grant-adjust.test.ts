@@ -80,6 +80,7 @@ let answer: (params: Record<string, unknown>) => Promise<{ rows: unknown[]; tota
 let reply: (payload: Record<string, unknown>) => Promise<unknown>;
 let denied: string[] = [];
 let usersAsked = 0;
+let movements: unknown[] = [];
 
 const page = (rows: unknown[], total = rows.length) => async () => ({ rows, total });
 
@@ -88,6 +89,7 @@ beforeEach(() => {
   sent.length = 0;
   denied = [];
   usersAsked = 0;
+  movements = [ADJUSTED_MOVEMENT];
   answer = page([LIVE, GIFTED, UNLIMITED, FOREVER, VOIDED]);
   reply = async () => ({ adjusted: true });
   (globalThis as Record<string, unknown>).erplora = {
@@ -104,7 +106,7 @@ beforeEach(() => {
         return answer(params ?? {});
       }
       if (name === 'services.packages.redemption_history') {
-        return { rows: [ADJUSTED_MOVEMENT], total: 1 };
+        return { rows: movements, total: movements.length };
       }
       return { rows: ROWS, total: 1 };
     },
@@ -132,6 +134,7 @@ type Mounted = HTMLElement & {
   adjustDays: string;
   adjustReason: string;
   adjustError: string;
+  adjustDirection: string;
   onRowAction(ev: CustomEvent<{ actionId: string; row: Record<string, unknown> }>): Promise<void>;
   askAdjust(grant: Record<string, unknown>): void;
   confirmAdjust(): Promise<void>;
@@ -376,5 +379,176 @@ describe('the voucher movements show the courtesy', () => {
     // The person is resolved once per opening, whatever their place in the list.
     expect(usersAsked).toBe(1);
     expect(text).not.toContain('ui.movementNoService');
+  });
+});
+
+// services#119 — the balance of a sold voucher can be CORRECTED: a session spent twice by mistake,
+// a voucher imported with the wrong count. The same «Adjust» form grows a switch «Add sessions /
+// Remove sessions» (only on a voucher with a session limit); taking away is sent as a NEGATIVE
+// amount, never more than the customer has left, and the movements call it a correction.
+describe('correcting the balance of a sold voucher', () => {
+  const pick = (el: Mounted, value: string) =>
+    hook(el, 'services-packages-grant-adjust-direction')!.dispatchEvent(
+      new CustomEvent('ionChange', { detail: { value } }),
+    );
+
+  it('offers «Remove sessions» only on a voucher with a session limit, and starts on «Add»', async () => {
+    const el = await mount();
+    await open(el);
+    el.askAdjust(LIVE);
+    await el.updateComplete;
+    expect(hook(el, 'services-packages-grant-adjust-direction')).not.toBeNull();
+    expect(hook(el, 'services-packages-grant-adjust-direction-add')).not.toBeNull();
+    expect(hook(el, 'services-packages-grant-adjust-direction-remove')).not.toBeNull();
+    expect(el.adjustDirection).toBe('add');
+
+    el.askAdjust(UNLIMITED);
+    await el.updateComplete;
+    expect(hook(el, 'services-packages-grant-adjust-direction')).toBeNull();
+  });
+
+  it('names the field and its limit after what it does', async () => {
+    const el = await mount();
+    await open(el);
+    el.askAdjust(LIVE);
+    await el.updateComplete;
+    pick(el, 'remove');
+    await el.updateComplete;
+    const uses = hook(el, 'services-packages-grant-adjust-uses') as HTMLElement;
+    expect(uses.getAttribute('label')).toBe('ui.adjustRemoveUsesLabel');
+    expect(uses.getAttribute('helper-text')).toBe('ui.adjustRemoveUsesHelp:{"remaining":3}');
+    expect(uses.getAttribute('max')).toBe('3');
+    expect(hook(el, 'services-packages-grant-adjust-submit')?.textContent).toContain('ui.actionAdjustGrant');
+
+    pick(el, 'add');
+    await el.updateComplete;
+    expect(uses.getAttribute('label')).toBe('ui.adjustUsesLabel');
+    expect(uses.getAttribute('max')).toBe('100');
+  });
+
+  it('sends what is taken away as a negative amount, with the trimmed reason, and reads the list again', async () => {
+    const el = await mount();
+    await open(el);
+    el.askAdjust(LIVE);
+    await el.updateComplete;
+    pick(el, 'remove');
+    el.adjustUses = '2';
+    el.adjustReason = '  spent twice by mistake  ';
+    await el.updateComplete;
+    const preview = hook(el, 'services-packages-grant-adjust-preview')?.textContent ?? '';
+    expect(preview).toContain('"remaining":1');
+    answer = page([{ ...LIVE, max_uses: 3, remaining: 1, adjusted_uses: -2 }]);
+    await el.confirmAdjust();
+    await el.updateComplete;
+    expect(sent).toEqual([
+      {
+        name: 'services.packages.adjust_grant',
+        payload: { grant_id: 'g-live', uses_delta: -2, days_delta: 0, reason: 'spent twice by mistake' },
+      },
+    ]);
+    expect(el.adjustTarget).toBeNull();
+    expect(el.grants[0].remaining).toBe(1);
+  });
+
+  it('cannot take away more than the customer has left, nor nothing', async () => {
+    const el = await mount();
+    await open(el);
+    el.askAdjust(LIVE);
+    await el.updateComplete;
+    pick(el, 'remove');
+    el.adjustReason = 'fix';
+    const submit = () => hook(el, 'services-packages-grant-adjust-submit') as HTMLElement;
+
+    for (const typed of ['4', '0', '', '-1', '1.5']) {
+      el.adjustUses = typed;
+      await el.updateComplete;
+      expect(submit().hasAttribute('disabled'), `typed ${JSON.stringify(typed)}`).toBe(true);
+      await el.confirmAdjust();
+      expect(sent).toEqual([]);
+    }
+
+    el.adjustUses = '3';
+    await el.updateComplete;
+    expect(submit().hasAttribute('disabled')).toBe(false);
+
+    // A voucher with nothing left has nothing to take away.
+    el.askAdjust({ ...LIVE, used: 5, remaining: 0 });
+    await el.updateComplete;
+    pick(el, 'remove');
+    el.adjustUses = '1';
+    el.adjustReason = 'fix';
+    await el.updateComplete;
+    expect(submit().hasAttribute('disabled')).toBe(true);
+  });
+
+  it('a correction can travel with an extension', async () => {
+    const el = await mount();
+    await open(el);
+    el.askAdjust(LIVE);
+    await el.updateComplete;
+    pick(el, 'remove');
+    el.adjustUses = '1';
+    el.adjustDays = '30';
+    el.adjustReason = 'imported wrong';
+    await el.confirmAdjust();
+    expect(sent[0].payload).toEqual({ grant_id: 'g-live', uses_delta: -1, days_delta: 30, reason: 'imported wrong' });
+  });
+
+  it('opening another sale starts again on «Add»', async () => {
+    const el = await mount();
+    await open(el);
+    el.askAdjust(LIVE);
+    await el.updateComplete;
+    pick(el, 'remove');
+    el.askAdjust(FOREVER);
+    el.adjustUses = '1';
+    el.adjustReason = 'gift';
+    await el.confirmAdjust();
+    expect(el.adjustDirection).toBe('add');
+    expect(sent[0].payload.uses_delta).toBe(1);
+  });
+
+  it('paints the refusal of taking too much with the module\'s own sentence', async () => {
+    reply = async () => {
+      throw Object.assign(new Error('You cannot take away more sessions than the customer has left.'), {
+        code: 'services.grant_adjust_below_used',
+      });
+    };
+    const el = await mount();
+    await open(el);
+    el.askAdjust(LIVE);
+    await el.updateComplete;
+    pick(el, 'remove');
+    el.adjustUses = '3';
+    el.adjustReason = 'fix';
+    await el.confirmAdjust();
+    await el.updateComplete;
+    expect(el.adjustTarget?.grant_id).toBe('g-live');
+    expect(el.adjustError).toBe('No puedes quitar más sesiones de las que le quedan al cliente.');
+    expect(hook(el, 'services-packages-grant-adjust-error')).not.toBeNull();
+  });
+
+  it('the sold list says how many sessions were taken away', async () => {
+    answer = page([{ ...LIVE, max_uses: 4, remaining: 2, adjusted_uses: -1, adjusted_days: 0 }]);
+    const el = await mount();
+    await open(el);
+    await el.updateComplete;
+    const text = el.shadowRoot.textContent ?? '';
+    expect(text).toContain('ui.grantCorrected:{"uses":1,"days":0}');
+    expect(text).not.toContain('ui.grantAdjusted');
+  });
+
+  it('the movements call it a correction, with what was taken, by whom and why', async () => {
+    movements = [{ ...ADJUSTED_MOVEMENT, uses_delta: -2, days_delta: 0, adjust_reason: 'spent twice' }];
+    const el = await mount();
+    await open(el, 'movements');
+    await settle(el);
+    const text = el.shadowRoot.textContent ?? '';
+    expect(text).toContain('ui.movement.corrected');
+    expect(text).toContain('ui.movementCorrected:{"uses":2,"days":0}');
+    expect(text).toContain('ui.movementCorrectedBy:{"who":"Marta"}');
+    expect(text).toContain('spent twice');
+    expect(text).not.toContain('ui.movement.adjusted');
+    expect(text).not.toContain('ui.movementAdjusted');
   });
 });

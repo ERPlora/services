@@ -202,7 +202,8 @@
       "released": "Liberada",
       "refunded": "Devuelta",
       "expired": "Caducada",
-      "adjusted": "Cortesía"
+      "adjusted": "Cortesía",
+      "corrected": "Corrección"
     },
     "openOrphans": "Bonos sin cliente",
     "orphansTitle": "Bonos sin cliente",
@@ -218,7 +219,7 @@
     "orphansMore": "Cargar más",
     "actionGrants": "Bonos vendidos",
     "grantsTitle": "Bonos vendidos",
-    "grantsHint": "todos los clientes que han comprado este bono, con las sesiones usadas y las que quedan. A un bono vivo se le pueden regalar sesiones o alargar la caducidad; una venta de la que no se ha usado nada se puede anular.",
+    "grantsHint": "todos los clientes que han comprado este bono, con las sesiones usadas y las que quedan. A un bono vivo se le pueden regalar sesiones o alargar la caducidad, o quitar sesiones para corregir su saldo; una venta de la que no se ha usado nada se puede anular.",
     "emptyGrants": "Nadie ha comprado este bono todavía.",
     "errorGrants": "No se han podido cargar los bonos vendidos",
     "grantsCount": "Se muestran {shown} de {total}",
@@ -243,7 +244,7 @@
     "grantAdjusted": "Regalado después: +{uses} sesión(es), +{days} día(s)",
     "actionAdjustGrant": "Ajustar",
     "adjustGrantTitle": "Ajustar este bono",
-    "adjustGrantHint": "Regala al cliente {customer} sesiones extra o alarga la caducidad sin cobrar. Queda en los movimientos del bono con quién, cuándo y por qué.",
+    "adjustGrantHint": "Regala al cliente {customer} sesiones extra o alarga la caducidad sin cobrar, o quítale sesiones para corregir el saldo. Queda en los movimientos del bono con quién, cuándo y por qué.",
     "adjustUsesLabel": "Sesiones que se añaden",
     "adjustUsesHelp": "Quedan {remaining}. Hasta 100.",
     "adjustDaysLabel": "Días que se alarga",
@@ -253,7 +254,14 @@
     "adjustPreviewUnlimited": "sin límite de",
     "errorAdjustGrant": "No se pudo ajustar el bono",
     "movementAdjusted": "+{uses} sesión(es) · +{days} día(s)",
-    "movementAdjustedBy": "Regalado por {who}"
+    "movementAdjustedBy": "Regalado por {who}",
+    "grantCorrected": "Corregido después: −{uses} sesión(es), +{days} día(s)",
+    "adjustAddSessions": "Añadir sesiones",
+    "adjustRemoveSessions": "Quitar sesiones",
+    "adjustRemoveUsesLabel": "Sesiones que se quitan",
+    "adjustRemoveUsesHelp": "Quedan {remaining}. Puedes quitar hasta {remaining}.",
+    "movementCorrected": "−{uses} sesión(es) · +{days} día(s)",
+    "movementCorrectedBy": "Corregido por {who}"
   },
   "errors": {
     "services.category_unavailable": "Esa categoría no está disponible: no existe en este negocio o se ha eliminado.",
@@ -284,10 +292,11 @@
     "services.grant_void_reason_required": "Indica por qué se anula este bono: el motivo queda en su registro.",
     "services.grant_not_voidable": "Ese bono no se puede anular ahora: se ha usado o anulado mientras tanto. Recarga la lista y vuelve a intentarlo.",
     "services.grant_adjust_reason_required": "Indica por qué se ajusta este bono: el motivo queda en su registro.",
-    "services.grant_adjust_invalid": "Las sesiones que se añaden tienen que ser un número entero de 0 a 100, y los días, de 0 a 366.",
+    "services.grant_adjust_invalid": "Las sesiones tienen que ser un número entero hasta 100 (para añadir o para quitar), y los días, de 0 a 366.",
     "services.grant_adjust_empty": "Añade al menos una sesión o un día.",
-    "services.grant_unlimited": "Ese bono no tiene límite de sesiones: no hay sesiones que añadir.",
+    "services.grant_unlimited": "Ese bono no tiene límite de sesiones: no hay sesiones que añadir ni quitar.",
     "services.grant_no_expiry": "Ese bono no caduca: no hay caducidad que alargar.",
-    "services.grant_not_adjustable": "Ese bono no se puede ajustar ahora: se ha anulado mientras tanto. Recarga la lista y vuelve a intentarlo."
+    "services.grant_not_adjustable": "Ese bono no se puede ajustar ahora: se ha anulado, o se han usado sus sesiones, mientras tanto. Recarga la lista y vuelve a intentarlo.",
+    "services.grant_adjust_below_used": "No puedes quitar más sesiones de las que le quedan al cliente."
   }
 }

@@ -459,6 +459,23 @@ refuses(
 )
 
 
+# services#118 + services#119 — adjusting a sold voucher: sessions both ways (a courtesy adds, a
+# balance correction takes away) up to 100 at once, days only LATER and up to 366, a reason always.
+# The schema is the first of three doors (handler, `_adjust_grant.sql`): its bounds are read here.
+ADJ = "services.packages.adjust_grant"
+accepts(ADJ, {"grant_id": "g1", "uses_delta": 1, "reason": "Gift"}, "a session given")
+accepts(ADJ, {"grant_id": "g1", "uses_delta": -1, "reason": "Spent twice"}, "a session taken away")
+accepts(ADJ, {"grant_id": "g1", "uses_delta": -100, "days_delta": 366, "reason": "Fix"}, "both limits")
+accepts(ADJ, {"grant_id": "g1", "uses_delta": 100, "reason": "Gift"}, "the upper session limit")
+refuses(ADJ, {"grant_id": "g1", "uses_delta": -101, "reason": "Fix"}, "more than 100 sessions taken")
+refuses(ADJ, {"grant_id": "g1", "uses_delta": 101, "reason": "Gift"}, "more than 100 sessions given")
+refuses(ADJ, {"grant_id": "g1", "days_delta": -1, "reason": "Fix"}, "a shorter expiry")
+refuses(ADJ, {"grant_id": "g1", "days_delta": 367, "reason": "Gift"}, "more than 366 days")
+refuses(ADJ, {"grant_id": "g1", "uses_delta": -1.5, "reason": "Fix"}, "a fraction of a session")
+refuses(ADJ, {"grant_id": "g1", "uses_delta": -1}, "no reason")
+refuses(ADJ, {"grant_id": "g1", "uses_delta": -1, "reason": "   "}, "a blank reason")
+
+
 # ── 4. Partial updates via `records.<x>.patch` ───────────────────────────────────────────────────
 
 print("\n4. the update doors are partial (records.*.patch)")

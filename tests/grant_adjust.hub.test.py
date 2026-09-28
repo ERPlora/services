@@ -12,7 +12,9 @@ runtime proves what a caller RECEIVES through the door a screen, a flow or the a
   2. an expired voucher gets days: it is live again and a session can be spent;
   3. every refusal reaches the caller as its own code, with nothing written;
   4. the declared `emit` leaves the hub;
-  5. the voucher's movements show the courtesy, with the amounts as numbers and the reason.
+  5. the voucher's movements show the courtesy, with the amounts as numbers and the reason;
+  6. a balance CORRECTION (services#119) takes sessions away — never more than are left, refused
+     as `services.grant_adjust_below_used` — and the voucher is used up where it should be.
 
 Usage: `erplora test <dir> --against-hub [dev|stable|sha256:…]` (module-toolkit#110). Never on its
 own: without a runtime it fails, it does not skip.
@@ -200,6 +202,53 @@ def test_4_the_courtesy_is_announced_and_listed(hub: Hub) -> None:
         hub.check_true("…and who gave it", bool(m.get("created_by")), str(m))
 
 
+def test_5_a_correction_takes_sessions_away(hub: Hub) -> None:
+    print("\n5 · a correction takes sessions away, never more than are left")
+    customer = tag("cust-fix")
+    package = create_package(hub, tag("Bono corregido"), max_uses=3, validity_days=30)
+    grant_id = grant(hub, package, customer)
+    hub.run("services.packages.redeem", {"grant_id": grant_id})
+    hub.refused(
+        "taking more sessions than are left",
+        "services.packages.adjust_grant",
+        {"grant_id": grant_id, "uses_delta": -3, "reason": "Spent twice"},
+        "services.grant_adjust_below_used",
+    )
+    out = hub.run(
+        "services.packages.adjust_grant",
+        {"grant_id": grant_id, "uses_delta": -2, "reason": "Spent twice"},
+    )
+    hub.check("the command reports the correction", out["result"]["uses_delta"], -2)
+    row = balance_of(hub, customer, grant_id)
+    hub.check(
+        "nothing left — as numbers",
+        [row["remaining"], row["max_uses"], row["used"]],
+        [0, 1, 1],
+    )
+    hub.refused(
+        "…so a session is refused",
+        "services.packages.redeem",
+        {"grant_id": grant_id},
+        "services.package_no_uses_left",
+    )
+    hub.refused(
+        "…and so is another correction",
+        "services.packages.adjust_grant",
+        {"grant_id": grant_id, "uses_delta": -1, "reason": "Again"},
+        "services.grant_adjust_below_used",
+    )
+    history = hub.query("services.packages.redemption_history", {"package_id": package})
+    hub.check(
+        "the movements show the correction, as a negative number, with its reason",
+        [
+            (m.get("uses_delta"), m.get("adjust_reason"))
+            for m in history
+            if m.get("movement") == "adjusted"
+        ],
+        [(-2, "Spent twice")],
+    )
+
+
 def main() -> int:
     hub = Hub("grant_adjust.hub", needs=("taxes", "services"))
     print(
@@ -210,9 +259,10 @@ def main() -> int:
     test_2_an_expired_voucher_takes_days(hub)
     test_3_every_refusal_names_its_reason(hub)
     test_4_the_courtesy_is_announced_and_listed(hub)
+    test_5_a_correction_takes_sessions_away(hub)
     return hub.finish(
         "a sold voucher takes sessions and days as a movement of its own, every refusal reaches the "
-        "caller as its code, and the courtesy is announced and listed"
+        "caller as its code, the courtesy is announced and listed, and a correction never takes more than is left"
     )
 
 

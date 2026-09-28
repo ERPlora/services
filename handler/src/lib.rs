@@ -1310,20 +1310,23 @@ fn void_refusal_for(reason: &str) -> DomainError {
 /// The read that decides whether a sold voucher may take more sessions or days (services#118).
 const READ_ADJUST_CHECK: &str = "services.packages.adjust_check";
 
-/// Most sessions / days ONE courtesy may add (services#118) — what the screen promises («up to 100»,
-/// «up to 366») and `commands/_adjust_grant.sql` repeats. Past it the amount is a typo: ten million
-/// days is a date no later read of the voucher can compute.
+/// Most sessions / days ONE adjustment may move (services#118; sessions both ways since
+/// services#119) — what the screen promises («up to 100», «up to 366») and
+/// `commands/_adjust_grant.sql` repeats. Past it the amount is a typo: ten million days is a date no
+/// later read of the voucher can compute.
 const ADJUST_MAX_USES: i64 = 100;
 const ADJUST_MAX_DAYS: i64 = 366;
 
 /// Logic of `services.packages.adjust_grant` — a courtesy on a SOLD voucher (services#118): «one
-/// more session on the house», «extended a month because we were closed».
+/// more session on the house», «extended a month because we were closed»; and the balance
+/// correction (services#119): «a session was spent twice by mistake», «imported with the wrong
+/// count» — the same movement with a minus sign on the sessions.
 ///
 /// It writes a MOVEMENT (`services_package_grant_adjustment`) and never rewrites the purchase: the
 /// grant's `max_uses` / `validity_days` stay the snapshot of what was sold (ADR-0390) and every
-/// reader adds the live movements on top. The deltas are signed in the table so the balance
-/// correction (services#119) can reuse it; THIS door only adds and refuses a negative amount with
-/// `services.grant_adjust_invalid`.
+/// reader adds the live movements on top. Days only move later (`services.grant_adjust_invalid`
+/// otherwise); a correction never takes more sessions than the customer has LEFT (`uses_left` of
+/// the read), refused as `services.grant_adjust_below_used`.
 ///
 /// Same shape as `void_grant`: the payload says which grant, how much and why; the `required` read
 /// `services.packages.adjust_check` — the hub's own rows — decides whether it exists, is live, and
@@ -1351,7 +1354,7 @@ pub fn adjust_grant_pure(input: Value) -> Result<Output, String> {
         parse_int(payload.get("days_delta")),
     ) {
         (Ok(u), Ok(d))
-            if (0..=ADJUST_MAX_USES).contains(&u.unwrap_or(0))
+            if (-ADJUST_MAX_USES..=ADJUST_MAX_USES).contains(&u.unwrap_or(0))
                 && (0..=ADJUST_MAX_DAYS).contains(&d.unwrap_or(0)) =>
         {
             (u.unwrap_or(0), d.unwrap_or(0))
@@ -1359,7 +1362,7 @@ pub fn adjust_grant_pure(input: Value) -> Result<Output, String> {
         _ => {
             return Ok(Output::new().with_error(redeem_refusal(
                 "services.grant_adjust_invalid",
-                "Sessions to add must be a whole number from 0 to 100, and days from 0 to 366.",
+                "Sessions must be a whole number up to 100 (to add or to remove), and days from 0 to 366.",
             )))
         }
     };
@@ -1382,11 +1385,25 @@ pub fn adjust_grant_pure(input: Value) -> Result<Output, String> {
     if !refused.trim().is_empty() {
         return Ok(Output::new().with_error(adjust_refusal_for(&refused)));
     }
-    if uses_delta > 0 && !flag_is(&row, "can_add_uses") {
+    if uses_delta != 0 && !flag_is(&row, "can_add_uses") {
         return Ok(Output::new().with_error(redeem_refusal(
             "services.grant_unlimited",
-            "That voucher has no session limit: there are no sessions to add.",
+            "That voucher has no session limit: there are no sessions to add or remove.",
         )));
+    }
+    if uses_delta < 0 {
+        // The floor of a correction: what the customer has left NOW, from the hub's own rows. A read
+        // that does not say it cannot back taking sessions away — fail closed.
+        let left = match parse_int(row.get("uses_left")) {
+            Ok(Some(left)) => left,
+            _ => return Ok(Output::new().with_error(adjust_refusal_for(""))),
+        };
+        if -uses_delta > left {
+            return Ok(Output::new().with_error(redeem_refusal(
+                "services.grant_adjust_below_used",
+                "You cannot take away more sessions than the customer has left.",
+            )));
+        }
     }
     if days_delta > 0 && !flag_is(&row, "can_extend") {
         return Ok(Output::new().with_error(redeem_refusal(
@@ -2660,6 +2677,7 @@ mod tests {
             "customer_id": "cus-1",
             "can_add_uses": 1,
             "can_extend": 1,
+            "uses_left": 3,
             "reason": ""
         })
     }
@@ -2754,13 +2772,13 @@ mod tests {
         }
     }
 
-    /// Taking sessions or days AWAY is the balance correction (services#119), not a courtesy: this
-    /// door only adds, and says so instead of writing a negative movement.
+    /// Days only move LATER (nobody asks to shorten a voucher someone paid for), and an amount that
+    /// is not a whole number is not guessed. Taking SESSIONS away is the correction below.
     #[test]
-    fn a_negative_or_unreadable_amount_is_refused() {
+    fn negative_days_or_an_unreadable_amount_is_refused() {
         for payload in [
-            json!({ "grant_id": "gr-1", "uses_delta": -1, "reason": "Oops" }),
             json!({ "grant_id": "gr-1", "uses_delta": 2, "days_delta": -1, "reason": "Oops" }),
+            json!({ "grant_id": "gr-1", "uses_delta": -1, "days_delta": -1, "reason": "Oops" }),
             json!({ "grant_id": "gr-1", "uses_delta": "two", "reason": "Oops" }),
         ] {
             let out = adjust_grant_pure(adjust_input(Some(adjustable_row()), payload.clone())).unwrap();
@@ -2775,6 +2793,7 @@ mod tests {
     fn an_amount_past_the_limit_is_refused_and_the_limit_itself_goes_through() {
         for payload in [
             json!({ "grant_id": "gr-1", "uses_delta": 101, "reason": "Typo" }),
+            json!({ "grant_id": "gr-1", "uses_delta": -101, "reason": "Typo" }),
             json!({ "grant_id": "gr-1", "days_delta": 367, "reason": "Typo" }),
             json!({ "grant_id": "gr-1", "uses_delta": 1, "days_delta": 10_000_000, "reason": "Typo" }),
         ] {
@@ -2830,6 +2849,84 @@ mod tests {
         let out = adjust_grant_pure(adjust_input(Some(blank_row), payload)).unwrap();
         assert_eq!(adjust_code(&out), Some("services.grant_not_adjustable"));
         assert!(out.operations.is_empty());
+    }
+
+    // ── services#119 — correcting a voucher's balance: taking sessions AWAY ─────────────────────
+    //
+    // A session spent twice by mistake, an imported voucher with the wrong count: the same movement
+    // as the courtesy with a minus sign. The floor is what the customer has LEFT (`uses_left` of
+    // `adjust_check` — the hub's own rows): a correction never leaves fewer sessions than were spent.
+
+    fn correction(uses_delta: i64) -> Value {
+        json!({ "grant_id": "gr-1", "uses_delta": uses_delta, "reason": "Spent twice by mistake" })
+    }
+
+    #[test]
+    fn a_correction_takes_sessions_away_as_a_negative_movement() {
+        let out = adjust_grant_pure(adjust_input(Some(adjustable_row()), correction(-2))).unwrap();
+        assert!(out.error.is_none(), "a correction within what is left must go through, got {out:?}");
+        assert_eq!(out.operations.len(), 1);
+        let op = &out.operations[0];
+        assert_eq!(op.command, "services._adjust_grant");
+        assert_eq!(op.params["uses_delta"], json!(-2));
+        assert_eq!(op.params["days_delta"], json!(0));
+        assert_eq!(op.params["reason"], json!("Spent twice by mistake"));
+        assert_eq!(out.result.unwrap()["uses_delta"], json!(-2));
+    }
+
+    /// Everything that is left can be taken — the boundary is a valid correction, one more is not.
+    #[test]
+    fn a_correction_cannot_take_more_sessions_than_are_left() {
+        let out = adjust_grant_pure(adjust_input(Some(adjustable_row()), correction(-3))).unwrap();
+        assert!(out.error.is_none(), "taking exactly what is left goes through, got {out:?}");
+        let out = adjust_grant_pure(adjust_input(Some(adjustable_row()), correction(-4))).unwrap();
+        assert_eq!(adjust_code(&out), Some("services.grant_adjust_below_used"));
+        assert!(out.operations.is_empty());
+
+        let mut spent = adjustable_row();
+        spent["uses_left"] = json!("0");
+        let out = adjust_grant_pure(adjust_input(Some(spent.clone()), correction(-1))).unwrap();
+        assert_eq!(adjust_code(&out), Some("services.grant_adjust_below_used"));
+        // A used-up voucher can still be GIVEN a session: the floor only guards a correction.
+        let out = adjust_grant_pure(adjust_input(Some(spent), correction(1))).unwrap();
+        assert!(out.error.is_none(), "a gift on a used-up voucher goes through, got {out:?}");
+    }
+
+    /// Fail-closed: a read that does not say how much is left cannot back a correction.
+    #[test]
+    fn a_correction_without_what_is_left_is_refused() {
+        for left in [Value::Null, json!(""), json!("many")] {
+            let mut row = adjustable_row();
+            row["uses_left"] = left.clone();
+            let out = adjust_grant_pure(adjust_input(Some(row), correction(-1))).unwrap();
+            assert_eq!(adjust_code(&out), Some("services.grant_not_adjustable"), "uses_left {left}");
+            assert!(out.operations.is_empty());
+        }
+        let mut row = adjustable_row();
+        row.as_object_mut().unwrap().remove("uses_left");
+        let out = adjust_grant_pure(adjust_input(Some(row), correction(-1))).unwrap();
+        assert_eq!(adjust_code(&out), Some("services.grant_not_adjustable"));
+    }
+
+    /// An unlimited voucher has no count to correct: refused by name, like a gift of sessions.
+    #[test]
+    fn a_correction_on_an_unlimited_voucher_is_refused_by_name() {
+        let mut unlimited = adjustable_row();
+        unlimited["can_add_uses"] = json!(0);
+        unlimited["uses_left"] = Value::Null;
+        let out = adjust_grant_pure(adjust_input(Some(unlimited), correction(-1))).unwrap();
+        assert_eq!(adjust_code(&out), Some("services.grant_unlimited"));
+        assert!(out.operations.is_empty());
+    }
+
+    /// A correction and an extension are one movement, like a gift and an extension.
+    #[test]
+    fn a_correction_can_travel_with_an_extension() {
+        let payload = json!({ "grant_id": "gr-1", "uses_delta": -1, "days_delta": 30, "reason": "Imported wrong" });
+        let out = adjust_grant_pure(adjust_input(Some(adjustable_row()), payload)).unwrap();
+        assert!(out.error.is_none(), "got {out:?}");
+        assert_eq!(out.operations[0].params["uses_delta"], json!(-1));
+        assert_eq!(out.operations[0].params["days_delta"], json!(30));
     }
 
     #[test]

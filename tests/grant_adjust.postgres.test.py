@@ -21,6 +21,9 @@ had no door. What is proven here, against a REAL Postgres:
      voucher's movements show every adjustment with who, when and why.
   6. The other readers of a grant's terms (the till's holds, a sale's redemptions, the orphan
      rescue list, the refund pre-check) count the gifted sessions too.
+  7. A BALANCE CORRECTION (services#119) takes sessions away as a NEGATIVE movement: never more
+     than the customer has left (sessions spent and live holds are the floor; an expired hold is
+     not), counted over this hub's rows only, and the snapshot is still not rewritten.
 
 Usage: tests/grant_adjust.postgres.test.py   (exit 0 = green; SKIPPED without the container)
 """
@@ -475,18 +478,18 @@ def what_cannot_be_adjusted(
     live = grant(db, pkg, "cus-edge")
     check("a blank reason writes nothing", 0, adjust(db, live, uses=1, reason="   "))
     check("nothing to add writes nothing", 0, adjust(db, live))
-    check("a negative session count writes nothing", 0, adjust(db, live, uses=-1))
     check("a negative day count writes nothing", 0, adjust(db, live, days=-1))
     check("… even hidden behind a positive one", 0, adjust(db, live, uses=2, days=-1))
     check(
-        "… or negative sessions behind positive days",
+        "… or behind a correction of sessions",
         0,
-        adjust(db, live, uses=-1, days=5),
+        adjust(db, live, uses=-1, days=-1),
     )
     # The screen promises «up to 100» sessions and «up to 366» days per adjustment; the write is
     # the authority, so a typo of 1000 sessions or ten million days (a date the till cannot even
     # compute on every later read) lands on zero rows, and the limits themselves are written.
     check("more than 100 sessions at once writes nothing", 0, adjust(db, live, uses=101))
+    check("taking more than 100 sessions at once writes nothing", 0, adjust(db, live, uses=-101))
     check("more than 366 days at once writes nothing", 0, adjust(db, live, days=367))
     check(
         "… even hidden behind an amount within the limit",
@@ -827,6 +830,129 @@ def the_other_readers_count_it(db: ScratchDb, svc: str, pkg: str) -> None:
     check("the extra hold stands", True, bool(extra))
 
 
+# ── 7 · the balance correction (services#119) ────────────────────────────────
+
+
+def uses_left(db: ScratchDb, grant_id: str, hub: str = HUB, now: str = NOW):
+    found = rows(db, "services.packages.adjust_check", {"grant_id": grant_id}, hub=hub, now=now)
+    return found[0]["uses_left"] if found else "missing"
+
+
+def stray_redemption(db: ScratchDb, grant_id: str, hub: str, is_deleted: int = 0) -> None:
+    """A spent session written by hand: of ANOTHER hub naming this grant, or soft-deleted."""
+    db.psql(
+        [],
+        db=db.name,
+        stdin=(
+            "INSERT INTO services_package_redemption "
+            "(id, hub_id, grant_id, package_id, customer_id, note, redeemed_at, status, "
+            "use_index, is_deleted, created_at, updated_at) "
+            f"SELECT '{uuid.uuid4()}', '{hub}', id, package_id, customer_id, '', '{NOW}', "
+            f"'consumed', 900 + (random() * 1000)::int, {is_deleted}, '{NOW}', '{NOW}' "
+            f"FROM services_package_grant WHERE id = '{grant_id}';\n"
+        ),
+    )
+
+
+def a_correction_takes_sessions_away(
+    db: ScratchDb, svc: str, pkg: str, unlimited_pkg: str
+) -> None:
+    print("\n7 · a correction takes sessions away, never below what was spent")
+    g = grant(db, pkg, "cus-fix")
+    redeem(db, g)
+    check("the pre-check says what is left", 1, uses_left(db, g))
+    check("taking more than is left writes nothing", 0, adjust(db, g, uses=-2, reason="Oops"))
+    check(
+        "taking what is left is one movement",
+        1,
+        adjust(db, g, uses=-1, reason="  Spent twice by mistake  "),
+    )
+    b = balance_of(db, g, "cus-fix")
+    check("the balance drops to what is really left", [0, 1, 1], [b["remaining"], b["max_uses"], b["used"]])
+    check("the grant's snapshot is NOT rewritten (ADR-0390)", 2, grant_row(db, g)["max_uses"])
+    check("the pre-check says used up", "no_uses_left", redeem_reason(db, g))
+    check("the till offers nothing", [], offered(db, "cus-fix", svc))
+    refused("a redeem past the correction", lambda: redeem(db, g))
+    refused("a hold past the correction", lambda: hold(db, g, svc, "order-fix"))
+    check("nothing left to take", 0, uses_left(db, g))
+    check("… so another correction writes nothing", 0, adjust(db, g, uses=-1, reason="Again"))
+    trail = json.loads(
+        db.scalar(
+            "SELECT row_to_json(a) FROM (SELECT hub_id, uses_delta, days_delta, reason, "
+            "created_by, adjusted_at FROM services_package_grant_adjustment "
+            f"WHERE grant_id = '{g}') a"
+        )
+    )
+    check(
+        "the movement is negative, with who, when and why — trimmed",
+        {
+            "hub_id": HUB,
+            "uses_delta": -1,
+            "days_delta": 0,
+            "reason": "Spent twice by mistake",
+            "created_by": USER,
+            "adjusted_at": NOW,
+        },
+        trail,
+    )
+    check("a gift after the correction is written", 1, adjust(db, g, uses=1, reason="Sorry"))
+    check("… and spendable again", 1, balance_of(db, g, "cus-fix")["remaining"])
+    page = list_page(db, "services.packages.grants", {"package_id": pkg, "limit": 500})
+    row = next(r for r in page["rows"] if r["grant_id"] == g)
+    check("the sold list nets the movements", [0, 2, 1], [row["adjusted_uses"], row["max_uses"], row["remaining"]])
+    history = list_page(
+        db,
+        "services.packages.redemption_history",
+        {"package_id": pkg, "f_movement": "adjusted", "limit": 500},
+    )
+    check(
+        "the movements list the correction and the gift",
+        [(-1, "Spent twice by mistake"), (1, "Sorry")],
+        sorted(
+            (r["uses_delta"], r["adjust_reason"])
+            for r in history["rows"]
+            if r["grant_id"] == g
+        ),
+    )
+
+    held = grant(db, pkg, "cus-fix-held")
+    hold(db, held, svc, "order-fix-held")
+    check("a live hold is spent: one left", 1, uses_left(db, held))
+    check("… so taking two writes nothing", 0, adjust(db, held, uses=-2))
+    tomorrow_plus = "2026-08-20T10:00:00Z"
+    check(
+        "an EXPIRED hold is not spent: two left once its deadline passed",
+        2,
+        uses_left(db, held, now=tomorrow_plus),
+    )
+    check(
+        "… and the write agrees",
+        1,
+        adjust(db, held, uses=-2, reason="Imported wrong", now=tomorrow_plus),
+    )
+
+    big = grant(db, pkg, "cus-fix-big")
+    adjust(db, big, uses=100)
+    check("exactly 100 sessions can be taken at once", 1, adjust(db, big, uses=-100))
+
+    unlimited = grant(db, unlimited_pkg, "cus-fix-unlimited")
+    check("an unlimited voucher has no count to correct", None, uses_left(db, unlimited))
+    check("… so a correction on it writes nothing", 0, adjust(db, unlimited, uses=-1))
+
+    # TENANCY and live rows only: a spent session and a gift of the NEIGHBOUR naming this grant, and
+    # a deleted spent session and a deleted gift of this hub, move neither the floor nor the ceiling.
+    mine = grant(db, pkg, "cus-fix-mine")
+    stray_redemption(db, mine, OTHER_HUB)
+    stray_redemption(db, mine, HUB, is_deleted=1)
+    stray(db, mine, OTHER_HUB, "stray-gift", uses=5, days=0)
+    stray(db, mine, HUB, "deleted-gift", uses=5, days=0, is_deleted=1)
+    check("the stray rows do not change what is left", 2, uses_left(db, mine))
+    check("… for the neighbour it does not exist", None, uses_left(db, mine, hub=OTHER_HUB))
+    check("taking three writes nothing", 0, adjust(db, mine, uses=-3))
+    check("the neighbour's correction writes nothing", 0, adjust(db, mine, uses=-1, hub=OTHER_HUB))
+    check("taking both is written", 1, adjust(db, mine, uses=-2))
+
+
 # ── main ─────────────────────────────────────────────────────────────────────
 
 
@@ -850,6 +976,8 @@ def main() -> int:
         the_trail_is_visible(db, pkg, other_pkg)
         readers_pkg = seed_package(db, HUB, "Two more haircuts", svc)
         the_other_readers_count_it(db, svc, readers_pkg)
+        fix_pkg = seed_package(db, HUB, "Two corrected haircuts", svc)
+        a_correction_takes_sessions_away(db, svc, fix_pkg, unlimited_pkg)
     finally:
         db.drop()
 
