@@ -292,7 +292,7 @@
     "services.grant_not_voidable": "That voucher cannot be voided right now: it was used or voided in the meantime. Reload the list and try again.",
     "services.grant_adjust_reason_required": "Say why this voucher is being adjusted: the reason stays on its record.",
     "services.grant_adjust_invalid": "Sessions must be a whole number up to 100 (to add or to remove), and days from 0 to 366.",
-    "services.grant_adjust_empty": "Add at least one session or one day.",
+    "services.grant_adjust_empty": "Add or remove at least one session, or add at least one day.",
     "services.grant_unlimited": "That voucher has no session limit: there are no sessions to add or remove.",
     "services.grant_no_expiry": "That voucher never expires: there is no expiry to extend.",
     "services.grant_not_adjustable": "That voucher cannot be adjusted right now: it was voided, or its sessions used, in the meantime. Reload the list and try again.",

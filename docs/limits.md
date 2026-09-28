@@ -20,13 +20,18 @@
   cross-module foreign key (the module contract), so a deleted or merged customer leaves grants that
   no balance screen will show. Of 17 products surveyed **not one** documents an answer to this, so
   there is no prior art to copy and ours has to be designed (services#81).
-- **A voucher sold by mistake can be voided, but a used one cannot be corrected.** Voiding
+- **A voucher sold by mistake can be voided; a used one is corrected, not voided.** Voiding
   (`services.packages.void_grant`, services#82) only works while nothing has been spent from it.
-  «Adjust» (`services.packages.adjust_grant`, services#118) only ADDS — sessions to a voucher with a
-  limit, days to one that expires, up to 100 sessions / 366 days per movement. Taking sessions or
-  days away, or correcting the balance of a voucher that was already used, is services#119.
-- **A courtesy cannot be undone from the screen.** Once given, the movement stays; the way back is
-  the balance correction of services#119.
+  «Adjust» (`services.packages.adjust_grant`) ADDS sessions to a voucher with a limit and days to
+  one that expires (services#118), and REMOVES sessions as a balance correction (services#119) —
+  never more than the customer has left (`services.grant_adjust_below_used`), up to 100 sessions /
+  366 days per movement. **Days only move later**: nobody shortens a voucher someone paid for, so
+  there is no way to bring an expiry forward.
+- **A movement is never deleted.** A courtesy given by mistake is undone with a correction of the
+  same size, and both stay in «Movements» with who and why.
+- **A correction and a redemption at the very same instant can both pass the floor.** The write
+  re-counts what is spent inside its own transaction, which closes every ordinary case; two tills
+  racing on the same millisecond are not serialised against each other (services#120).
 - **Voiding and redeeming the same voucher at the very same instant can both succeed.** The void
   re-checks inside its own transaction that nothing is spent or held, which closes every ordinary
   case; two tills racing on the same millisecond are not serialised against each other (services#120).
@@ -107,7 +112,7 @@ A refused redemption rolls the whole transaction back — no ledger row, no even
 | Redeem one use of a package | `services.redeem_package` |
 | See a customer's package balance, a voucher's movements and its sold vouchers | `services.view_package_balance` |
 | Void a voucher sold by mistake | `services.void_grant` (admin and manager only) |
-| Give a sold voucher more sessions or a later expiry | `services.adjust_grant` (admin and manager only) |
+| Give a sold voucher more sessions or a later expiry, or correct its balance | `services.adjust_grant` (admin and manager only) |
 | Change the module settings | `services.manage_settings` |
 
 By role: **admin** has everything. **manager** has everything except the three deletes and

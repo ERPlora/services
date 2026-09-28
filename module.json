@@ -1088,7 +1088,7 @@
         "services.package.grant_adjusted"
       ],
       "ai": {
-        "description": "Gives a voucher a customer already bought (a grant) more sessions and/or a later expiry, as a courtesy — «one more session on the house», «extended a month because we were closed» — with a mandatory reason. It is written as a movement (who, when, why, how much) that shows in the voucher's movements; the purchase itself is never rewritten. It revives an expired or used-up voucher. Refused with a domain code: services.grant_not_found, services.grant_already_voided, services.grant_adjust_empty (nothing to add), services.grant_unlimited (sessions on a voucher with no session limit), services.grant_no_expiry (days on a voucher that never expires) or services.grant_adjust_reason_required. It moves NO money and issues no fiscal document: a gifted session has no consideration."
+        "description": "Gives a voucher a customer already bought (a grant) more sessions and/or a later expiry, as a courtesy — «one more session on the house», «extended a month because we were closed» — with a mandatory reason. It is written as a movement (who, when, why, how much) that shows in the voucher's movements; the purchase itself is never rewritten. It revives an expired or used-up voucher. A NEGATIVE uses_delta is a balance correction — «a session was spent twice by mistake», «imported with the wrong count» — that takes sessions away, never more than the customer has left. Refused with a domain code: services.grant_not_found, services.grant_already_voided, services.grant_adjust_empty (nothing to move), services.grant_unlimited (sessions on a voucher with no session limit), services.grant_no_expiry (days on a voucher that never expires), services.grant_adjust_below_used (taking away more sessions than are left) or services.grant_adjust_reason_required. It moves NO money and issues no fiscal document: a gifted or corrected session has no consideration."
       },
       "expose_api": true
     },
@@ -1101,7 +1101,7 @@
         "op": "min",
         "n": 1,
         "error": "services.grant_not_adjustable",
-        "message": "That voucher could not be adjusted: it does not exist here, it was voided, or it cannot take what was asked."
+        "message": "That voucher could not be adjusted: it does not exist here, it was voided, its sessions were used in the meantime, or it cannot take what was asked."
       }
     },
     "services._on_sale_completed": {

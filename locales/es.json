@@ -293,7 +293,7 @@
     "services.grant_not_voidable": "Ese bono no se puede anular ahora: se ha usado o anulado mientras tanto. Recarga la lista y vuelve a intentarlo.",
     "services.grant_adjust_reason_required": "Indica por qué se ajusta este bono: el motivo queda en su registro.",
     "services.grant_adjust_invalid": "Las sesiones tienen que ser un número entero hasta 100 (para añadir o para quitar), y los días, de 0 a 366.",
-    "services.grant_adjust_empty": "Añade al menos una sesión o un día.",
+    "services.grant_adjust_empty": "Añade o quita al menos una sesión, o añade al menos un día.",
     "services.grant_unlimited": "Ese bono no tiene límite de sesiones: no hay sesiones que añadir ni quitar.",
     "services.grant_no_expiry": "Ese bono no caduca: no hay caducidad que alargar.",
     "services.grant_not_adjustable": "Ese bono no se puede ajustar ahora: se ha anulado, o se han usado sus sesiones, mientras tanto. Recarga la lista y vuelve a intentarlo.",

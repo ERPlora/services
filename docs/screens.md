@@ -184,23 +184,27 @@ Voiding moves **no money**: if the voucher was paid, refund the sale from Sales 
 voucher that was already used cannot be voided; correcting its balance (services#119) is a separate
 door that does not exist yet.
 
-### A courtesy on a sold voucher: more sessions, a later expiry (services#118)
+### Adjust a sold voucher: a courtesy (services#118) or a balance correction (services#119)
 
 Each row also shows the **expiry** («Expires …» / «Never expires») and, when something was given
-after the sale, «Given afterwards: +N session(s), +N day(s)». The sessions left and the expiry
-already include those courtesies.
+after the sale, «Given afterwards: +N session(s), +N day(s)» — or «Corrected afterwards: −N
+session(s), +N day(s)» when the movements took sessions away overall. The sessions left and the
+expiry already include those movements.
 
 A **live** sale that has a session limit or an expiry shows an «Adjust» button to whoever has
-`services.adjust_grant` (admin and manager). It swaps the list for a small form: **sessions to add**
-(only on a voucher with a session limit, up to 100), **days to extend** (only on one that expires,
-up to 366), a mandatory **reason**, and a preview of what the customer will have afterwards. The
-button stays disabled until there is a reason and something to add. Confirming runs
-`services.packages.adjust_grant` and reads the list again; a refusal (voided in the meantime) stays
-on the form. An expired or fully used voucher can be adjusted too — that is exactly when a salon
-gives the extra month or the session on the house.
+`services.adjust_grant` (admin and manager). It swaps the list for a small form: on a voucher with
+a session limit, an **Add sessions / Remove sessions** switch (it opens on «Add») and **sessions to
+add** (up to 100) or **sessions to remove** (up to what is left, never past 100); **days to extend**
+(only on one that expires, up to 366); a mandatory **reason**; and a preview of what the customer
+will have afterwards. The button stays disabled until there is a reason and something to move.
+Confirming runs `services.packages.adjust_grant` with a positive or negative `uses_delta` and reads
+the list again; a refusal (voided, or the sessions spent, in the meantime) stays on the form. An
+expired or fully used voucher can be adjusted too — that is exactly when a salon gives the extra
+month or the session on the house.
 
-The purchase is **never rewritten**: the courtesy is a movement of its own, and «Movements» shows it
-as **Courtesy** with what was given, by whom and why. No money moves and no document is issued.
+The purchase is **never rewritten**: every adjustment is a movement of its own, and «Movements»
+shows it as **Courtesy** (sessions added) or **Correction** (sessions removed) with how much, by whom
+and why. No money moves and no document is issued.
 
 ### Pay a line with a voucher (`erp-services-voucher-tender`)
 

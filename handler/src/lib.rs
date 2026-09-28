@@ -1369,7 +1369,7 @@ pub fn adjust_grant_pure(input: Value) -> Result<Output, String> {
     if uses_delta == 0 && days_delta == 0 {
         return Ok(Output::new().with_error(redeem_refusal(
             "services.grant_adjust_empty",
-            "Add at least one session or one day.",
+            "Add or remove at least one session, or add at least one day.",
         )));
     }
 
