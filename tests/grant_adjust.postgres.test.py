@@ -69,6 +69,52 @@ def refused(label: str, fn) -> None:
     print(f"  FAIL: ACCEPTED {label}")
 
 
+def accepted(label: str, fn) -> None:
+    """The database must ACCEPT — a refusal here is the fail, named, not a crash."""
+    try:
+        fn()
+    except RuntimeError as exc:
+        failures.append(f"{label}: it was REFUSED")
+        print(f"  FAIL: REFUSED {label} ({str(exc).splitlines()[0][:90]})")
+        return
+    print(f"  ok: accepted {label}")
+
+
+def stray(
+    db: ScratchDb,
+    grant_id: str,
+    hub: str,
+    reason: str,
+    uses: int = 5,
+    days: int = 365,
+    is_deleted: int = 0,
+) -> None:
+    """A movement row written by hand, past the command: ids are opaque, so a row of ANOTHER hub
+    can name this hub's grant, and a soft-deleted one exists once services#119 undoes one."""
+    db.psql(
+        [],
+        db=db.name,
+        stdin=(
+            "INSERT INTO services_package_grant_adjustment "
+            "(id, hub_id, grant_id, uses_delta, days_delta, reason, adjusted_at, is_deleted, "
+            "created_by, updated_by, created_at, updated_at) VALUES "
+            f"('{uuid.uuid4()}', '{hub}', '{grant_id}', {uses}, {days}, '{reason}', "
+            f"'{NOW}', {is_deleted}, 'x', 'x', '{NOW}', '{NOW}');\n"
+        ),
+    )
+
+
+def set_grant(db: ScratchDb, grant_id: str, assignment: str) -> None:
+    """Force a grant into a state no command produces (a half-dead row, a foreign package)."""
+    db.psql(
+        [
+            "-c",
+            f"UPDATE services_package_grant SET {assignment} WHERE id = '{grant_id}'",
+        ],
+        db=db.name,
+    )
+
+
 # ── seeding ──────────────────────────────────────────────────────────────────
 
 
@@ -334,6 +380,13 @@ def a_gifted_session_is_spendable(db: ScratchDb, svc: str, pkg: str) -> None:
     )
     refused("a fourth session", lambda: redeem(db, g))
 
+    chair = grant(db, pkg, "cus-gift-chair")
+    redeem(db, chair)
+    redeem(db, chair)
+    adjust(db, chair, uses=1)
+    accepted("the gifted session spent in the chair", lambda: redeem(db, chair))
+    refused("… and only that one", lambda: redeem(db, chair))
+
     snap = grant_row(db, g)
     check("the grant's snapshot is NOT rewritten (ADR-0390)", 2, snap["max_uses"])
     trail = json.loads(
@@ -425,6 +478,28 @@ def what_cannot_be_adjusted(
     check("a negative session count writes nothing", 0, adjust(db, live, uses=-1))
     check("a negative day count writes nothing", 0, adjust(db, live, days=-1))
     check("… even hidden behind a positive one", 0, adjust(db, live, uses=2, days=-1))
+    check(
+        "… or negative sessions behind positive days",
+        0,
+        adjust(db, live, uses=-1, days=5),
+    )
+
+    # The write repeats BOTH marks of a dead grant on its own: a row soft-deleted without a void
+    # stamp, or stamped voided while still flagged live, is not adjusted either.
+    deleted = grant(db, pkg, "cus-deleted")
+    set_grant(db, deleted, "is_deleted = 1")
+    check(
+        "a soft-deleted grant is not adjusted by the write",
+        0,
+        adjust(db, deleted, uses=1),
+    )
+    stamped = grant(db, pkg, "cus-stamped")
+    set_grant(db, stamped, f"voided_at = '{NOW}'")
+    check(
+        "a void-stamped grant is not adjusted by the write",
+        0,
+        adjust(db, stamped, uses=1),
+    )
 
     unlimited = grant(db, unlimited_pkg, "cus-unlimited")
     check(
@@ -458,7 +533,9 @@ def what_cannot_be_adjusted(
 # ── 4 · tenancy ──────────────────────────────────────────────────────────────
 
 
-def the_neighbour_cannot_adjust(db: ScratchDb, svc: str, pkg: str) -> None:
+def the_neighbour_cannot_adjust(
+    db: ScratchDb, svc: str, pkg: str, other_pkg: str
+) -> None:
     print("\n4 · the neighbour hub cannot adjust — nor see — this hub's grant")
     mine = grant(db, pkg, "cus-mine")
     redeem(db, mine)
@@ -474,18 +551,10 @@ def the_neighbour_cannot_adjust(db: ScratchDb, svc: str, pkg: str) -> None:
         adjust(db, mine, uses=5, hub=OTHER_HUB),
     )
     # A movement row of the NEIGHBOUR that names THIS grant: ids are opaque, so only the hub_id
-    # match in every reader keeps it from counting here.
-    db.psql(
-        [],
-        db=db.name,
-        stdin=(
-            "INSERT INTO services_package_grant_adjustment "
-            "(id, hub_id, grant_id, uses_delta, days_delta, reason, adjusted_at, is_deleted, "
-            "created_by, updated_by, created_at, updated_at) VALUES "
-            f"('{uuid.uuid4()}', '{OTHER_HUB}', '{mine}', 5, 365, 'stray', '{NOW}', 0, "
-            f"'x', 'x', '{NOW}', '{NOW}');\n"
-        ),
-    )
+    # match in every reader keeps it from counting here. And one of THIS hub, soft-deleted: only
+    # live movements count (services#119 will undo a movement that way).
+    stray(db, mine, OTHER_HUB, "stray")
+    stray(db, mine, HUB, "deleted-move", is_deleted=1)
     check(
         "the stray row adds no session to the balance",
         0,
@@ -513,9 +582,90 @@ def the_neighbour_cannot_adjust(db: ScratchDb, svc: str, pkg: str) -> None:
         db, "services.packages.redemption_history", {"package_id": pkg, "limit": 500}
     )
     check(
-        "the movements do not list it",
-        False,
-        any(r.get("adjust_reason") == "stray" for r in history["rows"]),
+        "the movements do not list it, nor the deleted one",
+        [],
+        [
+            r["adjust_reason"]
+            for r in history["rows"]
+            if r.get("adjust_reason") in ("stray", "deleted-move")
+        ],
+    )
+
+    # A grant of the NEIGHBOUR naming THIS hub's package (ids are opaque), with a movement of its
+    # own hub and one of this hub naming it: neither is a movement of this hub's voucher.
+    theirs = grant(db, other_pkg, "cus-cross", hub=OTHER_HUB)
+    set_grant(db, theirs, f"package_id = '{pkg}'")
+    stray(db, theirs, OTHER_HUB, "cross-own")
+    stray(db, theirs, HUB, "cross-named")
+    history = list_page(
+        db, "services.packages.redemption_history", {"package_id": pkg, "limit": 500}
+    )
+    check(
+        "the movements list neither",
+        [],
+        [
+            r["adjust_reason"]
+            for r in history["rows"]
+            if r.get("adjust_reason") in ("cross-own", "cross-named")
+        ],
+    )
+
+    # Every other reader of a grant's terms, against the neighbour's row and a deleted one too.
+    g = grant(db, pkg, "cus-stray-readers")
+    sold_one = hold(db, g, svc, "order-stray-a")
+    settle(db, sold_one, "sale-stray")
+    hold(db, g, svc, "order-stray-b")
+    stray(db, g, OTHER_HUB, "stray-readers")
+    stray(db, g, HUB, "deleted-readers", is_deleted=1)
+    held = rows(
+        db, "services.packages.holds_for_checkout", {"checkout_ref": "order-stray-b"}
+    )
+    check(
+        "the checkout's hold ignores it",
+        [0, "2026-09-17"],
+        [held[0]["remaining_after"], str(held[0]["expires_at"])[:10]],
+    )
+    sold = rows(db, "services.packages.redemptions_for_sale", {"sale_id": "sale-stray"})
+    check(
+        "the sale's redemptions ignore it",
+        [2, "2026-09-17"],
+        [sold[0]["max_uses"], str(sold[0]["expires_at"])[:10]],
+    )
+    refund = rows(db, "services.packages.refund_check", {"redemption_id": sold_one})[0]
+    check(
+        "the refund pre-check ignores it",
+        [2, "2026-09-17"],
+        [refund["max_uses"], str(refund["expires_at"])[:10]],
+    )
+    run(
+        db,
+        "services._refund",
+        {
+            "redemption_id": sold_one,
+            "refund_ref": "ret-s",
+            "refund_note": "",
+            "now": LATER,
+        },
+    )
+    check(
+        "a session returned after the real expiry is flagged expired",
+        1,
+        int(
+            db.scalar(
+                f"SELECT refund_expired FROM services_package_redemption WHERE id = '{sold_one}'"
+            )
+        ),
+    )
+    run(db, "services._on_customer_deleted", {"customer_id": "cus-stray-readers"})
+    orphan = next(
+        r
+        for r in rows(db, "services.packages.orphans", {}, now=LATER)
+        if r["grant_id"] == g
+    )
+    check(
+        "the rescue list ignores it",
+        [2, 1],
+        [orphan["max_uses"], orphan["is_expired"]],
     )
 
 
@@ -647,11 +797,19 @@ def the_other_readers_count_it(db: ScratchDb, svc: str, pkg: str) -> None:
         ),
     )
     run(db, "services._on_customer_deleted", {"customer_id": "cus-readers"})
-    orphan = next(r for r in rows(db, "services.packages.orphans", {}) if r["grant_id"] == g)
-    check("the rescue list counts the gift", [4, 2], [orphan["max_uses"], orphan["remaining"]])
+    orphan = next(
+        r for r in rows(db, "services.packages.orphans", {}) if r["grant_id"] == g
+    )
+    check(
+        "the rescue list counts the gift",
+        [4, 2],
+        [orphan["max_uses"], orphan["remaining"]],
+    )
     check("… and the new expiry", "2026-10-17", str(orphan["expires_at"])[:10])
     late = next(
-        r for r in rows(db, "services.packages.orphans", {}, now=LATER) if r["grant_id"] == g
+        r
+        for r in rows(db, "services.packages.orphans", {}, now=LATER)
+        if r["grant_id"] == g
     )
     check("… so it is not expired 40 days in", 0, late["is_expired"])
     check("the extra hold stands", True, bool(extra))
@@ -676,7 +834,7 @@ def main() -> int:
         a_gifted_session_is_spendable(db, svc, pkg)
         an_extended_expiry_revives_the_voucher(db, svc, pkg)
         what_cannot_be_adjusted(db, pkg, unlimited_pkg, forever_pkg)
-        the_neighbour_cannot_adjust(db, svc, pkg)
+        the_neighbour_cannot_adjust(db, svc, pkg, other_pkg)
         the_trail_is_visible(db, pkg, other_pkg)
         readers_pkg = seed_package(db, HUB, "Two more haircuts", svc)
         the_other_readers_count_it(db, svc, readers_pkg)
