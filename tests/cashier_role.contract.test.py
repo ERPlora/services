@@ -33,7 +33,10 @@ MUST_NOT = [
     "services.refund_package",
     # services#82 — voiding a voucher sold by mistake undoes a sale's entitlement: manager+admin,
     # like `sales.void_sale`, never the person who rang it up.
-    "services.void_grant"
+    "services.void_grant",
+    # services#118 — giving sessions or days away is a courtesy with a cost to the business (the
+    # same authority as a void): manager+admin, never the till.
+    "services.adjust_grant"
 ]
 
 errors = []
