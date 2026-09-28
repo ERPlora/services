@@ -4107,7 +4107,7 @@ var es_default = {
     },
     actionMovements: "Movimientos",
     movementsTitle: "Movimientos del bono",
-    movementsHint: "todas las sesiones de este bono: reservadas, entregadas, liberadas, caducadas y devueltas.",
+    movementsHint: "todas las sesiones de este bono: reservadas, entregadas, liberadas, caducadas y devueltas, y las cortes\xEDas regaladas despu\xE9s.",
     movementsMore: "Cargar m\xE1s",
     movementsCount: "Se muestran {shown} de {total}",
     movementCustomer: "Cliente",
@@ -4401,7 +4401,7 @@ var en_default = {
     },
     actionMovements: "Movements",
     movementsTitle: "Voucher movements",
-    movementsHint: "every session of this voucher: reserved, delivered, released, expired and given back.",
+    movementsHint: "every session of this voucher: reserved, delivered, released, expired and given back, plus the courtesies given afterwards.",
     movementsMore: "Load more",
     movementsCount: "Showing {shown} of {total}",
     movementCustomer: "Customer",
@@ -6303,8 +6303,8 @@ var ErpServicesPackages = class extends i3 {
     }
     return b2`<p>${t5("ui.adjustGrantHint", { customer: this.customerLabel(g3.customer_id) })}</p>
       ${hasLimit ? b2`<ion-input data-testid="services-packages-grant-adjust-uses" fill="outline" mode="md" label-placement="floating" label=${t5("ui.adjustUsesLabel")} helper-text=${t5("ui.adjustUsesHelp", { remaining: Number(g3.remaining) || 0 })} type="number" inputmode="numeric" min="0" max="100" step="1" .value=${this.adjustUses} @ionInput=${(e6) => this.adjustUses = String(e6.target.value ?? "")}></ion-input>` : A}
-      ${expires ? b2`<ion-input data-testid="services-packages-grant-adjust-days" fill="outline" mode="md" label-placement="floating" label=${t5("ui.adjustDaysLabel")} helper-text=${t5("ui.adjustDaysHelp", { when: this.day(g3.expires_at) })} type="number" inputmode="numeric" min="0" max="366" step="1" .value=${this.adjustDays} @ionInput=${(e6) => this.adjustDays = String(e6.target.value ?? "")}></ion-input>` : A}
-      <ion-textarea data-testid="services-packages-grant-adjust-reason" fill="outline" mode="md" label-placement="floating" label=${t5("ui.voidReasonLabel")} helper-text=${t5("ui.adjustReasonHelp")} auto-grow maxlength="500" .value=${this.adjustReason} @ionInput=${(e6) => this.adjustReason = String(e6.target.value ?? "")}></ion-textarea>
+      ${expires ? b2`<ion-input data-testid="services-packages-grant-adjust-days" class="ion-margin-top" fill="outline" mode="md" label-placement="floating" label=${t5("ui.adjustDaysLabel")} helper-text=${t5("ui.adjustDaysHelp", { when: this.day(g3.expires_at) })} type="number" inputmode="numeric" min="0" max="366" step="1" .value=${this.adjustDays} @ionInput=${(e6) => this.adjustDays = String(e6.target.value ?? "")}></ion-input>` : A}
+      <ion-textarea data-testid="services-packages-grant-adjust-reason" class="ion-margin-top" fill="outline" mode="md" label-placement="floating" label=${t5("ui.voidReasonLabel")} helper-text=${t5("ui.adjustReasonHelp")} auto-grow maxlength="500" .value=${this.adjustReason} @ionInput=${(e6) => this.adjustReason = String(e6.target.value ?? "")}></ion-textarea>
       <ok-inline-feedback data-testid="services-packages-grant-adjust-preview" tone="info" icon="gift-outline">
         ${t5("ui.adjustPreview", {
       remaining: newRemaining == null ? t5("ui.adjustPreviewUnlimited") : newRemaining,

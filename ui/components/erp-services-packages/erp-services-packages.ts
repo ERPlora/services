@@ -1143,9 +1143,9 @@ export class ErpServicesPackages extends LitElement {
         ? html`<ion-input data-testid="services-packages-grant-adjust-uses" fill="outline" mode="md" label-placement="floating" label=${t('ui.adjustUsesLabel')} helper-text=${t('ui.adjustUsesHelp', { remaining: Number(g.remaining) || 0 })} type="number" inputmode="numeric" min="0" max="100" step="1" .value=${this.adjustUses} @ionInput=${(e: any) => (this.adjustUses = String(e.target.value ?? ''))}></ion-input>`
         : nothing}
       ${expires
-        ? html`<ion-input data-testid="services-packages-grant-adjust-days" fill="outline" mode="md" label-placement="floating" label=${t('ui.adjustDaysLabel')} helper-text=${t('ui.adjustDaysHelp', { when: this.day(g.expires_at) })} type="number" inputmode="numeric" min="0" max="366" step="1" .value=${this.adjustDays} @ionInput=${(e: any) => (this.adjustDays = String(e.target.value ?? ''))}></ion-input>`
+        ? html`<ion-input data-testid="services-packages-grant-adjust-days" class="ion-margin-top" fill="outline" mode="md" label-placement="floating" label=${t('ui.adjustDaysLabel')} helper-text=${t('ui.adjustDaysHelp', { when: this.day(g.expires_at) })} type="number" inputmode="numeric" min="0" max="366" step="1" .value=${this.adjustDays} @ionInput=${(e: any) => (this.adjustDays = String(e.target.value ?? ''))}></ion-input>`
         : nothing}
-      <ion-textarea data-testid="services-packages-grant-adjust-reason" fill="outline" mode="md" label-placement="floating" label=${t('ui.voidReasonLabel')} helper-text=${t('ui.adjustReasonHelp')} auto-grow maxlength="500" .value=${this.adjustReason} @ionInput=${(e: any) => (this.adjustReason = String(e.target.value ?? ''))}></ion-textarea>
+      <ion-textarea data-testid="services-packages-grant-adjust-reason" class="ion-margin-top" fill="outline" mode="md" label-placement="floating" label=${t('ui.voidReasonLabel')} helper-text=${t('ui.adjustReasonHelp')} auto-grow maxlength="500" .value=${this.adjustReason} @ionInput=${(e: any) => (this.adjustReason = String(e.target.value ?? ''))}></ion-textarea>
       <ok-inline-feedback data-testid="services-packages-grant-adjust-preview" tone="info" icon="gift-outline">
         ${t('ui.adjustPreview', {
           remaining: newRemaining == null ? t('ui.adjustPreviewUnlimited') : newRemaining,

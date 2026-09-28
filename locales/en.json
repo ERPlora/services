@@ -183,7 +183,7 @@
     },
     "actionMovements": "Movements",
     "movementsTitle": "Voucher movements",
-    "movementsHint": "every session of this voucher: reserved, delivered, released, expired and given back.",
+    "movementsHint": "every session of this voucher: reserved, delivered, released, expired and given back, plus the courtesies given afterwards.",
     "movementsMore": "Load more",
     "movementsCount": "Showing {shown} of {total}",
     "movementCustomer": "Customer",
