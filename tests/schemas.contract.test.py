@@ -375,6 +375,10 @@ refuses(
     "the retired `discount_percent` key",
 )
 refuses(PU, dict(PKG_UPD, max_uses=-1), "a negative max_uses")
+# pm#521: the screen refuses a negative closed price / fixed discount in words; the server keeps
+# refusing it too — on the EDIT door as well, not only on create.
+refuses(PU, dict(PKG_UPD, fixed_price=-1), "a negative fixed price")
+refuses(PU, dict(PKG_UPD, discount_type="fixed", discount_amount_cents=-100), "a negative fixed discount")
 refuses(
     PU,
     {"package_id": "p1"},

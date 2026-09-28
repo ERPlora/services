@@ -17,7 +17,7 @@ import { checkMoneyDisplay } from '@erplora/module-toolkit/money-display-guard';
 //   (rv-customers-103). The helpers of `lib/` are witnesses too: a shared money helper would land
 //   there first, so the scan must provably read them (rv-taxes-78).
 // * notDisplay — none: pm#289 found no hand formatting outside a screen amount in this module (the
-//   price field's value uses a currency-less `Intl.NumberFormat`, which is not a hit). Add an entry
+//   money fields' values go through `formatMoneyInput` of the toolkit's money-input, pm#521). Add an entry
 //   (`'file: exact code line'` → why; an Intl hit is keyed by its folded CALL, as the finding's
 //   detail prints it) only with the reason it is not a screen amount.
 // * outfitkitImporters — each of the five screens imports OutfitKit by entry point, so the barrel

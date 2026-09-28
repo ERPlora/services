@@ -261,7 +261,10 @@
     "adjustRemoveUsesLabel": "Sesiones que se quitan",
     "adjustRemoveUsesHelp": "Quedan {remaining}. Puedes quitar hasta {remaining}.",
     "movementCorrected": "−{uses} sesión(es) · +{days} día(s)",
-    "movementCorrectedBy": "Corregido por {who}"
+    "movementCorrectedBy": "Corregido por {who}",
+    "errNotAnAmount": "Esto no es un importe. Escribe una cifra, por ejemplo 12,50.",
+    "errAmbiguousAmount": "Este importe se puede leer de dos maneras: «{typed}» tanto puede ser {grouped} como {decimal}. Escribe los decimales para que no haya duda.",
+    "errNegativeAmount": "Este importe no puede ser negativo."
   },
   "errors": {
     "services.category_unavailable": "Esa categoría no está disponible: no existe en este negocio o se ha eliminado.",

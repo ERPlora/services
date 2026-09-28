@@ -4184,7 +4184,10 @@ var es_default = {
     adjustRemoveUsesLabel: "Sesiones que se quitan",
     adjustRemoveUsesHelp: "Quedan {remaining}. Puedes quitar hasta {remaining}.",
     movementCorrected: "\u2212{uses} sesi\xF3n(es) \xB7 +{days} d\xEDa(s)",
-    movementCorrectedBy: "Corregido por {who}"
+    movementCorrectedBy: "Corregido por {who}",
+    errNotAnAmount: "Esto no es un importe. Escribe una cifra, por ejemplo 12,50.",
+    errAmbiguousAmount: "Este importe se puede leer de dos maneras: \xAB{typed}\xBB tanto puede ser {grouped} como {decimal}. Escribe los decimales para que no haya duda.",
+    errNegativeAmount: "Este importe no puede ser negativo."
   },
   errors: {
     "services.category_unavailable": "Esa categor\xEDa no est\xE1 disponible: no existe en este negocio o se ha eliminado.",
@@ -4487,7 +4490,10 @@ var en_default = {
     adjustRemoveUsesLabel: "Sessions to remove",
     adjustRemoveUsesHelp: "{remaining} left now. You can remove up to {remaining}.",
     movementCorrected: "\u2212{uses} session(s) \xB7 +{days} day(s)",
-    movementCorrectedBy: "Corrected by {who}"
+    movementCorrectedBy: "Corrected by {who}",
+    errNotAnAmount: "This is not an amount. Type a figure, for example 12.50.",
+    errAmbiguousAmount: "This amount can be read in two ways: \xAB{typed}\xBB could be {grouped} or {decimal}. Write the decimals so there is no doubt.",
+    errNegativeAmount: "This amount cannot be negative."
   },
   errors: {
     "services.category_unavailable": "That category is not available: it does not exist in this business or it has been deleted.",
@@ -4854,21 +4860,168 @@ __decorateClass([
 ], ErpServicesCategories.prototype, "allCategories", 2);
 define("erp-services-categories", ErpServicesCategories);
 
+// @erplora/module-toolkit/src/money-input.mjs
+var SPACING = "\\s'\\u2019\\u02bc";
+var GROUP_SEP = new RegExp(`[.,${SPACING}]`);
+var MINUS = /[-\u2212]/;
+var SIGN = /[-+\u2212]/;
+var SIGNS = /[-+\u2212]/g;
+var BRACKET = /[()]/;
+var CURRENCY_SIGNS = /\p{Sc}/gu;
+var AFFIX_FILLER = new RegExp(`^[${SPACING}\\p{Cf}.,+\\-\\u2212]*$`, "u");
+var NOT_AN_AMOUNT = Object.freeze({ ok: false, code: "not_an_amount" });
+function checkDecimals(decimals2) {
+  if (!Number.isInteger(decimals2) || decimals2 < 0 || decimals2 > 4) {
+    throw new RangeError(`money_input_decimals_invalid: ${String(decimals2)}`);
+  }
+}
+function currencyWords(currency, locale) {
+  if (currency === void 0) return [];
+  if (typeof currency !== "string" || !/^[A-Za-z]{3}$/.test(currency)) {
+    throw new RangeError(`money_input_currency_invalid: ${String(currency)}`);
+  }
+  const words = /* @__PURE__ */ new Set([currency.toLowerCase()]);
+  for (const lang of [locale || "en", "en"]) {
+    for (const currencyDisplay of ["symbol", "narrowSymbol"]) {
+      const part = new Intl.NumberFormat(lang, { style: "currency", currency, currencyDisplay }).formatToParts(1).find((p4) => p4.type === "currency");
+      if (part) words.add(part.value.toLowerCase());
+    }
+  }
+  return [...words].sort((a3, b3) => b3.length - a3.length);
+}
+function isCurrencyOnly(affixes, words) {
+  let rest = affixes.toLowerCase();
+  if (!words.length) rest = rest.replace(CURRENCY_SIGNS, " ");
+  for (const word of words) rest = rest.split(word).join(" ");
+  return AFFIX_FILLER.test(rest);
+}
+function isGrouping(intPart) {
+  const groups = intPart.split(GROUP_SEP);
+  if (groups.length < 2) return false;
+  const [first, ...rest] = groups;
+  const last = rest.pop();
+  return /^[1-9]\d{0,2}$/.test(first) && rest.every((g3) => /^\d{2,3}$/.test(g3)) && /^\d{3}$/.test(last);
+}
+function digitsToMinor(intDigits2, fracDigits, decimals2) {
+  const padded = fracDigits.padEnd(decimals2 + 1, "0");
+  const kept = (intDigits2 || "0") + padded.slice(0, decimals2);
+  let minor = Number(kept);
+  if (Number(padded[decimals2]) >= 5) minor += 1;
+  return Number.isSafeInteger(minor) ? minor : null;
+}
+function signed(minor, negative) {
+  return negative && minor !== 0 ? -minor : minor;
+}
+function splitCore(core, decimals2) {
+  const dots = (core.match(/\./g) ?? []).length;
+  const commas = (core.match(/,/g) ?? []).length;
+  if (dots && commas) {
+    const dec = core.lastIndexOf(".") > core.lastIndexOf(",") ? "." : ",";
+    if ((dec === "." ? dots : commas) !== 1) return null;
+    const at2 = core.lastIndexOf(dec);
+    return { intPart: core.slice(0, at2), frac: core.slice(at2 + 1) };
+  }
+  if (dots + commas !== 1) return { intPart: core, frac: "" };
+  const at = Math.max(core.lastIndexOf("."), core.lastIndexOf(","));
+  const intPart = core.slice(0, at);
+  const tail = core.slice(at + 1);
+  if (tail.length === 3 && isGrouping(core)) {
+    if (decimals2 === 0) return { intPart: core, frac: "" };
+    if (decimals2 !== 3) return { ambiguous: { intPart, tail } };
+  }
+  return { intPart, frac: tail };
+}
+function intDigits(intPart) {
+  if (!GROUP_SEP.test(intPart)) return /^\d*$/.test(intPart) ? intPart : null;
+  return isGrouping(intPart) ? intPart.replace(/\D/g, "") : null;
+}
+function parseMoneyInput(typed, decimals2, options = {}) {
+  checkDecimals(decimals2);
+  const words = currencyWords(options.currency, options.locale);
+  if (typeof typed === "number") return parseNumber(typed, decimals2);
+  const raw = String(typed ?? "").trim();
+  if (!raw) return { ok: true, minor: null };
+  const firstDigit = raw.search(/\d/);
+  if (firstDigit < 0) return NOT_AN_AMOUNT;
+  const start = firstDigit > 0 && /[.,]/.test(raw[firstDigit - 1]) ? firstDigit - 1 : firstDigit;
+  const end = raw.search(/\d\D*$/) + 1;
+  const prefix = raw.slice(0, start);
+  const suffix = raw.slice(end);
+  const core = raw.slice(start, end);
+  const signs = prefix.match(SIGNS) ?? [];
+  if (signs.length > 1 || SIGN.test(suffix) || BRACKET.test(prefix + suffix)) return NOT_AN_AMOUNT;
+  if (!isCurrencyOnly(`${prefix} ${suffix}`, words)) return NOT_AN_AMOUNT;
+  const negative = signs.length === 1 && MINUS.test(signs[0]);
+  const split = splitCore(core, decimals2);
+  if (!split) return NOT_AN_AMOUNT;
+  if ("ambiguous" in split) {
+    const { intPart, tail } = split.ambiguous;
+    const digits = intPart.replace(/\D/g, "");
+    const grouped = digitsToMinor(digits + tail, "", decimals2);
+    const decimal = digitsToMinor(digits, tail, decimals2);
+    if (grouped === null || decimal === null) return NOT_AN_AMOUNT;
+    return {
+      ok: false,
+      code: "ambiguous_amount",
+      readings: { grouped: signed(grouped, negative), decimal: signed(decimal, negative) }
+    };
+  }
+  const whole = intDigits(split.intPart);
+  if (whole === null || split.frac && !/^\d+$/.test(split.frac)) return NOT_AN_AMOUNT;
+  const minor = digitsToMinor(whole, split.frac, decimals2);
+  return minor === null ? NOT_AN_AMOUNT : { ok: true, minor: signed(minor, negative) };
+}
+function parseNumber(n6, decimals2) {
+  const m4 = /^(\d+)(?:\.(\d+))?$/.exec(String(Math.abs(n6)));
+  if (!m4) return NOT_AN_AMOUNT;
+  const minor = digitsToMinor(m4[1], m4[2] ?? "", decimals2);
+  return minor === null ? NOT_AN_AMOUNT : { ok: true, minor: signed(minor, n6 < 0) };
+}
+function formatMoneyInput(minor, decimals2, locale) {
+  checkDecimals(decimals2);
+  if (minor == null) return "";
+  return new Intl.NumberFormat(locale || "en", {
+    minimumFractionDigits: decimals2,
+    maximumFractionDigits: decimals2,
+    useGrouping: false,
+    numberingSystem: "latn"
+  }).format(minor / 10 ** decimals2);
+}
+function normaliseMoneyInput(typed, decimals2, locale, currency) {
+  const parsed = parseMoneyInput(typed, decimals2, { currency, locale });
+  return parsed.ok && parsed.minor !== null ? formatMoneyInput(parsed.minor, decimals2, locale) : typed;
+}
+
 // ui/components/erp-services-list/erp-services-list.ts
 var CATALOG2 = { es: es_default, en: en_default };
-function toMinorUnits(v3) {
-  const decimals2 = erplora2().currencyDecimals;
-  return majorToMinor(String(v3 ?? "").replace(",", "."), typeof decimals2 === "number" ? decimals2 : 2);
+function currencyDecimals() {
+  const d3 = erplora2().currencyDecimals;
+  return typeof d3 === "number" ? d3 : 2;
+}
+function readPrice(typed) {
+  const c5 = erplora2();
+  const d3 = currencyDecimals();
+  const raw = String(typed ?? "");
+  const read = parseMoneyInput(raw, d3, { currency: c5.currency || void 0, locale: c5.locale });
+  if (read.ok) {
+    const minor = read.minor ?? 0;
+    return minor < 0 ? { ok: false, key: "ui.errNegativeAmount" } : { ok: true, minor };
+  }
+  if (read.code === "ambiguous_amount") {
+    return {
+      ok: false,
+      key: "ui.errAmbiguousAmount",
+      params: {
+        typed: raw.trim(),
+        grouped: formatMoneyInput(read.readings.grouped, d3, c5.locale),
+        decimal: formatMoneyInput(read.readings.decimal, d3, c5.locale)
+      }
+    };
+  }
+  return { ok: false, key: "ui.errNotAnAmount" };
 }
 function toMajorText(minor) {
-  const decimals2 = erplora2().currencyDecimals;
-  const d3 = typeof decimals2 === "number" ? decimals2 : 2;
-  const major = minorToMajor(Number(minor) || 0, d3);
-  return new Intl.NumberFormat(erplora2().locale || "en", {
-    minimumFractionDigits: d3,
-    maximumFractionDigits: d3,
-    useGrouping: false
-  }).format(major);
+  return formatMoneyInput(Number(minor) || 0, currencyDecimals(), erplora2().locale || "en");
 }
 function taxCategoryDisplayName(c5) {
   return (c5.display_name ?? "").trim() || (c5.name ?? "").trim() || c5.key;
@@ -5123,6 +5276,12 @@ var ErpServicesList = class extends i3 {
     table?.addEventListener("click", (e6) => this.onTableClick(e6));
     table?.addEventListener("panelClose", () => this.editSeq++);
   }
+  /** On leaving the price field: rewritten in the hub's notation when readable, left EXACTLY as
+   *  typed when not — the refusal on save quotes it back (pm#521). */
+  normalisePrice() {
+    const c5 = erplora2();
+    this.newPrice = normaliseMoneyInput(String(this.newPrice ?? ""), currencyDecimals(), c5.locale, c5.currency || void 0);
+  }
   /** Back to a clean CREATE form (services#4). */
   cancelEdit() {
     this.editSeq++;
@@ -5144,6 +5303,11 @@ var ErpServicesList = class extends i3 {
       this.formError = erplora2().t(CATALOG2, "ui.errorTaxRequired");
       return;
     }
+    const price = readPrice(this.newPrice);
+    if (!price.ok) {
+      this.formError = erplora2().t(CATALOG2, price.key, price.params);
+      return;
+    }
     this.saving = true;
     this.formError = "";
     this.pageError = "";
@@ -5154,8 +5318,8 @@ var ErpServicesList = class extends i3 {
         short_description: "",
         category_id: this.newCategory || null,
         pricing_type: "fixed",
-        // El input recoge EUROS (step 0.01) pero la columna es céntimos (ADR-0007): 15 € → 1500.
-        price: toMinorUnits(this.newPrice),
+        // The field holds MAJOR units, the column MINOR units (ADR-0007): 15 € → 1500.
+        price: price.minor,
         cost: 0,
         duration_minutes: Number(this.newDuration) || 60,
         buffer_before: 0,
@@ -5189,6 +5353,11 @@ var ErpServicesList = class extends i3 {
       this.formError = erplora2().t(CATALOG2, "ui.errorTaxRequired");
       return;
     }
+    const price = readPrice(this.newPrice);
+    if (!price.ok) {
+      this.formError = erplora2().t(CATALOG2, price.key, price.params);
+      return;
+    }
     this.saving = true;
     this.formError = "";
     this.pageError = "";
@@ -5197,7 +5366,7 @@ var ErpServicesList = class extends i3 {
         service_id: this.editingId,
         name: this.newName.trim(),
         category_id: this.newCategory || null,
-        price: toMinorUnits(this.newPrice),
+        price: price.minor,
         duration_minutes: Number(this.newDuration) || 60,
         tax_category_key: this.newTaxRateId
       });
@@ -5327,7 +5496,7 @@ var ErpServicesList = class extends i3 {
                   <ion-button size="small" fill="clear" data-testid="services-list-edit-cancel" @click=${() => this.cancelEdit()}>${t5("ui.editingCancel")}</ion-button>
                 </ok-inline-feedback>` : A}
             <ion-input data-testid="services-list-name" fill="outline" label-placement="floating" label=${t5("ui.colName")} .value=${this.newName} @ionInput=${(e6) => this.newName = e6.target.value}></ion-input>
-            <ion-input data-testid="services-list-price" fill="outline" label-placement="floating" label=${t5("ui.colPrice")} type="text" inputmode="decimal" .value=${this.newPrice} @ionInput=${(e6) => this.newPrice = e6.target.value}></ion-input>
+            <ion-input data-testid="services-list-price" fill="outline" label-placement="floating" label=${t5("ui.colPrice")} type="text" inputmode="decimal" .value=${this.newPrice} @ionInput=${(e6) => this.newPrice = e6.target.value} @ionBlur=${() => this.normalisePrice()}></ion-input>
             <ion-input data-testid="services-list-duration" fill="outline" label-placement="floating" label=${t5("ui.colDuration")} type="number" step="1" .value=${this.newDuration} @ionInput=${(e6) => this.newDuration = e6.target.value}></ion-input>
             <!-- Both selects go WITHOUT a placeholder, on purpose (services#57): with a floating
                  label, Ionic lifts the label into the border gap as soon as the field has focus and
@@ -5547,10 +5716,29 @@ function decimals() {
   const d3 = erplora3().currencyDecimals;
   return typeof d3 === "number" ? d3 : 2;
 }
-function toMinorOrNull(v3) {
-  const s5 = String(v3 ?? "").trim().replace(",", ".");
-  if (!s5) return null;
-  return majorToMinor(s5, decimals());
+function readMoney(typed) {
+  const c5 = erplora3();
+  const d3 = decimals();
+  const raw = String(typed ?? "");
+  const read = parseMoneyInput(raw, d3, { currency: c5.currency || void 0, locale: c5.locale });
+  if (read.ok) {
+    return read.minor !== null && read.minor < 0 ? { ok: false, key: "ui.errNegativeAmount" } : { ok: true, minor: read.minor };
+  }
+  if (read.code === "ambiguous_amount") {
+    return {
+      ok: false,
+      key: "ui.errAmbiguousAmount",
+      params: {
+        typed: raw.trim(),
+        grouped: formatMoneyInput(read.readings.grouped, d3, c5.locale),
+        decimal: formatMoneyInput(read.readings.decimal, d3, c5.locale)
+      }
+    };
+  }
+  return { ok: false, key: "ui.errNotAnAmount" };
+}
+function toMoneyText(minor) {
+  return formatMoneyInput(Number(minor) || 0, decimals(), erplora3().locale);
 }
 function toBasisPoints(v3) {
   const s5 = String(v3 ?? "").trim().replace(",", ".");
@@ -5747,8 +5935,8 @@ var ErpServicesPackages = class extends i3 {
       this.form = {
         name: String(full.name ?? ""),
         discountType: type,
-        discountValue: type === "fixed" ? String(minorToMajor(Number(full.discount_amount_cents) || 0, decimals())) : String(minorToMajor(Number(full.discount_percent_bp) || 0, PERCENT_DECIMALS)),
-        fixedPrice: full.fixed_price == null || full.fixed_price === "" ? "" : String(minorToMajor(Number(full.fixed_price) || 0, decimals())),
+        discountValue: type === "fixed" ? toMoneyText(full.discount_amount_cents) : String(minorToMajor(Number(full.discount_percent_bp) || 0, PERCENT_DECIMALS)),
+        fixedPrice: full.fixed_price == null || full.fixed_price === "" ? "" : toMoneyText(full.fixed_price),
         validityDays: full.validity_days == null ? "" : String(full.validity_days),
         maxUses: full.max_uses == null ? "" : String(full.max_uses)
       };
@@ -6064,6 +6252,13 @@ var ErpServicesPackages = class extends i3 {
       this.adjusting = false;
     }
   }
+  /** On leaving a money field: rewritten in the hub's notation when readable, left EXACTLY as
+   *  typed when not — the refusal on save quotes it back (pm#521). A percentage is not money and
+   *  never comes through here. */
+  normaliseMoney(typed) {
+    const c5 = erplora3();
+    return normaliseMoneyInput(String(typed ?? ""), decimals(), c5.locale, c5.currency || void 0);
+  }
   /** Back to a clean CREATE form. */
   cancelEdit() {
     this.editSeq++;
@@ -6072,15 +6267,29 @@ var ErpServicesPackages = class extends i3 {
     this.items = [{ serviceId: "", sessions: "1" }];
     this.formError = "";
   }
+  /**
+   * The two money fields of the header, read — or the sentence of why one cannot be used, naming
+   * the field (there are two on the form). Empty closed price = `null` (the lines minus the
+   * discount, never a free voucher); empty fixed discount = 0 (no discount).
+   */
+  readMoneyFields() {
+    const c5 = erplora3();
+    const fixed = this.form.discountType === "fixed";
+    const discount = fixed ? readMoney(this.form.discountValue) : { ok: true, minor: null };
+    if (!discount.ok) return { ok: false, message: `${c5.t(CATALOG3, "ui.colDiscountAmount")}: ${c5.t(CATALOG3, discount.key, discount.params)}` };
+    const fixedPrice = readMoney(this.form.fixedPrice);
+    if (!fixedPrice.ok) return { ok: false, message: `${c5.t(CATALOG3, "ui.colFixedPrice")}: ${c5.t(CATALOG3, fixedPrice.key, fixedPrice.params)}` };
+    return { ok: true, discount: fixed ? discount.minor ?? 0 : null, fixedPrice: fixedPrice.minor };
+  }
   /** The header fields as the commands want them: percent OR minor units by `discount_type`. */
-  headerPayload() {
+  headerPayload(money) {
     const fixed = this.form.discountType === "fixed";
     return {
       name: this.form.name.trim(),
       discount_type: fixed ? "fixed" : "percentage",
       discount_percent_bp: fixed ? null : toBasisPoints(this.form.discountValue),
-      discount_amount_cents: fixed ? toMinorOrNull(this.form.discountValue) ?? 0 : null,
-      fixed_price: toMinorOrNull(this.form.fixedPrice),
+      discount_amount_cents: money.discount,
+      fixed_price: money.fixedPrice,
       validity_days: toIntOrNull(this.form.validityDays),
       max_uses: toIntOrNull(this.form.maxUses)
     };
@@ -6091,7 +6300,12 @@ var ErpServicesPackages = class extends i3 {
     const required = this.editingId ? "services.change_package" : "services.add_package";
     if (!can3(required) || !this.form.name.trim()) return;
     const t5 = (k2) => erplora3().t(CATALOG3, k2);
-    const header = this.headerPayload();
+    const money = this.readMoneyFields();
+    if (!money.ok) {
+      this.formError = money.message;
+      return;
+    }
+    const header = this.headerPayload(money);
     const lines = this.items.filter((l3) => l3.serviceId).map((l3) => ({ service_id: l3.serviceId, quantity: Math.max(1, Math.round(Number(l3.sessions) || 1)) * SESSION_SCALE }));
     if (!this.editingId && lines.length === 0) {
       this.formError = t5("ui.errorPackageNoLines");
@@ -6433,8 +6647,8 @@ var ErpServicesPackages = class extends i3 {
             <ion-select-option value="percentage">${t5("ui.discountType.percentage")}</ion-select-option>
             <ion-select-option value="fixed">${t5("ui.discountType.fixed")}</ion-select-option>
           </ion-select>
-          <ion-input data-testid="services-packages-discount-value" fill="outline" label-placement="floating" label=${fixed ? t5("ui.colDiscountAmount") : t5("ui.colDiscountPercent")} type="text" inputmode="decimal" .value=${this.form.discountValue} @ionInput=${(e6) => this.form = { ...this.form, discountValue: e6.target.value }}></ion-input>
-          <ion-input data-testid="services-packages-fixed-price" fill="outline" label-placement="floating" label=${t5("ui.colFixedPrice")} helper-text=${t5("ui.fixedPriceHelp")} type="text" inputmode="decimal" .value=${this.form.fixedPrice} @ionInput=${(e6) => this.form = { ...this.form, fixedPrice: e6.target.value }}></ion-input>
+          <ion-input data-testid="services-packages-discount-value" fill="outline" label-placement="floating" label=${fixed ? t5("ui.colDiscountAmount") : t5("ui.colDiscountPercent")} type="text" inputmode="decimal" .value=${this.form.discountValue} @ionInput=${(e6) => this.form = { ...this.form, discountValue: e6.target.value }} @ionBlur=${() => fixed && (this.form = { ...this.form, discountValue: this.normaliseMoney(this.form.discountValue) })}></ion-input>
+          <ion-input data-testid="services-packages-fixed-price" fill="outline" label-placement="floating" label=${t5("ui.colFixedPrice")} helper-text=${t5("ui.fixedPriceHelp")} type="text" inputmode="decimal" .value=${this.form.fixedPrice} @ionInput=${(e6) => this.form = { ...this.form, fixedPrice: e6.target.value }} @ionBlur=${() => this.form = { ...this.form, fixedPrice: this.normaliseMoney(this.form.fixedPrice) }}></ion-input>
           <ion-input data-testid="services-packages-validity-days" fill="outline" label-placement="floating" label=${t5("ui.colValidityDays")} helper-text=${t5("ui.validityHelp")} type="number" min="1" step="1" .value=${this.form.validityDays} @ionInput=${(e6) => this.form = { ...this.form, validityDays: e6.target.value }}></ion-input>
           <ion-input data-testid="services-packages-max-uses" fill="outline" label-placement="floating" label=${t5("ui.colMaxUses")} helper-text=${t5("ui.maxUsesHelp")} type="number" min="1" step="1" .value=${this.form.maxUses} @ionInput=${(e6) => this.form = { ...this.form, maxUses: e6.target.value }}></ion-input>
           ${this.editingId ? b2`<ok-inline-feedback data-testid="services-packages-lines-fixed" tone="neutral" icon="information-circle-outline">${t5("ui.packageLinesFixed")}</ok-inline-feedback>` : this.renderLines()}
