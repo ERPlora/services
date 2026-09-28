@@ -44,7 +44,7 @@ UPDATE services_package_redemption AS r
        updated_by = :current_user_id,
        updated_at = :now
   FROM services_package_grant g
-  LEFT JOIN (SELECT hub_id, grant_id, SUM(uses_delta) AS uses_delta, SUM(days_delta) AS days_delta
+  LEFT JOIN (SELECT hub_id, grant_id, CAST(SUM(uses_delta) AS BIGINT) AS uses_delta, CAST(SUM(days_delta) AS BIGINT) AS days_delta
                FROM services_package_grant_adjustment
               WHERE is_deleted = 0
               GROUP BY hub_id, grant_id) adj

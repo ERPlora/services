@@ -85,7 +85,7 @@ WITH candidate AS (
           WHERE r.hub_id = :hub_id AND r.grant_id = g.id AND r.is_deleted = 0
             AND (r.expires_at IS NULL OR erp_dt(:now) < erp_dt(r.expires_at)))   AS first_redeemed_at
     FROM services_package_grant g
-    LEFT JOIN (SELECT hub_id, grant_id, SUM(uses_delta) AS uses_delta, SUM(days_delta) AS days_delta
+    LEFT JOIN (SELECT hub_id, grant_id, CAST(SUM(uses_delta) AS BIGINT) AS uses_delta, CAST(SUM(days_delta) AS BIGINT) AS days_delta
                  FROM services_package_grant_adjustment
                 WHERE is_deleted = 0
                 GROUP BY hub_id, grant_id) adj
