@@ -148,7 +148,9 @@ opens the voucher's ledger — every session it has moved: **reserved**, **deliv
 **expired** and **given back** — with the customer, the sale and, for a return, who returned it,
 when and against which document. A session that came back into an already expired voucher says so,
 because a session that is on the books but cannot be spent is exactly the thing an operator must not
-discover later. «Released» and «expired» are different rows on purpose: the first is the cashier
+discover later. The customer and whoever gave a session back are shown by **name** (services#121):
+«loading name…» while it arrives, the id when it cannot be had (no `customers`, no permission to see
+customers, the customer deleted). «Released» and «expired» are different rows on purpose: the first is the cashier
 undoing a hold, the second is a checkout nobody ever came back to.
 
 It reads `services.packages.redemption_history`, which includes the soft-deleted rows on purpose:
@@ -168,7 +170,8 @@ The row action next to «Movements», gated by the same `services.view_package_b
 customer who bought that voucher — one row per purchase (grant), newest first, a page at a time with
 «Load more» — with the date, the amount, the sessions used and left, the sale it came from and a
 status pill: **Active** or **Voided**. A voided sale stays in the list with who voided it, when and
-why: that is its trail. Loading, empty and error are painted.
+why: that is its trail. Loading, empty and error are painted. The customer — here and in the void
+confirmation — and whoever voided are shown by **name**, the same way as in «Movements».
 
 A sale **nothing has been spent from** (no delivered session and none held at a till) shows a «Void»
 button to whoever has `services.void_grant` (admin and manager). It swaps the list for a

@@ -3,6 +3,7 @@
   "module": "services",
   "consumes": {
     "queries": [
+      "hub.users.list",
       "services.categories.list",
       "services.packages.get",
       "services.packages.grants",

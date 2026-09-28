@@ -4158,7 +4158,8 @@ var es_default = {
     voidGrantHint: "El bono del cliente {customer} ({amount}) deja de poder usarse y queda en la lista como anulado. El dinero no se devuelve aqu\xED: si se cobr\xF3, devuelve la venta desde Ventas con una devoluci\xF3n.",
     voidReasonLabel: "Motivo",
     voidReasonHelp: "Obligatorio. Queda en el registro del bono, p. ej. \xABvendido al cliente equivocado\xBB.",
-    errorVoidGrant: "No se ha podido anular el bono"
+    errorVoidGrant: "No se ha podido anular el bono",
+    nameLoading: "Cargando nombre\u2026"
   },
   errors: {
     "services.category_unavailable": "Esa categor\xEDa no est\xE1 disponible: no existe en este negocio o se ha eliminado.",
@@ -4428,7 +4429,8 @@ var en_default = {
     voidGrantHint: "The voucher of customer {customer} ({amount}) stops being usable and stays in the list as voided. The money is not given back here: if it was paid, refund the sale from Sales with a return.",
     voidReasonLabel: "Reason",
     voidReasonHelp: "Required. It stays on the voucher's record, e.g. \xABsold to the wrong customer\xBB.",
-    errorVoidGrant: "Could not void the voucher"
+    errorVoidGrant: "Could not void the voucher",
+    nameLoading: "Loading name\u2026"
   },
   errors: {
     "services.category_unavailable": "That category is not available: it does not exist in this business or it has been deleted.",
@@ -4544,10 +4546,10 @@ var ErpServicesCategories = class extends i3 {
   }
   get columns() {
     const t5 = (k2) => erplora().t(CATALOG, k2);
-    const nameOf = (id) => this.allCategories.find((c5) => c5.id === id)?.name ?? "\u2014";
+    const nameOf2 = (id) => this.allCategories.find((c5) => c5.id === id)?.name ?? "\u2014";
     return [
       { key: "name", header: t5("ui.colName"), sortable: true, filterable: true, filterType: "text" },
-      { key: "parent_id", header: t5("ui.colParent"), sortable: true, format: (r6) => nameOf(r6.parent_id) },
+      { key: "parent_id", header: t5("ui.colParent"), sortable: true, format: (r6) => nameOf2(r6.parent_id) },
       { key: "sort_order", header: t5("ui.colSortOrder"), align: "right", sortable: true },
       { key: "service_count", header: t5("ui.colServiceCount"), align: "right", sortable: true, filterable: true, filterType: "range" }
     ];
@@ -5471,6 +5473,12 @@ function can3(permission) {
   const client = erplora3();
   return typeof client.hasPermission === "function" ? client.hasPermission(permission) : true;
 }
+function nameOf(answer, id) {
+  const list = Array.isArray(answer) ? answer : Array.isArray(answer?.rows) ? answer.rows : [];
+  const row = list.find((r6) => String(r6?.id ?? "") === id);
+  const name = String(row?.name ?? "").trim();
+  return name || null;
+}
 function decimals() {
   const d3 = erplora3().currencyDecimals;
   return typeof d3 === "number" ? d3 : 2;
@@ -5518,6 +5526,8 @@ var ErpServicesPackages = class extends i3 {
     this.orphansTotal = 0;
     this.orphansLoading = false;
     this.orphansError = "";
+    this.customerNames = /* @__PURE__ */ new Map();
+    this.userNames = null;
     this.grantsOf = null;
     this.grants = [];
     this.grantsTotal = 0;
@@ -5691,6 +5701,7 @@ var ErpServicesPackages = class extends i3 {
    *  previous one with a second copy stacked underneath. */
   async openMovements(p4) {
     this.movementsOf = { id: p4.id, name: p4.name };
+    this.forgetNames();
     this.movements = [];
     this.movementsTotal = 0;
     this.movementsError = "";
@@ -5722,8 +5733,10 @@ var ErpServicesPackages = class extends i3 {
         params: { package_id: target.id }
       });
       if (this.movementsOf !== target) return;
-      this.movements = [...this.movements, ...page?.rows ?? []];
+      const rows = page?.rows ?? [];
+      this.movements = [...this.movements, ...rows];
       this.movementsTotal = page?.total ?? this.movements.length;
+      this.resolveNames(rows.map((m4) => m4.customer_id), rows.map((m4) => m4.refunded_by));
     } catch (e6) {
       if (this.movementsOf !== target) return;
       this.movementsError = domainMessage(e6, erplora3().locale, erplora3().t(CATALOG3, "ui.errorMovements"));
@@ -5770,6 +5783,7 @@ var ErpServicesPackages = class extends i3 {
    *  a page at a time, three states painted, a reopening reads again instead of stacking. */
   async openGrants(p4) {
     this.grantsOf = { id: p4.id, name: p4.name };
+    this.forgetNames();
     this.voidTarget = null;
     await this.reloadGrants();
   }
@@ -5794,14 +5808,76 @@ var ErpServicesPackages = class extends i3 {
         params: { package_id: target.id }
       });
       if (this.grantsOf !== target) return;
-      this.grants = [...this.grants, ...page?.rows ?? []];
+      const rows = page?.rows ?? [];
+      this.grants = [...this.grants, ...rows];
       this.grantsTotal = page?.total ?? this.grants.length;
+      this.resolveNames(rows.map((g3) => g3.customer_id), rows.map((g3) => g3.voided_by));
     } catch (e6) {
       if (this.grantsOf !== target) return;
       this.grantsError = domainMessage(e6, erplora3().locale, erplora3().t(CATALOG3, "ui.errorGrants"));
     } finally {
       if (this.grantsOf === target) this.grantsLoading = false;
     }
+  }
+  forgetNames() {
+    this.customerNames = /* @__PURE__ */ new Map();
+    this.userNames = null;
+  }
+  /**
+   * Resolve the names of a page just painted (services#121), through the doors the catalogue
+   * already uses — no contract of its own:
+   *   * customers through `customers.get` on the OPTIONAL door (ADR-0127): `services` does not
+   *     depend on `customers`, so «not installed» answers `undefined` and the id stays. Asked once
+   *     per distinct id not already known, and not at all without `customers.view_customer` (the
+   *     runtime would refuse it anyway);
+   *   * employees through `hub.users.list`, the core's reserved namespace — the same door
+   *     `kitchen`, `sales` and `appointments` use — once per opening, and only if someone is named.
+   * Every failure degrades to the id: the sheet never breaks for want of a name.
+   */
+  resolveNames(customerIds, userIds) {
+    const known = this.customerNames;
+    const pending = [...new Set(customerIds.filter((id) => !!id))].filter((id) => !known.has(id));
+    if (pending.length) {
+      const client = erplora3();
+      const allowed = can3("customers.view_customer") && typeof client.queryOptional === "function";
+      this.customerNames = new Map([...known, ...pending.map((id) => [id, allowed ? void 0 : null])]);
+      if (allowed) {
+        for (const id of pending) {
+          void client.queryOptional("customers.get", { customer_id: id }).then((answer) => nameOf(answer, id), () => null).then((name) => {
+            this.customerNames = new Map(this.customerNames).set(id, name);
+          });
+        }
+      }
+    }
+    if (this.userNames === null && userIds.some((id) => !!id)) {
+      this.userNames = void 0;
+      void erplora3().query("hub.users.list").then(
+        (answer) => {
+          const names = /* @__PURE__ */ new Map();
+          for (const person of Array.isArray(answer) ? answer : []) {
+            const id = String(person?.id ?? "");
+            const name = nameOf([person], id);
+            if (id && name) names.set(id, name);
+          }
+          return names;
+        },
+        () => /* @__PURE__ */ new Map()
+      ).then((names) => {
+        this.userNames = names;
+      });
+    }
+  }
+  /** What to paint for a customer id: its name, «loading name…» while on its way, else the id. */
+  customerLabel(id) {
+    const name = this.customerNames.get(id);
+    if (name === void 0 && this.customerNames.has(id)) return erplora3().t(CATALOG3, "ui.nameLoading");
+    return name ?? id;
+  }
+  /** Same for an employee (who voided, who gave a session back); `—` when nobody is recorded. */
+  userLabel(id) {
+    if (!id) return "\u2014";
+    if (this.userNames === void 0) return erplora3().t(CATALOG3, "ui.nameLoading");
+    return this.userNames?.get(id) ?? id;
   }
   closeGrants() {
     this.grantsOf = null;
@@ -5960,9 +6036,9 @@ var ErpServicesPackages = class extends i3 {
           <ok-status-pill size="sm" tone=${this.movementTone(m4.movement)}>${t5(`ui.movement.${m4.movement}`)}</ok-status-pill>
           ${m4.service_name ?? t5("ui.movementNoService")}
         </h3>
-        <p>${this.stamp(m4.redeemed_at)} · ${t5("ui.movementCustomer")}: ${m4.customer_id}${m4.sale_id ? b2` · ${t5("ui.movementSale")}: ${m4.sale_id}` : A}</p>
+        <p>${this.stamp(m4.redeemed_at)} · ${t5("ui.movementCustomer")}: ${this.customerLabel(m4.customer_id)}${m4.sale_id ? b2` · ${t5("ui.movementSale")}: ${m4.sale_id}` : A}</p>
         ${refunded ? b2`<p class="refund">
-              ${t5("ui.movementRefundedBy", { who: m4.refunded_by ?? "\u2014", when: this.stamp(m4.refunded_at) })}
+              ${t5("ui.movementRefundedBy", { who: this.userLabel(m4.refunded_by), when: this.stamp(m4.refunded_at) })}
               · ${t5("ui.movementRefundDoc")}: ${m4.refund_ref ?? "\u2014"}
               ${m4.refund_note ? b2` · ${m4.refund_note}` : A}
             </p>
@@ -6050,21 +6126,21 @@ var ErpServicesPackages = class extends i3 {
       <ion-label class="ion-text-wrap">
         <h3>
           <ok-status-pill size="sm" tone=${voided ? "neutral" : "success"}>${t5(`ui.grantStatus.${g3.status}`)}</ok-status-pill>
-          ${t5("ui.movementCustomer")}: ${g3.customer_id}
+          ${t5("ui.movementCustomer")}: ${this.customerLabel(g3.customer_id)}
         </h3>
         <p>
           ${this.stamp(g3.granted_at)} · ${erplora3().formatMoney(Number(g3.amount_cents) || 0)}
           · ${g3.max_uses == null ? t5("ui.grantUsesUnlimited", { used: Number(g3.used) || 0 }) : t5("ui.grantUses", { used: Number(g3.used) || 0, remaining: Number(g3.remaining) || 0 })}
           ${g3.sale_id ? b2` · ${t5("ui.movementSale")}: ${g3.sale_id}` : A}
         </p>
-        ${voided ? b2`<p class="refund">${t5("ui.grantVoidedBy", { who: g3.voided_by ?? "\u2014", when: this.stamp(g3.voided_at) })}${g3.void_reason ? b2` · ${g3.void_reason}` : A}</p>` : A}
+        ${voided ? b2`<p class="refund">${t5("ui.grantVoidedBy", { who: this.userLabel(g3.voided_by), when: this.stamp(g3.voided_at) })}${g3.void_reason ? b2` · ${g3.void_reason}` : A}</p>` : A}
       </ion-label>
       ${voidable ? b2`<ion-button slot="end" size="small" fill="clear" data-testid=${`services-packages-grant-void-${g3.grant_id}`} style=${ionTone("text", "danger")} @click=${() => this.askVoid(g3)}>${t5("ui.actionVoidGrant")}</ion-button>` : A}
     </ion-item>`;
   }
   renderVoidConfirm(g3) {
     const t5 = (k2, p4) => erplora3().t(CATALOG3, k2, p4);
-    return b2`<p>${t5("ui.voidGrantHint", { customer: g3.customer_id, amount: erplora3().formatMoney(Number(g3.amount_cents) || 0) })}</p>
+    return b2`<p>${t5("ui.voidGrantHint", { customer: this.customerLabel(g3.customer_id), amount: erplora3().formatMoney(Number(g3.amount_cents) || 0) })}</p>
       <ion-textarea data-testid="services-packages-grant-void-reason" fill="outline" mode="md" label-placement="floating" label=${t5("ui.voidReasonLabel")} helper-text=${t5("ui.voidReasonHelp")} auto-grow maxlength="500" .value=${this.voidReason} @ionInput=${(e6) => this.voidReason = String(e6.target.value ?? "")}></ion-textarea>
       ${this.voidError ? b2`<ok-inline-feedback data-testid="services-packages-grant-void-error" tone="danger" icon="alert-circle-outline">${this.voidError}</ok-inline-feedback>` : A}
       <ion-button class="ion-margin-top" expand="block" data-testid="services-packages-grant-void-submit" style=${ionTone("solid", "danger")} ?disabled=${this.voiding || !this.voidReason.trim()} @click=${() => this.confirmVoid()}>
@@ -6216,6 +6292,12 @@ __decorateClass([
 __decorateClass([
   r5()
 ], ErpServicesPackages.prototype, "orphansError", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "customerNames", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "userNames", 2);
 __decorateClass([
   r5()
 ], ErpServicesPackages.prototype, "grantsOf", 2);

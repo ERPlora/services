@@ -23,6 +23,9 @@ const CATALOG: Record<string, unknown> = { es: esLocale, en: enLocale };
 
 interface ErploraClientLike extends ListClient {
   query<T = unknown>(name: string, params?: Record<string, unknown>): Promise<T>;
+  /** ADR-0127: `undefined` when the owner module is not in this hub. Optional in the type because an
+   *  older shell may not carry it; then the name simply stays the id. */
+  queryOptional?<T = unknown>(name: string, params?: Record<string, unknown>): Promise<T | undefined>;
   queryAll<T = unknown>(name: string, params?: Record<string, unknown>): Promise<T[]>;
   queryPage<R = unknown>(name: string, params: ListParams): Promise<ListPage<R>>;
   command<T = unknown>(name: string, payload?: Record<string, unknown>): Promise<T>;
@@ -120,6 +123,24 @@ function erplora(): ErploraClientLike {
 function can(permission: string): boolean {
   const client = erplora();
   return typeof client.hasPermission === 'function' ? client.hasPermission(permission) : true;
+}
+
+/**
+ * The name of `id` in an answer of `customers.get` or `hub.users.list` — or `null`.
+ *
+ * Only the row whose `id` IS the one asked for counts (services#121): a name is never painted for
+ * an id it was not answered for. The dispatcher already scopes `customers.get` to this hub; this is
+ * the screen's own half of that promise, so a wrong row can never become «this customer».
+ */
+function nameOf(answer: unknown, id: string): string | null {
+  const list = Array.isArray(answer)
+    ? answer
+    : Array.isArray((answer as { rows?: unknown[] } | null)?.rows)
+      ? (answer as { rows: unknown[] }).rows
+      : [];
+  const row = list.find((r) => String((r as { id?: unknown } | null)?.id ?? '') === id) as { name?: unknown } | undefined;
+  const name = String(row?.name ?? '').trim();
+  return name || null;
 }
 
 function decimals(): number {
@@ -253,6 +274,16 @@ export class ErpServicesPackages extends LitElement {
   @state() orphansTotal = 0;
   @state() orphansLoading = false;
   @state() orphansError = '';
+
+  /**
+   * Names of the people the voucher sheets mention (services#121), keyed by the id ASKED for:
+   * absent = never asked, `undefined` = on its way, `null` = cannot be had (the id is the fallback),
+   * a string = the name. Read again on every opening of a sheet — a renamed customer is not kept.
+   */
+  @state() customerNames: ReadonlyMap<string, string | null | undefined> = new Map();
+  /** The hub's people by user id (`hub.users.list`); `undefined` while on its way, empty when it
+   *  failed (then the id is the fallback), `null` when nobody asked yet. */
+  @state() userNames: ReadonlyMap<string, string> | null | undefined = null;
 
   /** Voucher whose SALES are listed (services#82); `null` = the sheet is closed. */
   @state() grantsOf: { id: string; name: string } | null = null;
@@ -452,6 +483,7 @@ export class ErpServicesPackages extends LitElement {
    *  previous one with a second copy stacked underneath. */
   private async openMovements(p: Package): Promise<void> {
     this.movementsOf = { id: p.id, name: p.name };
+    this.forgetNames();
     this.movements = [];
     this.movementsTotal = 0;
     this.movementsError = '';
@@ -487,8 +519,10 @@ export class ErpServicesPackages extends LitElement {
       // The sheet may have been closed, moved to another voucher or REOPENED (a new opening object,
       // pm#459) while the page was in flight; painting it then would stack a stale ledger on it.
       if (this.movementsOf !== target) return;
-      this.movements = [...this.movements, ...(page?.rows ?? [])];
+      const rows = page?.rows ?? [];
+      this.movements = [...this.movements, ...rows];
       this.movementsTotal = page?.total ?? this.movements.length;
+      this.resolveNames(rows.map((m) => m.customer_id), rows.map((m) => m.refunded_by));
     } catch (e) {
       if (this.movementsOf !== target) return; // pm#459: another opening owns the sheet now
       this.movementsError = domainMessage(e, erplora().locale, erplora().t(CATALOG, 'ui.errorMovements'));
@@ -541,6 +575,7 @@ export class ErpServicesPackages extends LitElement {
    *  a page at a time, three states painted, a reopening reads again instead of stacking. */
   private async openGrants(p: Package): Promise<void> {
     this.grantsOf = { id: p.id, name: p.name };
+    this.forgetNames();
     this.voidTarget = null;
     await this.reloadGrants();
   }
@@ -568,14 +603,86 @@ export class ErpServicesPackages extends LitElement {
         params: { package_id: target.id },
       });
       if (this.grantsOf !== target) return; // pm#459: another opening owns the sheet now
-      this.grants = [...this.grants, ...(page?.rows ?? [])];
+      const rows = page?.rows ?? [];
+      this.grants = [...this.grants, ...rows];
       this.grantsTotal = page?.total ?? this.grants.length;
+      this.resolveNames(rows.map((g) => g.customer_id), rows.map((g) => g.voided_by));
     } catch (e) {
       if (this.grantsOf !== target) return;
       this.grantsError = domainMessage(e, erplora().locale, erplora().t(CATALOG, 'ui.errorGrants'));
     } finally {
       if (this.grantsOf === target) this.grantsLoading = false;
     }
+  }
+
+  private forgetNames(): void {
+    this.customerNames = new Map();
+    this.userNames = null;
+  }
+
+  /**
+   * Resolve the names of a page just painted (services#121), through the doors the catalogue
+   * already uses — no contract of its own:
+   *   * customers through `customers.get` on the OPTIONAL door (ADR-0127): `services` does not
+   *     depend on `customers`, so «not installed» answers `undefined` and the id stays. Asked once
+   *     per distinct id not already known, and not at all without `customers.view_customer` (the
+   *     runtime would refuse it anyway);
+   *   * employees through `hub.users.list`, the core's reserved namespace — the same door
+   *     `kitchen`, `sales` and `appointments` use — once per opening, and only if someone is named.
+   * Every failure degrades to the id: the sheet never breaks for want of a name.
+   */
+  private resolveNames(customerIds: (string | null)[], userIds: (string | null)[]): void {
+    const known = this.customerNames;
+    const pending = [...new Set(customerIds.filter((id): id is string => !!id))].filter((id) => !known.has(id));
+    if (pending.length) {
+      const client = erplora();
+      const allowed = can('customers.view_customer') && typeof client.queryOptional === 'function';
+      this.customerNames = new Map([...known, ...pending.map((id): [string, null | undefined] => [id, allowed ? undefined : null])]);
+      if (allowed) {
+        for (const id of pending) {
+          void client
+            .queryOptional!<unknown>('customers.get', { customer_id: id })
+            .then((answer) => nameOf(answer, id), () => null)
+            .then((name) => {
+              this.customerNames = new Map(this.customerNames).set(id, name);
+            });
+        }
+      }
+    }
+    if (this.userNames === null && userIds.some((id) => !!id)) {
+      this.userNames = undefined;
+      void erplora()
+        .query<unknown>('hub.users.list')
+        .then(
+          (answer) => {
+            const names = new Map<string, string>();
+            for (const person of Array.isArray(answer) ? answer : []) {
+              const id = String((person as { id?: unknown } | null)?.id ?? '');
+              const name = nameOf([person], id);
+              if (id && name) names.set(id, name);
+            }
+            return names;
+          },
+          () => new Map<string, string>(),
+        )
+        .then((names) => {
+          this.userNames = names;
+        });
+    }
+  }
+
+  /** What to paint for a customer id: its name, «loading name…» while on its way, else the id. */
+  private customerLabel(id: string): string {
+    const name = this.customerNames.get(id);
+    if (name === undefined && this.customerNames.has(id)) return erplora().t(CATALOG, 'ui.nameLoading');
+    return name ?? id;
+  }
+
+  /** Same for an employee (who voided, who gave a session back); `—` when nobody is recorded. */
+  private userLabel(id: string | null): string {
+    if (!id) return '—';
+    if (this.userNames === undefined) return erplora().t(CATALOG, 'ui.nameLoading');
+    return this.userNames?.get(id) ?? id;
   }
 
   private closeGrants(): void {
@@ -753,10 +860,10 @@ export class ErpServicesPackages extends LitElement {
           <ok-status-pill size="sm" tone=${this.movementTone(m.movement)}>${t(`ui.movement.${m.movement}`)}</ok-status-pill>
           ${m.service_name ?? t('ui.movementNoService')}
         </h3>
-        <p>${this.stamp(m.redeemed_at)} · ${t('ui.movementCustomer')}: ${m.customer_id}${m.sale_id ? html` · ${t('ui.movementSale')}: ${m.sale_id}` : nothing}</p>
+        <p>${this.stamp(m.redeemed_at)} · ${t('ui.movementCustomer')}: ${this.customerLabel(m.customer_id)}${m.sale_id ? html` · ${t('ui.movementSale')}: ${m.sale_id}` : nothing}</p>
         ${refunded
           ? html`<p class="refund">
-              ${t('ui.movementRefundedBy', { who: m.refunded_by ?? '—', when: this.stamp(m.refunded_at) })}
+              ${t('ui.movementRefundedBy', { who: this.userLabel(m.refunded_by), when: this.stamp(m.refunded_at) })}
               · ${t('ui.movementRefundDoc')}: ${m.refund_ref ?? '—'}
               ${m.refund_note ? html` · ${m.refund_note}` : nothing}
             </p>
@@ -873,7 +980,7 @@ export class ErpServicesPackages extends LitElement {
       <ion-label class="ion-text-wrap">
         <h3>
           <ok-status-pill size="sm" tone=${voided ? 'neutral' : 'success'}>${t(`ui.grantStatus.${g.status}`)}</ok-status-pill>
-          ${t('ui.movementCustomer')}: ${g.customer_id}
+          ${t('ui.movementCustomer')}: ${this.customerLabel(g.customer_id)}
         </h3>
         <p>
           ${this.stamp(g.granted_at)} · ${erplora().formatMoney(Number(g.amount_cents) || 0)}
@@ -883,7 +990,7 @@ export class ErpServicesPackages extends LitElement {
           ${g.sale_id ? html` · ${t('ui.movementSale')}: ${g.sale_id}` : nothing}
         </p>
         ${voided
-          ? html`<p class="refund">${t('ui.grantVoidedBy', { who: g.voided_by ?? '—', when: this.stamp(g.voided_at) })}${g.void_reason ? html` · ${g.void_reason}` : nothing}</p>`
+          ? html`<p class="refund">${t('ui.grantVoidedBy', { who: this.userLabel(g.voided_by), when: this.stamp(g.voided_at) })}${g.void_reason ? html` · ${g.void_reason}` : nothing}</p>`
           : nothing}
       </ion-label>
       ${voidable
@@ -894,7 +1001,7 @@ export class ErpServicesPackages extends LitElement {
 
   private renderVoidConfirm(g: SoldGrant) {
     const t = (k: string, p?: Record<string, unknown>): string => erplora().t(CATALOG, k, p);
-    return html`<p>${t('ui.voidGrantHint', { customer: g.customer_id, amount: erplora().formatMoney(Number(g.amount_cents) || 0) })}</p>
+    return html`<p>${t('ui.voidGrantHint', { customer: this.customerLabel(g.customer_id), amount: erplora().formatMoney(Number(g.amount_cents) || 0) })}</p>
       <ion-textarea data-testid="services-packages-grant-void-reason" fill="outline" mode="md" label-placement="floating" label=${t('ui.voidReasonLabel')} helper-text=${t('ui.voidReasonHelp')} auto-grow maxlength="500" .value=${this.voidReason} @ionInput=${(e: any) => (this.voidReason = String(e.target.value ?? ''))}></ion-textarea>
       ${this.voidError
         ? html`<ok-inline-feedback data-testid="services-packages-grant-void-error" tone="danger" icon="alert-circle-outline">${this.voidError}</ok-inline-feedback>`
