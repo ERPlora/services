@@ -24,6 +24,7 @@
       "services.categories.create",
       "services.categories.delete",
       "services.categories.update",
+      "services.packages.adjust_grant",
       "services.packages.create",
       "services.packages.delete",
       "services.packages.hold_for_line",
