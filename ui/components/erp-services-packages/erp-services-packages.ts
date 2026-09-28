@@ -772,19 +772,21 @@ export class ErpServicesPackages extends LitElement {
    * What the form would send: whole numbers, 0 for a blank field AND for a half the voucher cannot
    * take (no sessions on an unlimited voucher, no days on one that never expires — the field is not
    * even painted, but a value typed for another sale must not travel). `null` when a field is not a
-   * whole number ≥ 0 or nothing is added: the button stays disabled.
+   * whole number from 0 to its limit (100 sessions, 366 days) or nothing is added: the button stays
+   * disabled.
    */
   private adjustAmounts(): { uses: number; days: number } | null {
     const target = this.adjustTarget;
     if (!target) return null;
-    const read = (raw: string, allowed: boolean): number | null => {
+    const read = (raw: string, allowed: boolean, max: number): number | null => {
       if (!allowed) return 0;
       const text = raw.trim();
       if (!text) return 0;
-      return /^\d+$/.test(text) ? Number(text) : null;
+      return /^\d+$/.test(text) && Number(text) <= max ? Number(text) : null;
     };
-    const uses = read(this.adjustUses, target.max_uses != null);
-    const days = read(this.adjustDays, target.expires_at != null);
+    // The limits the helper texts promise («up to 100», «up to 366»); the handler and the write repeat them.
+    const uses = read(this.adjustUses, target.max_uses != null, 100);
+    const days = read(this.adjustDays, target.expires_at != null, 366);
     if (uses === null || days === null || uses + days === 0) return null;
     return { uses, days };
   }

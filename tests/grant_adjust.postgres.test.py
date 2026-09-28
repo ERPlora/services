@@ -483,6 +483,16 @@ def what_cannot_be_adjusted(
         0,
         adjust(db, live, uses=-1, days=5),
     )
+    # The screen promises «up to 100» sessions and «up to 366» days per adjustment; the write is
+    # the authority, so a typo of 1000 sessions or ten million days (a date the till cannot even
+    # compute on every later read) lands on zero rows, and the limits themselves are written.
+    check("more than 100 sessions at once writes nothing", 0, adjust(db, live, uses=101))
+    check("more than 366 days at once writes nothing", 0, adjust(db, live, days=367))
+    check(
+        "… even hidden behind an amount within the limit",
+        0,
+        adjust(db, live, uses=1, days=10_000_000),
+    )
 
     # The write repeats BOTH marks of a dead grant on its own: a row soft-deleted without a void
     # stamp, or stamped voided while still flagged live, is not adjusted either.
@@ -518,6 +528,8 @@ def what_cannot_be_adjusted(
     )
     check("… so days on it write nothing", 0, adjust(db, forever, days=10))
     check("… and sessions on it are written", 1, adjust(db, forever, uses=1))
+    at_the_limit = grant(db, pkg, "cus-limit")
+    check("exactly 100 sessions and 366 days are written", 1, adjust(db, at_the_limit, uses=100, days=366))
     check(
         "none of the refused ones left a movement",
         0,

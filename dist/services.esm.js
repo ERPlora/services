@@ -4207,7 +4207,7 @@ var es_default = {
     "services.grant_void_reason_required": "Indica por qu\xE9 se anula este bono: el motivo queda en su registro.",
     "services.grant_not_voidable": "Ese bono no se puede anular ahora: se ha usado o anulado mientras tanto. Recarga la lista y vuelve a intentarlo.",
     "services.grant_adjust_reason_required": "Indica por qu\xE9 se ajusta este bono: el motivo queda en su registro.",
-    "services.grant_adjust_invalid": "Las sesiones y los d\xEDas que se a\xF1aden tienen que ser n\xFAmeros enteros, cero o m\xE1s.",
+    "services.grant_adjust_invalid": "Las sesiones que se a\xF1aden tienen que ser un n\xFAmero entero de 0 a 100, y los d\xEDas, de 0 a 366.",
     "services.grant_adjust_empty": "A\xF1ade al menos una sesi\xF3n o un d\xEDa.",
     "services.grant_unlimited": "Ese bono no tiene l\xEDmite de sesiones: no hay sesiones que a\xF1adir.",
     "services.grant_no_expiry": "Ese bono no caduca: no hay caducidad que alargar.",
@@ -4501,7 +4501,7 @@ var en_default = {
     "services.grant_void_reason_required": "Say why this voucher is being voided: the reason stays on its record.",
     "services.grant_not_voidable": "That voucher cannot be voided right now: it was used or voided in the meantime. Reload the list and try again.",
     "services.grant_adjust_reason_required": "Say why this voucher is being adjusted: the reason stays on its record.",
-    "services.grant_adjust_invalid": "Sessions and days to add must be whole numbers, zero or more.",
+    "services.grant_adjust_invalid": "Sessions to add must be a whole number from 0 to 100, and days from 0 to 366.",
     "services.grant_adjust_empty": "Add at least one session or one day.",
     "services.grant_unlimited": "That voucher has no session limit: there are no sessions to add.",
     "services.grant_no_expiry": "That voucher never expires: there is no expiry to extend.",
@@ -5992,19 +5992,20 @@ var ErpServicesPackages = class extends i3 {
    * What the form would send: whole numbers, 0 for a blank field AND for a half the voucher cannot
    * take (no sessions on an unlimited voucher, no days on one that never expires — the field is not
    * even painted, but a value typed for another sale must not travel). `null` when a field is not a
-   * whole number ≥ 0 or nothing is added: the button stays disabled.
+   * whole number from 0 to its limit (100 sessions, 366 days) or nothing is added: the button stays
+   * disabled.
    */
   adjustAmounts() {
     const target = this.adjustTarget;
     if (!target) return null;
-    const read = (raw, allowed) => {
+    const read = (raw, allowed, max) => {
       if (!allowed) return 0;
       const text = raw.trim();
       if (!text) return 0;
-      return /^\d+$/.test(text) ? Number(text) : null;
+      return /^\d+$/.test(text) && Number(text) <= max ? Number(text) : null;
     };
-    const uses = read(this.adjustUses, target.max_uses != null);
-    const days = read(this.adjustDays, target.expires_at != null);
+    const uses = read(this.adjustUses, target.max_uses != null, 100);
+    const days = read(this.adjustDays, target.expires_at != null, 366);
     if (uses === null || days === null || uses + days === 0) return null;
     return { uses, days };
   }

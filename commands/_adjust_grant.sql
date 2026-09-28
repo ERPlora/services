@@ -3,7 +3,8 @@
 -- `services.packages.adjust_check` said yes.
 --
 -- It repeats every condition of the pre-check — this hub, still live, not voided, a non-blank
--- reason, something to add, nothing negative, no sessions on an unlimited voucher and no days on
+-- reason, something to add, nothing negative, no more than 100 sessions nor 366 days at once (what
+-- the screen promises; the handler's ADJUST_MAX_*), no sessions on an unlimited voucher and no days on
 -- one that never expires — so the read is advisory and the WRITE is the authority. A refused case
 -- lands on zero rows and the manifest's `expect_rows` turns that into
 -- `services.grant_not_adjustable` and rolls back.
@@ -25,6 +26,8 @@ WHERE g.id = :grant_id
   AND TRIM(COALESCE(:reason, '')) <> ''
   AND CAST(:uses_delta AS BIGINT) >= 0
   AND CAST(:days_delta AS BIGINT) >= 0
+  AND CAST(:uses_delta AS BIGINT) <= 100
+  AND CAST(:days_delta AS BIGINT) <= 366
   AND (CAST(:uses_delta AS BIGINT) > 0 OR CAST(:days_delta AS BIGINT) > 0)
   AND (CAST(:uses_delta AS BIGINT) = 0 OR g.max_uses IS NOT NULL)
   AND (CAST(:days_delta AS BIGINT) = 0 OR g.validity_days IS NOT NULL);

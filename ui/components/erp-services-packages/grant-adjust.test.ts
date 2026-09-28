@@ -250,6 +250,32 @@ describe('adjusting a sold voucher', () => {
     expect(submit.hasAttribute('disabled')).toBe(false);
   });
 
+  it('cannot be sent past the limit it promises: 100 sessions and 366 days at once', async () => {
+    const el = await mount();
+    await open(el);
+    el.askAdjust(LIVE);
+    el.adjustReason = 'closed';
+    const submit = () => hook(el, 'services-packages-grant-adjust-submit') as HTMLElement;
+
+    el.adjustUses = '101';
+    await el.updateComplete;
+    expect(submit().hasAttribute('disabled')).toBe(true);
+    await el.confirmAdjust();
+    expect(sent).toEqual([]);
+
+    el.adjustUses = '1';
+    el.adjustDays = '367';
+    await el.updateComplete;
+    expect(submit().hasAttribute('disabled')).toBe(true);
+    await el.confirmAdjust();
+    expect(sent).toEqual([]);
+
+    el.adjustUses = '100';
+    el.adjustDays = '366';
+    await el.updateComplete;
+    expect(submit().hasAttribute('disabled')).toBe(false);
+  });
+
   it('previews what the customer will have before anything is sent', async () => {
     const el = await mount();
     await open(el);

@@ -1310,6 +1310,12 @@ fn void_refusal_for(reason: &str) -> DomainError {
 /// The read that decides whether a sold voucher may take more sessions or days (services#118).
 const READ_ADJUST_CHECK: &str = "services.packages.adjust_check";
 
+/// Most sessions / days ONE courtesy may add (services#118) — what the screen promises («up to 100»,
+/// «up to 366») and `commands/_adjust_grant.sql` repeats. Past it the amount is a typo: ten million
+/// days is a date no later read of the voucher can compute.
+const ADJUST_MAX_USES: i64 = 100;
+const ADJUST_MAX_DAYS: i64 = 366;
+
 /// Logic of `services.packages.adjust_grant` — a courtesy on a SOLD voucher (services#118): «one
 /// more session on the house», «extended a month because we were closed».
 ///
@@ -1344,13 +1350,16 @@ pub fn adjust_grant_pure(input: Value) -> Result<Output, String> {
         parse_int(payload.get("uses_delta")),
         parse_int(payload.get("days_delta")),
     ) {
-        (Ok(u), Ok(d)) if u.unwrap_or(0) >= 0 && d.unwrap_or(0) >= 0 => {
+        (Ok(u), Ok(d))
+            if (0..=ADJUST_MAX_USES).contains(&u.unwrap_or(0))
+                && (0..=ADJUST_MAX_DAYS).contains(&d.unwrap_or(0)) =>
+        {
             (u.unwrap_or(0), d.unwrap_or(0))
         }
         _ => {
             return Ok(Output::new().with_error(redeem_refusal(
                 "services.grant_adjust_invalid",
-                "Sessions and days to add must be whole numbers, zero or more.",
+                "Sessions to add must be a whole number from 0 to 100, and days from 0 to 366.",
             )))
         }
     };
@@ -2758,6 +2767,24 @@ mod tests {
             assert_eq!(adjust_code(&out), Some("services.grant_adjust_invalid"), "payload {payload}");
             assert!(out.operations.is_empty());
         }
+    }
+
+    /// The screen promises «up to 100» sessions and «up to 366» days per adjustment: past that it is
+    /// a typo (ten million days is a date no later read can compute), refused before any write.
+    #[test]
+    fn an_amount_past_the_limit_is_refused_and_the_limit_itself_goes_through() {
+        for payload in [
+            json!({ "grant_id": "gr-1", "uses_delta": 101, "reason": "Typo" }),
+            json!({ "grant_id": "gr-1", "days_delta": 367, "reason": "Typo" }),
+            json!({ "grant_id": "gr-1", "uses_delta": 1, "days_delta": 10_000_000, "reason": "Typo" }),
+        ] {
+            let out = adjust_grant_pure(adjust_input(Some(adjustable_row()), payload.clone())).unwrap();
+            assert_eq!(adjust_code(&out), Some("services.grant_adjust_invalid"), "payload {payload}");
+            assert!(out.operations.is_empty());
+        }
+        let limit = json!({ "grant_id": "gr-1", "uses_delta": 100, "days_delta": 366, "reason": "Closed" });
+        let out = adjust_grant_pure(adjust_input(Some(adjustable_row()), limit)).unwrap();
+        assert!(out.error.is_none(), "the limit itself is a valid adjustment, got {out:?}");
     }
 
     /// 🔴 A courtesy with a blank reason does not exist: nothing to audit.
