@@ -4124,7 +4124,8 @@ var es_default = {
       consumed: "Entregada",
       released: "Liberada",
       refunded: "Devuelta",
-      expired: "Caducada"
+      expired: "Caducada",
+      adjusted: "Cortes\xEDa"
     },
     openOrphans: "Bonos sin cliente",
     orphansTitle: "Bonos sin cliente",
@@ -4140,7 +4141,7 @@ var es_default = {
     orphansMore: "Cargar m\xE1s",
     actionGrants: "Bonos vendidos",
     grantsTitle: "Bonos vendidos",
-    grantsHint: "cada cliente que ha comprado este bono, con las sesiones usadas y las que le quedan. Una venta de la que no se ha usado nada se puede anular.",
+    grantsHint: "todos los clientes que han comprado este bono, con las sesiones usadas y las que quedan. A un bono vivo se le pueden regalar sesiones o alargar la caducidad; una venta de la que no se ha usado nada se puede anular.",
     emptyGrants: "Nadie ha comprado este bono todav\xEDa.",
     errorGrants: "No se han podido cargar los bonos vendidos",
     grantsCount: "Se muestran {shown} de {total}",
@@ -4159,7 +4160,23 @@ var es_default = {
     voidReasonLabel: "Motivo",
     voidReasonHelp: "Obligatorio. Queda en el registro del bono, p. ej. \xABvendido al cliente equivocado\xBB.",
     errorVoidGrant: "No se ha podido anular el bono",
-    nameLoading: "Cargando nombre\u2026"
+    nameLoading: "Cargando nombre\u2026",
+    grantExpires: "Caduca el {when}",
+    grantNoExpiry: "No caduca",
+    grantAdjusted: "Regalado despu\xE9s: +{uses} sesi\xF3n(es), +{days} d\xEDa(s)",
+    actionAdjustGrant: "Ajustar",
+    adjustGrantTitle: "Ajustar este bono",
+    adjustGrantHint: "Regala al cliente {customer} sesiones extra o alarga la caducidad sin cobrar. Queda en los movimientos del bono con qui\xE9n, cu\xE1ndo y por qu\xE9.",
+    adjustUsesLabel: "Sesiones que se a\xF1aden",
+    adjustUsesHelp: "Quedan {remaining}. Hasta 100.",
+    adjustDaysLabel: "D\xEDas que se alarga",
+    adjustDaysHelp: "Ahora caduca el {when}. Hasta 366.",
+    adjustReasonHelp: "Obligatorio. Queda en el registro del bono, p. ej. \xABcerramos en agosto\xBB.",
+    adjustPreview: "Tras el ajuste: quedan {remaining} sesi\xF3n(es) \xB7 caduca el {when}",
+    adjustPreviewUnlimited: "sin l\xEDmite de",
+    errorAdjustGrant: "No se pudo ajustar el bono",
+    movementAdjusted: "+{uses} sesi\xF3n(es) \xB7 +{days} d\xEDa(s)",
+    movementAdjustedBy: "Regalado por {who}"
   },
   errors: {
     "services.category_unavailable": "Esa categor\xEDa no est\xE1 disponible: no existe en este negocio o se ha eliminado.",
@@ -4188,7 +4205,13 @@ var es_default = {
     "services.grant_already_voided": "Ese bono ya estaba anulado.",
     "services.grant_in_use": "Ese bono ya se ha usado: no se puede anular.",
     "services.grant_void_reason_required": "Indica por qu\xE9 se anula este bono: el motivo queda en su registro.",
-    "services.grant_not_voidable": "Ese bono no se puede anular ahora: se ha usado o anulado mientras tanto. Recarga la lista y vuelve a intentarlo."
+    "services.grant_not_voidable": "Ese bono no se puede anular ahora: se ha usado o anulado mientras tanto. Recarga la lista y vuelve a intentarlo.",
+    "services.grant_adjust_reason_required": "Indica por qu\xE9 se ajusta este bono: el motivo queda en su registro.",
+    "services.grant_adjust_invalid": "Las sesiones y los d\xEDas que se a\xF1aden tienen que ser n\xFAmeros enteros, cero o m\xE1s.",
+    "services.grant_adjust_empty": "A\xF1ade al menos una sesi\xF3n o un d\xEDa.",
+    "services.grant_unlimited": "Ese bono no tiene l\xEDmite de sesiones: no hay sesiones que a\xF1adir.",
+    "services.grant_no_expiry": "Ese bono no caduca: no hay caducidad que alargar.",
+    "services.grant_not_adjustable": "Ese bono no se puede ajustar ahora: se ha anulado mientras tanto. Recarga la lista y vuelve a intentarlo."
   }
 };
 
@@ -4395,7 +4418,8 @@ var en_default = {
       consumed: "Delivered",
       released: "Released",
       refunded: "Given back",
-      expired: "Expired"
+      expired: "Expired",
+      adjusted: "Courtesy"
     },
     openOrphans: "Vouchers with no customer",
     orphansTitle: "Vouchers with no customer",
@@ -4411,7 +4435,7 @@ var en_default = {
     orphansMore: "Load more",
     actionGrants: "Sold vouchers",
     grantsTitle: "Sold vouchers",
-    grantsHint: "every customer who bought this voucher, with the sessions used and left. A sale nothing was used from can be voided.",
+    grantsHint: "every customer who bought this voucher, with the sessions used and left. A live voucher can get extra sessions or a later expiry as a courtesy; a sale nothing was used from can be voided.",
     emptyGrants: "Nobody has bought this voucher yet.",
     errorGrants: "Could not load the sold vouchers",
     grantsCount: "Showing {shown} of {total}",
@@ -4430,7 +4454,23 @@ var en_default = {
     voidReasonLabel: "Reason",
     voidReasonHelp: "Required. It stays on the voucher's record, e.g. \xABsold to the wrong customer\xBB.",
     errorVoidGrant: "Could not void the voucher",
-    nameLoading: "Loading name\u2026"
+    nameLoading: "Loading name\u2026",
+    grantExpires: "Expires {when}",
+    grantNoExpiry: "Never expires",
+    grantAdjusted: "Given afterwards: +{uses} session(s), +{days} day(s)",
+    actionAdjustGrant: "Adjust",
+    adjustGrantTitle: "Adjust this voucher",
+    adjustGrantHint: "Give customer {customer} extra sessions or a later expiry at no charge. It is recorded in the voucher's movements with who, when and why.",
+    adjustUsesLabel: "Sessions to add",
+    adjustUsesHelp: "{remaining} left now. Up to 100.",
+    adjustDaysLabel: "Days to extend",
+    adjustDaysHelp: "Expires {when} now. Up to 366.",
+    adjustReasonHelp: "Required. It stays on the voucher's record, e.g. \xABwe were closed in August\xBB.",
+    adjustPreview: "After the adjustment: {remaining} session(s) left \xB7 expires {when}",
+    adjustPreviewUnlimited: "no limit of",
+    errorAdjustGrant: "Could not adjust the voucher",
+    movementAdjusted: "+{uses} session(s) \xB7 +{days} day(s)",
+    movementAdjustedBy: "Given by {who}"
   },
   errors: {
     "services.category_unavailable": "That category is not available: it does not exist in this business or it has been deleted.",
@@ -4459,7 +4499,13 @@ var en_default = {
     "services.grant_already_voided": "That voucher was already voided.",
     "services.grant_in_use": "That voucher was already used: it cannot be voided.",
     "services.grant_void_reason_required": "Say why this voucher is being voided: the reason stays on its record.",
-    "services.grant_not_voidable": "That voucher cannot be voided right now: it was used or voided in the meantime. Reload the list and try again."
+    "services.grant_not_voidable": "That voucher cannot be voided right now: it was used or voided in the meantime. Reload the list and try again.",
+    "services.grant_adjust_reason_required": "Say why this voucher is being adjusted: the reason stays on its record.",
+    "services.grant_adjust_invalid": "Sessions and days to add must be whole numbers, zero or more.",
+    "services.grant_adjust_empty": "Add at least one session or one day.",
+    "services.grant_unlimited": "That voucher has no session limit: there are no sessions to add.",
+    "services.grant_no_expiry": "That voucher never expires: there is no expiry to extend.",
+    "services.grant_not_adjustable": "That voucher cannot be adjusted right now: it was voided in the meantime. Reload the list and try again."
   }
 };
 
@@ -5537,6 +5583,12 @@ var ErpServicesPackages = class extends i3 {
     this.voidReason = "";
     this.voiding = false;
     this.voidError = "";
+    this.adjustTarget = null;
+    this.adjustUses = "";
+    this.adjustDays = "";
+    this.adjustReason = "";
+    this.adjusting = false;
+    this.adjustError = "";
     this.onLocaleChange = () => this.requestUpdate();
   }
   static {
@@ -5736,7 +5788,10 @@ var ErpServicesPackages = class extends i3 {
       const rows = page?.rows ?? [];
       this.movements = [...this.movements, ...rows];
       this.movementsTotal = page?.total ?? this.movements.length;
-      this.resolveNames(rows.map((m4) => m4.customer_id), rows.map((m4) => m4.refunded_by));
+      this.resolveNames(
+        rows.map((m4) => m4.customer_id),
+        rows.map((m4) => m4.movement === "adjusted" ? m4.created_by ?? null : m4.refunded_by)
+      );
     } catch (e6) {
       if (this.movementsOf !== target) return;
       this.movementsError = domainMessage(e6, erplora3().locale, erplora3().t(CATALOG3, "ui.errorMovements"));
@@ -5785,6 +5840,7 @@ var ErpServicesPackages = class extends i3 {
     this.grantsOf = { id: p4.id, name: p4.name };
     this.forgetNames();
     this.voidTarget = null;
+    this.adjustTarget = null;
     await this.reloadGrants();
   }
   async reloadGrants() {
@@ -5882,9 +5938,11 @@ var ErpServicesPackages = class extends i3 {
   closeGrants() {
     this.grantsOf = null;
     this.voidTarget = null;
+    this.adjustTarget = null;
   }
   /** Ask to void a sale: the sheet swaps its list for the confirmation, reason still blank. */
   askVoid(grant) {
+    this.adjustTarget = null;
     this.voidTarget = grant;
     this.voidReason = "";
     this.voidError = "";
@@ -5915,6 +5973,68 @@ var ErpServicesPackages = class extends i3 {
       this.voidError = domainMessage(e6, erplora3().locale, erplora3().t(CATALOG3, "ui.errorVoidGrant"));
     } finally {
       this.voiding = false;
+    }
+  }
+  /** Ask to adjust a sale (services#118): the sheet swaps its list for the courtesy form, blank. */
+  askAdjust(grant) {
+    this.voidTarget = null;
+    this.adjustTarget = grant;
+    this.adjustUses = "";
+    this.adjustDays = "";
+    this.adjustReason = "";
+    this.adjustError = "";
+  }
+  cancelAdjust() {
+    this.adjustTarget = null;
+    this.adjustError = "";
+  }
+  /**
+   * What the form would send: whole numbers, 0 for a blank field AND for a half the voucher cannot
+   * take (no sessions on an unlimited voucher, no days on one that never expires — the field is not
+   * even painted, but a value typed for another sale must not travel). `null` when a field is not a
+   * whole number ≥ 0 or nothing is added: the button stays disabled.
+   */
+  adjustAmounts() {
+    const target = this.adjustTarget;
+    if (!target) return null;
+    const read = (raw, allowed) => {
+      if (!allowed) return 0;
+      const text = raw.trim();
+      if (!text) return 0;
+      return /^\d+$/.test(text) ? Number(text) : null;
+    };
+    const uses = read(this.adjustUses, target.max_uses != null);
+    const days = read(this.adjustDays, target.expires_at != null);
+    if (uses === null || days === null || uses + days === 0) return null;
+    return { uses, days };
+  }
+  /**
+   * Give the courtesy. The reason is mandatory and something must be added — a blank form is not
+   * even sent (the handler refuses it too). On success the list is READ AGAIN: the server says what
+   * the voucher is worth now. A refusal stays on the form with the module's own sentence.
+   */
+  async confirmAdjust() {
+    const target = this.adjustTarget;
+    const reason = this.adjustReason.trim();
+    const amounts = this.adjustAmounts();
+    if (!target || !reason || !amounts || this.adjusting || !can3("services.adjust_grant")) return;
+    this.adjusting = true;
+    this.adjustError = "";
+    try {
+      await erplora3().command("services.packages.adjust_grant", {
+        grant_id: target.grant_id,
+        uses_delta: amounts.uses,
+        days_delta: amounts.days,
+        reason
+      });
+      if (this.adjustTarget !== target) return;
+      this.adjustTarget = null;
+      await this.reloadGrants();
+    } catch (e6) {
+      if (this.adjustTarget !== target) return;
+      this.adjustError = domainMessage(e6, erplora3().locale, erplora3().t(CATALOG3, "ui.errorAdjustGrant"));
+    } finally {
+      this.adjusting = false;
     }
   }
   /** Back to a clean CREATE form. */
@@ -6006,6 +6126,12 @@ var ErpServicesPackages = class extends i3 {
       </ion-content>
     </ion-modal>`;
   }
+  /** A day (an expiry), in the hub's locale. */
+  day(value) {
+    if (!value) return "\u2014";
+    const d3 = new Date(value);
+    return Number.isNaN(d3.getTime()) ? value : d3.toLocaleDateString(erplora3().locale, { dateStyle: "short" });
+  }
   /** A movement's date, in the hub's locale. An unparseable or absent stamp prints as «—». */
   stamp(value) {
     if (!value) return "\u2014";
@@ -6022,6 +6148,7 @@ var ErpServicesPackages = class extends i3 {
       case "expired":
         return "neutral";
       case "held":
+      case "adjusted":
         return "info";
       default:
         return "success";
@@ -6030,6 +6157,18 @@ var ErpServicesPackages = class extends i3 {
   renderMovement(m4) {
     const t5 = (k2, p4) => erplora3().t(CATALOG3, k2, p4);
     const refunded = m4.movement === "refunded";
+    if (m4.movement === "adjusted") {
+      return b2`<ion-item class="movement">
+        <ion-label class="ion-text-wrap">
+          <h3>
+            <ok-status-pill size="sm" tone=${this.movementTone(m4.movement)}>${t5("ui.movement.adjusted")}</ok-status-pill>
+            ${t5("ui.movementAdjusted", { uses: Number(m4.uses_delta) || 0, days: Number(m4.days_delta) || 0 })}
+          </h3>
+          <p>${this.stamp(m4.redeemed_at)} · ${t5("ui.movementCustomer")}: ${this.customerLabel(m4.customer_id)}</p>
+          <p class="refund">${t5("ui.movementAdjustedBy", { who: this.userLabel(m4.created_by ?? null) })}${m4.adjust_reason ? b2` · ${m4.adjust_reason}` : A}</p>
+        </ion-label>
+      </ion-item>`;
+    }
     return b2`<ion-item class="movement">
       <ion-label class="ion-text-wrap">
         <h3>
@@ -6122,6 +6261,9 @@ var ErpServicesPackages = class extends i3 {
     const t5 = (k2, p4) => erplora3().t(CATALOG3, k2, p4);
     const voided = g3.status === "voided";
     const voidable = Number(g3.can_void) === 1 && can3("services.void_grant");
+    const adjustable = Number(g3.can_adjust) === 1 && can3("services.adjust_grant");
+    const giftedUses = Number(g3.adjusted_uses) || 0;
+    const giftedDays = Number(g3.adjusted_days) || 0;
     return b2`<ion-item class="movement">
       <ion-label class="ion-text-wrap">
         <h3>
@@ -6133,10 +6275,47 @@ var ErpServicesPackages = class extends i3 {
           · ${g3.max_uses == null ? t5("ui.grantUsesUnlimited", { used: Number(g3.used) || 0 }) : t5("ui.grantUses", { used: Number(g3.used) || 0, remaining: Number(g3.remaining) || 0 })}
           ${g3.sale_id ? b2` · ${t5("ui.movementSale")}: ${g3.sale_id}` : A}
         </p>
+        <p>
+          ${g3.expires_at ? t5("ui.grantExpires", { when: this.day(g3.expires_at) }) : t5("ui.grantNoExpiry")}
+          ${giftedUses || giftedDays ? b2` · ${t5("ui.grantAdjusted", { uses: giftedUses, days: giftedDays })}` : A}
+        </p>
         ${voided ? b2`<p class="refund">${t5("ui.grantVoidedBy", { who: this.userLabel(g3.voided_by), when: this.stamp(g3.voided_at) })}${g3.void_reason ? b2` · ${g3.void_reason}` : A}</p>` : A}
       </ion-label>
+      ${adjustable ? b2`<ion-button slot="end" size="small" fill="clear" data-testid=${`services-packages-grant-adjust-${g3.grant_id}`} @click=${() => this.askAdjust(g3)}>${t5("ui.actionAdjustGrant")}</ion-button>` : A}
       ${voidable ? b2`<ion-button slot="end" size="small" fill="clear" data-testid=${`services-packages-grant-void-${g3.grant_id}`} style=${ionTone("text", "danger")} @click=${() => this.askVoid(g3)}>${t5("ui.actionVoidGrant")}</ion-button>` : A}
     </ion-item>`;
+  }
+  /** The courtesy form (services#118): only the halves the voucher can take, a mandatory reason, and
+   *  a preview of what the customer will have — the server re-computes it, this is for the eye. */
+  renderAdjustForm(g3) {
+    const t5 = (k2, p4) => erplora3().t(CATALOG3, k2, p4);
+    const amounts = this.adjustAmounts();
+    const hasLimit = g3.max_uses != null;
+    const expires = g3.expires_at != null;
+    const newRemaining = hasLimit ? (Number(g3.remaining) || 0) + (amounts?.uses ?? 0) : null;
+    let newExpiry = null;
+    if (expires) {
+      const d3 = new Date(String(g3.expires_at));
+      if (!Number.isNaN(d3.getTime())) {
+        d3.setUTCDate(d3.getUTCDate() + (amounts?.days ?? 0));
+        newExpiry = d3.toISOString();
+      }
+    }
+    return b2`<p>${t5("ui.adjustGrantHint", { customer: this.customerLabel(g3.customer_id) })}</p>
+      ${hasLimit ? b2`<ion-input data-testid="services-packages-grant-adjust-uses" fill="outline" mode="md" label-placement="floating" label=${t5("ui.adjustUsesLabel")} helper-text=${t5("ui.adjustUsesHelp", { remaining: Number(g3.remaining) || 0 })} type="number" inputmode="numeric" min="0" max="100" step="1" .value=${this.adjustUses} @ionInput=${(e6) => this.adjustUses = String(e6.target.value ?? "")}></ion-input>` : A}
+      ${expires ? b2`<ion-input data-testid="services-packages-grant-adjust-days" fill="outline" mode="md" label-placement="floating" label=${t5("ui.adjustDaysLabel")} helper-text=${t5("ui.adjustDaysHelp", { when: this.day(g3.expires_at) })} type="number" inputmode="numeric" min="0" max="366" step="1" .value=${this.adjustDays} @ionInput=${(e6) => this.adjustDays = String(e6.target.value ?? "")}></ion-input>` : A}
+      <ion-textarea data-testid="services-packages-grant-adjust-reason" fill="outline" mode="md" label-placement="floating" label=${t5("ui.voidReasonLabel")} helper-text=${t5("ui.adjustReasonHelp")} auto-grow maxlength="500" .value=${this.adjustReason} @ionInput=${(e6) => this.adjustReason = String(e6.target.value ?? "")}></ion-textarea>
+      <ok-inline-feedback data-testid="services-packages-grant-adjust-preview" tone="info" icon="gift-outline">
+        ${t5("ui.adjustPreview", {
+      remaining: newRemaining == null ? t5("ui.adjustPreviewUnlimited") : newRemaining,
+      when: newExpiry ? this.day(newExpiry) : t5("ui.grantNoExpiry")
+    })}
+      </ok-inline-feedback>
+      ${this.adjustError ? b2`<ok-inline-feedback data-testid="services-packages-grant-adjust-error" tone="danger" icon="alert-circle-outline">${this.adjustError}</ok-inline-feedback>` : A}
+      <ion-button class="ion-margin-top" expand="block" data-testid="services-packages-grant-adjust-submit" ?disabled=${this.adjusting || !amounts || !this.adjustReason.trim()} @click=${() => this.confirmAdjust()}>
+        ${this.adjusting ? t5("ui.btnSaving") : t5("ui.actionAdjustGrant")}
+      </ion-button>
+      <ion-button expand="block" fill="outline" data-testid="services-packages-grant-adjust-cancel" ?disabled=${this.adjusting} @click=${() => this.cancelAdjust()}>${t5("ui.btnCancel")}</ion-button>`;
   }
   renderVoidConfirm(g3) {
     const t5 = (k2, p4) => erplora3().t(CATALOG3, k2, p4);
@@ -6151,10 +6330,11 @@ var ErpServicesPackages = class extends i3 {
   renderGrants() {
     const t5 = (k2, p4) => erplora3().t(CATALOG3, k2, p4);
     const confirming = this.voidTarget;
+    const adjusting = this.adjustTarget;
     return b2`<ion-modal .isOpen=${!!this.grantsOf} @ionModalDidDismiss=${() => this.closeGrants()}>
       <ion-header class="ion-no-border">
         <ion-toolbar>
-          <ion-title>${confirming ? t5("ui.voidGrantTitle") : t5("ui.grantsTitle")}</ion-title>
+          <ion-title>${confirming ? t5("ui.voidGrantTitle") : adjusting ? t5("ui.adjustGrantTitle") : t5("ui.grantsTitle")}</ion-title>
           <ion-buttons slot="end">
             <ion-button data-testid="services-packages-grants-close" @click=${() => this.closeGrants()}>${t5("ui.btnClose")}</ion-button>
           </ion-buttons>
@@ -6162,7 +6342,7 @@ var ErpServicesPackages = class extends i3 {
       </ion-header>
       <ion-content class="ion-padding">
         <!-- Self-styled: ion-modal is reparented to <body>, this component's CSS does not reach it. -->
-        ${confirming ? this.renderVoidConfirm(confirming) : b2`<p><b>${this.grantsOf?.name ?? ""}</b> — ${t5("ui.grantsHint")}</p>
+        ${confirming ? this.renderVoidConfirm(confirming) : adjusting ? this.renderAdjustForm(adjusting) : b2`<p><b>${this.grantsOf?.name ?? ""}</b> — ${t5("ui.grantsHint")}</p>
             ${this.grantsError ? b2`<ok-inline-feedback data-testid="services-packages-grants-error" tone="danger" icon="alert-circle-outline">${this.grantsError}</ok-inline-feedback>` : A}
             ${this.grants.length === 0 ? this.grantsLoading ? b2`<ok-inline-feedback data-testid="services-packages-grants-loading" tone="neutral" icon="time-outline">${t5("ui.loading")}</ok-inline-feedback>` : this.grantsError ? A : b2`<ok-inline-feedback data-testid="services-packages-grants-empty" tone="neutral" icon="information-circle-outline">${t5("ui.emptyGrants")}</ok-inline-feedback>` : b2`<ion-list lines="full">${this.grants.map((g3) => this.renderGrant(g3))}</ion-list>
                   ${this.grants.length < this.grantsTotal ? b2`<p class="more">${t5("ui.grantsCount", { shown: this.grants.length, total: this.grantsTotal })}</p>
@@ -6325,6 +6505,24 @@ __decorateClass([
 __decorateClass([
   r5()
 ], ErpServicesPackages.prototype, "voidError", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "adjustTarget", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "adjustUses", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "adjustDays", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "adjustReason", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "adjusting", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "adjustError", 2);
 define("erp-services-packages", ErpServicesPackages);
 
 // ui/components/erp-services-session-refund/erp-services-session-refund.ts
