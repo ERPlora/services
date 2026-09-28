@@ -314,6 +314,8 @@ export class ErpServicesPackages extends LitElement {
   @state() adjustUses = '';
   @state() adjustDays = '';
   @state() adjustReason = '';
+  /** services#119: the sessions field ADDS (a courtesy) or REMOVES (a balance correction). */
+  @state() adjustDirection: 'add' | 'remove' = 'add';
   @state() adjusting = false;
   @state() adjustError = '';
 
@@ -757,6 +759,7 @@ export class ErpServicesPackages extends LitElement {
   askAdjust(grant: SoldGrant): void {
     this.voidTarget = null;
     this.adjustTarget = grant;
+    this.adjustDirection = 'add';
     this.adjustUses = '';
     this.adjustDays = '';
     this.adjustReason = '';
@@ -773,7 +776,8 @@ export class ErpServicesPackages extends LitElement {
    * take (no sessions on an unlimited voucher, no days on one that never expires — the field is not
    * even painted, but a value typed for another sale must not travel). `null` when a field is not a
    * whole number from 0 to its limit (100 sessions, 366 days) or nothing is added: the button stays
-   * disabled.
+   * disabled. Removing sessions (services#119) travels NEGATIVE and its limit is what the customer
+   * has left — the handler and the write refuse more as `services.grant_adjust_below_used`.
    */
   private adjustAmounts(): { uses: number; days: number } | null {
     const target = this.adjustTarget;
@@ -784,11 +788,18 @@ export class ErpServicesPackages extends LitElement {
       if (!text) return 0;
       return /^\d+$/.test(text) && Number(text) <= max ? Number(text) : null;
     };
-    // The limits the helper texts promise («up to 100», «up to 366»); the handler and the write repeat them.
-    const uses = read(this.adjustUses, target.max_uses != null, 100);
+    // The limits the helper texts promise («up to 100», «up to 366», «up to what is left»); the
+    // handler and the write repeat them.
+    const removing = this.adjustDirection === 'remove';
+    const uses = read(this.adjustUses, target.max_uses != null, removing ? this.removableUses(target) : 100);
     const days = read(this.adjustDays, target.expires_at != null, 366);
     if (uses === null || days === null || uses + days === 0) return null;
-    return { uses, days };
+    return { uses: removing ? -uses : uses, days };
+  }
+
+  /** Most sessions a correction may take from a sale: what is left, and never past 100 at once. */
+  private removableUses(g: SoldGrant): number {
+    return Math.min(100, Math.max(0, Number(g.remaining) || 0));
   }
 
   /**
@@ -957,14 +968,18 @@ export class ErpServicesPackages extends LitElement {
     const t = (k: string, p?: Record<string, unknown>): string => erplora().t(CATALOG, k, p);
     const refunded = m.movement === 'refunded';
     if (m.movement === 'adjusted') {
+      // A negative session count is a balance correction (services#119), not a courtesy.
+      const uses = Number(m.uses_delta) || 0;
+      const days = Number(m.days_delta) || 0;
+      const corrected = uses < 0;
       return html`<ion-item class="movement">
         <ion-label class="ion-text-wrap">
           <h3>
-            <ok-status-pill size="sm" tone=${this.movementTone(m.movement)}>${t('ui.movement.adjusted')}</ok-status-pill>
-            ${t('ui.movementAdjusted', { uses: Number(m.uses_delta) || 0, days: Number(m.days_delta) || 0 })}
+            <ok-status-pill size="sm" tone=${this.movementTone(m.movement)}>${t(corrected ? 'ui.movement.corrected' : 'ui.movement.adjusted')}</ok-status-pill>
+            ${corrected ? t('ui.movementCorrected', { uses: -uses, days }) : t('ui.movementAdjusted', { uses, days })}
           </h3>
           <p>${this.stamp(m.redeemed_at)} · ${t('ui.movementCustomer')}: ${this.customerLabel(m.customer_id)}</p>
-          <p class="refund">${t('ui.movementAdjustedBy', { who: this.userLabel(m.created_by ?? null) })}${m.adjust_reason ? html` · ${m.adjust_reason}` : nothing}</p>
+          <p class="refund">${t(corrected ? 'ui.movementCorrectedBy' : 'ui.movementAdjustedBy', { who: this.userLabel(m.created_by ?? null) })}${m.adjust_reason ? html` · ${m.adjust_reason}` : nothing}</p>
         </ion-label>
       </ion-item>`;
     }
@@ -1109,7 +1124,11 @@ export class ErpServicesPackages extends LitElement {
         </p>
         <p>
           ${g.expires_at ? t('ui.grantExpires', { when: this.day(g.expires_at) }) : t('ui.grantNoExpiry')}
-          ${giftedUses || giftedDays ? html` · ${t('ui.grantAdjusted', { uses: giftedUses, days: giftedDays })}` : nothing}
+          ${giftedUses < 0
+            ? html` · ${t('ui.grantCorrected', { uses: -giftedUses, days: giftedDays })}`
+            : giftedUses || giftedDays
+            ? html` · ${t('ui.grantAdjusted', { uses: giftedUses, days: giftedDays })}`
+            : nothing}
         </p>
         ${voided
           ? html`<p class="refund">${t('ui.grantVoidedBy', { who: this.userLabel(g.voided_by), when: this.stamp(g.voided_at) })}${g.void_reason ? html` · ${g.void_reason}` : nothing}</p>`
@@ -1124,8 +1143,9 @@ export class ErpServicesPackages extends LitElement {
     </ion-item>`;
   }
 
-  /** The courtesy form (services#118): only the halves the voucher can take, a mandatory reason, and
-   *  a preview of what the customer will have — the server re-computes it, this is for the eye. */
+  /** The adjust form (services#118): only the halves the voucher can take, a mandatory reason, and
+   *  a preview of what the customer will have — the server re-computes it, this is for the eye.
+   *  On a voucher with a session limit the sessions ADD or REMOVE (services#119, a correction). */
   private renderAdjustForm(g: SoldGrant) {
     const t = (k: string, p?: Record<string, unknown>): string => erplora().t(CATALOG, k, p);
     const amounts = this.adjustAmounts();
@@ -1140,15 +1160,20 @@ export class ErpServicesPackages extends LitElement {
         newExpiry = d.toISOString();
       }
     }
+    const removing = this.adjustDirection === 'remove';
     return html`<p>${t('ui.adjustGrantHint', { customer: this.customerLabel(g.customer_id) })}</p>
       ${hasLimit
-        ? html`<ion-input data-testid="services-packages-grant-adjust-uses" class="ion-margin-top" fill="outline" mode="md" label-placement="floating" label=${t('ui.adjustUsesLabel')} helper-text=${t('ui.adjustUsesHelp', { remaining: Number(g.remaining) || 0 })} type="number" inputmode="numeric" min="0" max="100" step="1" .value=${this.adjustUses} @ionInput=${(e: any) => (this.adjustUses = String(e.target.value ?? ''))}></ion-input>`
+        ? html`<ion-segment data-testid="services-packages-grant-adjust-direction" class="ion-margin-top" .value=${this.adjustDirection} ?disabled=${this.adjusting} @ionChange=${(e: any) => (this.adjustDirection = e.detail?.value === 'remove' ? 'remove' : 'add')}>
+              <ion-segment-button data-testid="services-packages-grant-adjust-direction-add" value="add"><ion-label>${t('ui.adjustAddSessions')}</ion-label></ion-segment-button>
+              <ion-segment-button data-testid="services-packages-grant-adjust-direction-remove" value="remove"><ion-label>${t('ui.adjustRemoveSessions')}</ion-label></ion-segment-button>
+            </ion-segment>
+            <ion-input data-testid="services-packages-grant-adjust-uses" class="ion-margin-top" fill="outline" mode="md" label-placement="floating" label=${t(removing ? 'ui.adjustRemoveUsesLabel' : 'ui.adjustUsesLabel')} helper-text=${t(removing ? 'ui.adjustRemoveUsesHelp' : 'ui.adjustUsesHelp', { remaining: Number(g.remaining) || 0 })} type="number" inputmode="numeric" min="0" max=${removing ? this.removableUses(g) : 100} step="1" .value=${this.adjustUses} @ionInput=${(e: any) => (this.adjustUses = String(e.target.value ?? ''))}></ion-input>`
         : nothing}
       ${expires
         ? html`<ion-input data-testid="services-packages-grant-adjust-days" class="ion-margin-top" fill="outline" mode="md" label-placement="floating" label=${t('ui.adjustDaysLabel')} helper-text=${t('ui.adjustDaysHelp', { when: this.day(g.expires_at) })} type="number" inputmode="numeric" min="0" max="366" step="1" .value=${this.adjustDays} @ionInput=${(e: any) => (this.adjustDays = String(e.target.value ?? ''))}></ion-input>`
         : nothing}
       <ion-textarea data-testid="services-packages-grant-adjust-reason" class="ion-margin-top" fill="outline" mode="md" label-placement="floating" label=${t('ui.voidReasonLabel')} helper-text=${t('ui.adjustReasonHelp')} auto-grow maxlength="500" .value=${this.adjustReason} @ionInput=${(e: any) => (this.adjustReason = String(e.target.value ?? ''))}></ion-textarea>
-      <ok-inline-feedback data-testid="services-packages-grant-adjust-preview" tone="info" icon="gift-outline">
+      <ok-inline-feedback data-testid="services-packages-grant-adjust-preview" tone="info" icon=${removing ? 'remove-circle-outline' : 'gift-outline'}>
         ${t('ui.adjustPreview', {
           remaining: newRemaining == null ? t('ui.adjustPreviewUnlimited') : newRemaining,
           when: newExpiry ? this.day(newExpiry) : t('ui.grantNoExpiry'),

@@ -7,9 +7,22 @@
 -- extended and one that never expires can still take a session, so a single «adjustable» flag
 -- would refuse half of what the salon asked for. A grant soft-deleted without a void stamp does
 -- not exist for this door: `grant_not_found`.
+--
+-- `uses_left` is the floor of a balance CORRECTION (services#119, a negative `uses_delta`): the
+-- sessions the customer has left now — the grant's snapshot plus its live movements, minus the
+-- live sessions spent against it (held ones included, an expired hold not: the same count as
+-- `services.packages.balance`). NULL on an unlimited voucher or a grant that is not here. The
+-- handler refuses taking more than this as `services.grant_adjust_below_used`, and
+-- `_adjust_grant.sql` repeats the count inside the transaction.
 WITH grant_row AS (
-    SELECT id, package_id, customer_id, is_deleted, voided_at, max_uses, validity_days
-      FROM services_package_grant
+    SELECT id, package_id, customer_id, is_deleted, voided_at, max_uses, validity_days,
+           max_uses
+             + COALESCE((SELECT CAST(SUM(a.uses_delta) AS BIGINT) FROM services_package_grant_adjustment a
+                          WHERE a.hub_id = g.hub_id AND a.grant_id = g.id AND a.is_deleted = 0), 0)
+             - (SELECT COUNT(*) FROM services_package_redemption r
+                 WHERE r.hub_id = g.hub_id AND r.grant_id = g.id AND r.is_deleted = 0
+                   AND (r.expires_at IS NULL OR erp_dt(:now) < erp_dt(r.expires_at))) AS uses_left
+      FROM services_package_grant g
      WHERE id = :grant_id AND hub_id = :hub_id
 ),
 facts AS (
@@ -20,7 +33,8 @@ facts AS (
         (SELECT is_deleted FROM grant_row)                AS is_deleted,
         (SELECT voided_at FROM grant_row)                 AS voided_at,
         (SELECT max_uses FROM grant_row)                  AS max_uses,
-        (SELECT validity_days FROM grant_row)             AS validity_days
+        (SELECT validity_days FROM grant_row)             AS validity_days,
+        (SELECT uses_left FROM grant_row)                 AS uses_left
 )
 SELECT
     :grant_id                                             AS grant_id,
@@ -28,6 +42,7 @@ SELECT
     customer_id,
     CASE WHEN max_uses IS NOT NULL THEN 1 ELSE 0 END      AS can_add_uses,
     CASE WHEN validity_days IS NOT NULL THEN 1 ELSE 0 END AS can_extend,
+    CAST(uses_left AS BIGINT)                             AS uses_left,
     CASE
         WHEN gid IS NULL           THEN 'grant_not_found'
         WHEN voided_at IS NOT NULL THEN 'already_voided'

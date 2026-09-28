@@ -35,7 +35,8 @@ MUST_NOT = [
     # like `sales.void_sale`, never the person who rang it up.
     "services.void_grant",
     # services#118 — giving sessions or days away is a courtesy with a cost to the business (the
-    # same authority as a void): manager+admin, never the till.
+    # same authority as a void): manager+admin, never the till. services#119 — correcting the
+    # balance (taking sessions away) goes through the same door and the same authority.
     "services.adjust_grant"
 ]
 
