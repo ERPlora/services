@@ -7,6 +7,7 @@ import '@erplora/outfitkit/ok-data-table';
 import '@erplora/outfitkit/ok-status-pill';
 import type { DataTableColumn, DataTableAction } from '@erplora/outfitkit';
 import { createListController, majorToMinor, minorToMajor } from '@erplora/module-sdk';
+import { formatMoneyInput, normaliseMoneyInput, parseMoneyInput } from '@erplora/module-toolkit/money-input';
 import type { ListController, ListClient, ListParams, ListPage } from '@erplora/module-sdk';
 // Module i18n (ADR-0055): the `ui` catalogues are inlined at build time (esbuild).
 import esLocale from '../../../locales/es.json';
@@ -34,6 +35,8 @@ interface ErploraClientLike extends ListClient {
   locale: string;
   t(catalog: Record<string, unknown>, key: string, params?: Record<string, unknown>): string;
   formatMoney(minor: number, opts?: { currency?: string; locale?: string }): string;
+  /** ISO 4217 code of the hub currency: the only currency money-input cleans off a typed amount. */
+  currency?: string;
   currencyDecimals: number;
 }
 
@@ -154,11 +157,50 @@ function decimals(): number {
   return typeof d === 'number' ? d : 2;
 }
 
-/** Typed money (major units, comma or dot) → MINOR units. '' → null. */
-function toMinorOrNull(v: string): number | null {
-  const s = String(v ?? '').trim().replace(',', '.');
-  if (!s) return null;
-  return majorToMinor(s, decimals());
+/** What a typed money field turned out to be — or the i18n key (and its words) of why it cannot be used. */
+type MoneyRead = { ok: true; minor: number | null } | { ok: false; key: string; params?: Record<string, unknown> };
+
+/**
+ * Typed money → MINOR units of the hub currency; nothing typed → `null` (pm#521).
+ *
+ * The READING is the toolkit's (`@erplora/module-toolkit/money-input`, combos#9): the local
+ * `replace(',', '.')` read «1.250,50» — how the table prints the same money — as `1.250.50` and
+ * saved 0: the voucher sold for nothing, the discount silently dropped. The shared piece reads both
+ * separators, cleans the hub currency and the no-break spaces a paste brings, and REFUSES what it
+ * cannot read (`not_an_amount`) or can read two ways (`ambiguous_amount`, with both readings).
+ *
+ * What stays here: neither money field of a voucher can be negative (`minimum: 0` in
+ * `package_create.json` / `package_update.json`) — refused in words before the server answers
+ * with a raw schema detail. What EMPTY means is the caller's: no closed price vs. no discount.
+ */
+function readMoney(typed: unknown): MoneyRead {
+  const c = erplora();
+  const d = decimals();
+  const raw = String(typed ?? '');
+  const read = parseMoneyInput(raw, d, { currency: c.currency || undefined, locale: c.locale });
+  if (read.ok) {
+    return read.minor !== null && read.minor < 0 ? { ok: false, key: 'ui.errNegativeAmount' } : { ok: true, minor: read.minor };
+  }
+  if (read.code === 'ambiguous_amount') {
+    // What they actually wrote and THE TWO READINGS OF IT, in the hub's locale, so the person can
+    // copy the one they meant straight back into the field.
+    return {
+      ok: false,
+      key: 'ui.errAmbiguousAmount',
+      params: {
+        typed: raw.trim(),
+        grouped: formatMoneyInput(read.readings.grouped, d, c.locale),
+        decimal: formatMoneyInput(read.readings.decimal, d, c.locale),
+      },
+    };
+  }
+  return { ok: false, key: 'ui.errNotAnAmount' };
+}
+
+/** MINOR units → the money field's text: hub locale, currency decimals, NO grouping (it must read
+ *  back as the same amount). */
+function toMoneyText(minor: unknown): string {
+  return formatMoneyInput(Number(minor) || 0, decimals(), erplora().locale);
 }
 
 /** Typed percentage (major units, comma or dot) → whole BASIS POINTS. '' → 0. */
@@ -476,9 +518,9 @@ export class ErpServicesPackages extends LitElement {
         name: String(full.name ?? ''),
         discountType: type,
         discountValue: type === 'fixed'
-          ? String(minorToMajor(Number(full.discount_amount_cents) || 0, decimals()))
+          ? toMoneyText(full.discount_amount_cents)
           : String(minorToMajor(Number(full.discount_percent_bp) || 0, PERCENT_DECIMALS)),
-        fixedPrice: full.fixed_price == null || full.fixed_price === '' ? '' : String(minorToMajor(Number(full.fixed_price) || 0, decimals())),
+        fixedPrice: full.fixed_price == null || full.fixed_price === '' ? '' : toMoneyText(full.fixed_price),
         validityDays: full.validity_days == null ? '' : String(full.validity_days),
         maxUses: full.max_uses == null ? '' : String(full.max_uses),
       };
@@ -832,6 +874,14 @@ export class ErpServicesPackages extends LitElement {
     }
   }
 
+  /** On leaving a money field: rewritten in the hub's notation when readable, left EXACTLY as
+   *  typed when not — the refusal on save quotes it back (pm#521). A percentage is not money and
+   *  never comes through here. */
+  private normaliseMoney(typed: string): string {
+    const c = erplora();
+    return normaliseMoneyInput(String(typed ?? ''), decimals(), c.locale, c.currency || undefined);
+  }
+
   /** Back to a clean CREATE form. */
   cancelEdit(): void {
     this.editSeq++;
@@ -841,15 +891,30 @@ export class ErpServicesPackages extends LitElement {
     this.formError = '';
   }
 
+  /**
+   * The two money fields of the header, read — or the sentence of why one cannot be used, naming
+   * the field (there are two on the form). Empty closed price = `null` (the lines minus the
+   * discount, never a free voucher); empty fixed discount = 0 (no discount).
+   */
+  private readMoneyFields(): { ok: true; discount: number | null; fixedPrice: number | null } | { ok: false; message: string } {
+    const c = erplora();
+    const fixed = this.form.discountType === 'fixed';
+    const discount: MoneyRead = fixed ? readMoney(this.form.discountValue) : { ok: true, minor: null };
+    if (!discount.ok) return { ok: false, message: `${c.t(CATALOG, 'ui.colDiscountAmount')}: ${c.t(CATALOG, discount.key, discount.params)}` };
+    const fixedPrice = readMoney(this.form.fixedPrice);
+    if (!fixedPrice.ok) return { ok: false, message: `${c.t(CATALOG, 'ui.colFixedPrice')}: ${c.t(CATALOG, fixedPrice.key, fixedPrice.params)}` };
+    return { ok: true, discount: fixed ? discount.minor ?? 0 : null, fixedPrice: fixedPrice.minor };
+  }
+
   /** The header fields as the commands want them: percent OR minor units by `discount_type`. */
-  private headerPayload(): Record<string, unknown> {
+  private headerPayload(money: { discount: number | null; fixedPrice: number | null }): Record<string, unknown> {
     const fixed = this.form.discountType === 'fixed';
     return {
       name: this.form.name.trim(),
       discount_type: fixed ? 'fixed' : 'percentage',
       discount_percent_bp: fixed ? null : toBasisPoints(this.form.discountValue),
-      discount_amount_cents: fixed ? toMinorOrNull(this.form.discountValue) ?? 0 : null,
-      fixed_price: toMinorOrNull(this.form.fixedPrice),
+      discount_amount_cents: money.discount,
+      fixed_price: money.fixedPrice,
       validity_days: toIntOrNull(this.form.validityDays),
       max_uses: toIntOrNull(this.form.maxUses),
     };
@@ -861,7 +926,13 @@ export class ErpServicesPackages extends LitElement {
     const required = this.editingId ? 'services.change_package' : 'services.add_package';
     if (!can(required) || !this.form.name.trim()) return;
     const t = (k: string): string => erplora().t(CATALOG, k);
-    const header = this.headerPayload();
+    // An amount that cannot be read is REFUSED in words, never coerced to 0 (pm#521).
+    const money = this.readMoneyFields();
+    if (!money.ok) {
+      this.formError = money.message;
+      return;
+    }
+    const header = this.headerPayload(money);
     const lines = this.items
       .filter((l) => l.serviceId)
       .map((l) => ({ service_id: l.serviceId, quantity: Math.max(1, Math.round(Number(l.sessions) || 1)) * SESSION_SCALE }));
@@ -1295,8 +1366,8 @@ export class ErpServicesPackages extends LitElement {
             <ion-select-option value="percentage">${t('ui.discountType.percentage')}</ion-select-option>
             <ion-select-option value="fixed">${t('ui.discountType.fixed')}</ion-select-option>
           </ion-select>
-          <ion-input data-testid="services-packages-discount-value" fill="outline" label-placement="floating" label=${fixed ? t('ui.colDiscountAmount') : t('ui.colDiscountPercent')} type="text" inputmode="decimal" .value=${this.form.discountValue} @ionInput=${(e: any) => (this.form = { ...this.form, discountValue: e.target.value })}></ion-input>
-          <ion-input data-testid="services-packages-fixed-price" fill="outline" label-placement="floating" label=${t('ui.colFixedPrice')} helper-text=${t('ui.fixedPriceHelp')} type="text" inputmode="decimal" .value=${this.form.fixedPrice} @ionInput=${(e: any) => (this.form = { ...this.form, fixedPrice: e.target.value })}></ion-input>
+          <ion-input data-testid="services-packages-discount-value" fill="outline" label-placement="floating" label=${fixed ? t('ui.colDiscountAmount') : t('ui.colDiscountPercent')} type="text" inputmode="decimal" .value=${this.form.discountValue} @ionInput=${(e: any) => (this.form = { ...this.form, discountValue: e.target.value })} @ionBlur=${() => fixed && (this.form = { ...this.form, discountValue: this.normaliseMoney(this.form.discountValue) })}></ion-input>
+          <ion-input data-testid="services-packages-fixed-price" fill="outline" label-placement="floating" label=${t('ui.colFixedPrice')} helper-text=${t('ui.fixedPriceHelp')} type="text" inputmode="decimal" .value=${this.form.fixedPrice} @ionInput=${(e: any) => (this.form = { ...this.form, fixedPrice: e.target.value })} @ionBlur=${() => (this.form = { ...this.form, fixedPrice: this.normaliseMoney(this.form.fixedPrice) })}></ion-input>
           <ion-input data-testid="services-packages-validity-days" fill="outline" label-placement="floating" label=${t('ui.colValidityDays')} helper-text=${t('ui.validityHelp')} type="number" min="1" step="1" .value=${this.form.validityDays} @ionInput=${(e: any) => (this.form = { ...this.form, validityDays: e.target.value })}></ion-input>
           <ion-input data-testid="services-packages-max-uses" fill="outline" label-placement="floating" label=${t('ui.colMaxUses')} helper-text=${t('ui.maxUsesHelp')} type="number" min="1" step="1" .value=${this.form.maxUses} @ionInput=${(e: any) => (this.form = { ...this.form, maxUses: e.target.value })}></ion-input>
           ${this.editingId

@@ -5,7 +5,8 @@ import { define } from '@erplora/outfitkit/define';
 import '@erplora/outfitkit/ok-inline-feedback';
 import '@erplora/outfitkit/ok-data-table';
 import type { DataTableColumn, DataTableAction } from '@erplora/outfitkit';
-import { createListController, majorToMinor, minorToMajor } from '@erplora/module-sdk';
+import { createListController } from '@erplora/module-sdk';
+import { formatMoneyInput, normaliseMoneyInput, parseMoneyInput } from '@erplora/module-toolkit/money-input';
 import type { ListController, ListClient, ListParams, ListPage } from '@erplora/module-sdk';
 // i18n del módulo (ADR-0055): los catálogos `ui` se inlinean en build (esbuild) y los textos
 // internos se resuelven con `erplora.t(CATALOG, 'ui.clave')` (idioma activo, fallback locale→en→clave).
@@ -15,36 +16,62 @@ import { domainMessage } from '../../lib/domain-error';
 import { ionTone } from '../../lib/ion-tone';
 const CATALOG: Record<string, unknown> = { es: esLocale, en: enLocale };
 
-/** Lo tecleado → UNIDADES MÍNIMAS (el dinero es INTEGER, ADR-0007/0123). «15,50» → 1550.
- *
- *  Dos supuestos que estaban aquí y eran falsos:
- *  - **la coma**: en es-ES se teclea «15,50» y `Number` da `NaN`, que caía a 0 → el servicio se
- *    creaba GRATIS (mismo bug que dejó sin cerrar la caja, cash_register#272);
- *  - **la escala**: era un `×100` clavado. La escala es la de LA MONEDA del hub —
- *    `majorToMinor` con `erplora.currencyDecimals`—; en JPY la unidad mínima ES el yen y un
- *    ×100 cobra 100 veces de más. Si el shell es viejo y no la inyecta, se cae a 2, nunca a
- *    `NaN`: un `NaN` en una columna INTEGER es corrupción silenciosa. */
-function toMinorUnits(v: string | number): number {
-  const decimals = erplora().currencyDecimals;
-  return majorToMinor(String(v ?? '').replace(',', '.'), typeof decimals === 'number' ? decimals : 2);
+/** Decimals of the hub CURRENCY (`erplora.currencyDecimals`): in JPY the minor unit IS the yen and
+ *  a hardcoded ×100 would charge 100 times too much. An old shell that does not inject them falls
+ *  back to 2, never to `NaN` — a `NaN` in an INTEGER column is silent corruption. */
+function currencyDecimals(): number {
+  const d = erplora().currencyDecimals;
+  return typeof d === 'number' ? d : 2;
 }
 
-/** MINOR units (what the row carries) → what a human types in the price field, in the HUB's
- *  locale (services#54): 2200 → «22,00» in es, «22.00» in en. Two fixed rules:
- *  - the decimals are the CURRENCY's (`erplora.currencyDecimals`), so the field never shows a
- *    different scale than the money it edits;
- *  - `useGrouping: false`: «1.250,50» would not survive the trip back through `toMinorUnits`
- *    (it reads `.` as a decimal dot), and a price field must round-trip through itself.
- *  Same figure, same screen, same notation as the table's «22,00 €» two centimetres away. */
+/** What the price field turned out to be — or the i18n key (and its words) of why it cannot be used. */
+type PriceRead = { ok: true; minor: number } | { ok: false; key: string; params?: Record<string, unknown> };
+
+/**
+ * The typed price → MINOR units of the hub currency (the money is INTEGER, ADR-0007/0123; pm#521).
+ *
+ * The READING is the toolkit's (`@erplora/module-toolkit/money-input`, combos#9): the local
+ * `replace(',', '.')` read «1.250,50» — verbatim what the table prints next to the field — as
+ * `1.250.50` and saved the service FREE, and «1.250» as 1,25 without a word. The shared piece reads
+ * both separators, cleans the hub currency and the no-break spaces a paste brings, and REFUSES what
+ * it cannot read (`not_an_amount`) or can read two ways (`ambiguous_amount`, with both readings).
+ *
+ * What stays here is what only this module knows:
+ *  * an EMPTY price is 0 — the column is `NOT NULL DEFAULT 0` and a free service is legitimate;
+ *  * a NEGATIVE price is refused in words here, before the server answers `minimum: 0`
+ *    (`service_create.json`, `service_update.json`) with a raw schema detail.
+ */
+function readPrice(typed: unknown): PriceRead {
+  const c = erplora();
+  const d = currencyDecimals();
+  const raw = String(typed ?? '');
+  const read = parseMoneyInput(raw, d, { currency: c.currency || undefined, locale: c.locale });
+  if (read.ok) {
+    const minor = read.minor ?? 0;
+    return minor < 0 ? { ok: false, key: 'ui.errNegativeAmount' } : { ok: true, minor };
+  }
+  if (read.code === 'ambiguous_amount') {
+    // What they actually wrote and THE TWO READINGS OF IT, in the hub's locale, so the person can
+    // copy the one they meant straight back into the field.
+    return {
+      ok: false,
+      key: 'ui.errAmbiguousAmount',
+      params: {
+        typed: raw.trim(),
+        grouped: formatMoneyInput(read.readings.grouped, d, c.locale),
+        decimal: formatMoneyInput(read.readings.decimal, d, c.locale),
+      },
+    };
+  }
+  return { ok: false, key: 'ui.errNotAnAmount' };
+}
+
+/** MINOR units (what the row carries) → what a human types in the price field (services#54):
+ *  2200 → «22,00» in es, «22.00» in en — the hub locale, the CURRENCY's decimals and NO grouping,
+ *  so the field's own output always reads back as the same amount. Same figure, same screen, same
+ *  notation as the table's «22,00 €» two centimetres away. */
 function toMajorText(minor: unknown): string {
-  const decimals = erplora().currencyDecimals;
-  const d = typeof decimals === 'number' ? decimals : 2;
-  const major = minorToMajor(Number(minor) || 0, d);
-  return new Intl.NumberFormat(erplora().locale || 'en', {
-    minimumFractionDigits: d,
-    maximumFractionDigits: d,
-    useGrouping: false,
-  }).format(major);
+  return formatMoneyInput(Number(minor) || 0, currencyDecimals(), erplora().locale || 'en');
 }
 
 interface ErploraClientLike extends ListClient {
@@ -59,12 +86,14 @@ interface ErploraClientLike extends ListClient {
   queryPage<R = unknown>(name: string, params: ListParams): Promise<ListPage<R>>;
   command<T = unknown>(name: string, payload?: Record<string, unknown>): Promise<T>;
   on(event: string, cb: (payload: unknown) => void): () => void;
-  /** i18n del módulo (ADR-0055): idioma activo + traducción del catálogo `ui`. */
+  /** Module i18n (ADR-0055): active language + translation of the `ui` catalogue. */
   locale: string;
   t(catalog: Record<string, unknown>, key: string, params?: Record<string, unknown>): string;
-  /** Dinero (ADR-0123): recibe UNIDADES MÍNIMAS y divide por los decimales de la moneda. */
+  /** Money (ADR-0123): takes MINOR units and divides by the currency's decimals. */
   formatMoney(minor: number, opts?: { currency?: string; locale?: string }): string;
-  /** Decimales de la moneda del hub — la escala del dinero. 2 en EUR, 0 en JPY, 3 en KWD. */
+  /** ISO 4217 code of the hub currency: the only currency money-input cleans off a typed amount. */
+  currency?: string;
+  /** Decimals of the hub currency — the scale of the money. 2 in EUR, 0 in JPY, 3 in KWD. */
   currencyDecimals: number;
   /** UI visibility only; the runtime re-checks the permission on every command. */
   hasPermission?(permission: string): boolean;
@@ -477,6 +506,13 @@ export class ErpServicesList extends LitElement {
     table?.addEventListener('panelClose', () => this.editSeq++);
   }
 
+  /** On leaving the price field: rewritten in the hub's notation when readable, left EXACTLY as
+   *  typed when not — the refusal on save quotes it back (pm#521). */
+  private normalisePrice(): void {
+    const c = erplora();
+    this.newPrice = normaliseMoneyInput(String(this.newPrice ?? ''), currencyDecimals(), c.locale, c.currency || undefined);
+  }
+
   /** Back to a clean CREATE form (services#4). */
   cancelEdit(): void {
     this.editSeq++;
@@ -503,6 +539,12 @@ export class ErpServicesList extends LitElement {
       this.formError = erplora().t(CATALOG, 'ui.errorTaxRequired');
       return;
     }
+    // An amount that cannot be read is REFUSED in words, never coerced to 0 (pm#521).
+    const price = readPrice(this.newPrice);
+    if (!price.ok) {
+      this.formError = erplora().t(CATALOG, price.key, price.params);
+      return;
+    }
     this.saving = true;
     this.formError = '';
     this.pageError = ''; // a save is the next thing the person did: an older row refusal is stale
@@ -513,8 +555,8 @@ export class ErpServicesList extends LitElement {
         short_description: '',
         category_id: this.newCategory || null,
         pricing_type: 'fixed',
-        // El input recoge EUROS (step 0.01) pero la columna es céntimos (ADR-0007): 15 € → 1500.
-        price: toMinorUnits(this.newPrice),
+        // The field holds MAJOR units, the column MINOR units (ADR-0007): 15 € → 1500.
+        price: price.minor,
         cost: 0,
         duration_minutes: Number(this.newDuration) || 60,
         buffer_before: 0,
@@ -549,6 +591,11 @@ export class ErpServicesList extends LitElement {
       this.formError = erplora().t(CATALOG, 'ui.errorTaxRequired');
       return;
     }
+    const price = readPrice(this.newPrice);
+    if (!price.ok) {
+      this.formError = erplora().t(CATALOG, price.key, price.params);
+      return;
+    }
     this.saving = true;
     this.formError = '';
     this.pageError = ''; // a save is the next thing the person did: an older row refusal is stale
@@ -557,7 +604,7 @@ export class ErpServicesList extends LitElement {
         service_id: this.editingId,
         name: this.newName.trim(),
         category_id: this.newCategory || null,
-        price: toMinorUnits(this.newPrice),
+        price: price.minor,
         duration_minutes: Number(this.newDuration) || 60,
         tax_category_key: this.newTaxRateId,
       });
@@ -709,7 +756,7 @@ export class ErpServicesList extends LitElement {
                 </ok-inline-feedback>`
               : nothing}
             <ion-input data-testid="services-list-name" fill="outline" label-placement="floating" label=${t('ui.colName')} .value=${this.newName} @ionInput=${(e: any) => (this.newName = e.target.value)}></ion-input>
-            <ion-input data-testid="services-list-price" fill="outline" label-placement="floating" label=${t('ui.colPrice')} type="text" inputmode="decimal" .value=${this.newPrice} @ionInput=${(e: any) => (this.newPrice = e.target.value)}></ion-input>
+            <ion-input data-testid="services-list-price" fill="outline" label-placement="floating" label=${t('ui.colPrice')} type="text" inputmode="decimal" .value=${this.newPrice} @ionInput=${(e: any) => (this.newPrice = e.target.value)} @ionBlur=${() => this.normalisePrice()}></ion-input>
             <ion-input data-testid="services-list-duration" fill="outline" label-placement="floating" label=${t('ui.colDuration')} type="number" step="1" .value=${this.newDuration} @ionInput=${(e: any) => (this.newDuration = e.target.value)}></ion-input>
             <!-- Both selects go WITHOUT a placeholder, on purpose (services#57): with a floating
                  label, Ionic lifts the label into the border gap as soon as the field has focus and
