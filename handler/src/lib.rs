@@ -2794,7 +2794,13 @@ mod tests {
     fn an_adjustment_without_a_grant_id_is_refused() {
         let mut payload = adjust_payload();
         payload["grant_id"] = json!(" ");
-        let out = adjust_grant_pure(adjust_input(Some(adjustable_row()), payload)).unwrap();
+        let out = adjust_grant_pure(adjust_input(Some(adjustable_row()), payload.clone())).unwrap();
+        assert_eq!(adjust_code(&out), Some("services.grant_not_adjustable"));
+        assert!(out.operations.is_empty());
+        // Even a read that echoes the same blank id does not make a blank id adjustable.
+        let mut blank_row = adjustable_row();
+        blank_row["grant_id"] = json!("");
+        let out = adjust_grant_pure(adjust_input(Some(blank_row), payload)).unwrap();
         assert_eq!(adjust_code(&out), Some("services.grant_not_adjustable"));
         assert!(out.operations.is_empty());
     }
