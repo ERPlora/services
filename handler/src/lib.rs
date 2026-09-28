@@ -600,6 +600,12 @@ fn refusal_for(reason: &str) -> DomainError {
             "services.package_no_grant",
             "This customer does not have that voucher: nobody has sold it to them.",
         ),
+        // services#128 — before `no_grant` in the query, and its own code: a voided voucher is not
+        // one «nobody sold», and the cashier must not be sent to sell it again.
+        "voided" => redeem_refusal(
+            "services.package_voided",
+            "This voucher was voided: it can no longer be used.",
+        ),
         "no_uses_left" => redeem_refusal(
             "services.package_no_uses_left",
             "This voucher has no sessions left.",
@@ -688,6 +694,9 @@ pub fn redeem_package_pure(input: Value) -> Result<Output, String> {
     p.insert("appointment_id".into(), payload.get("appointment_id").cloned().unwrap_or(Value::Null));
     p.insert("sale_id".into(), payload.get("sale_id").cloned().unwrap_or(Value::Null));
     p.insert("note".into(), json!(str_field(&payload, "note")));
+    // services#128: `_redeem_refusal.sql` is shared with the till's hold, which checks that the
+    // voucher covers the line's service. At the chair there is no line: an explicit NULL.
+    p.insert("service_id".into(), Value::Null);
 
     Ok(Output::new()
         .with_operation(Operation::sql("services._redeem", p.clone()))
@@ -1934,8 +1943,33 @@ mod tests {
         assert_eq!(op.params["appointment_id"], json!("apt-9"));
         assert_eq!(op.params["note"], json!("first use"));
         assert!(op.params["sale_id"].is_null(), "an optional link the caller did not send is NULL, not a string");
+        assert!(
+            op.params.get("service_id").is_some_and(|v| v.is_null()),
+            "services#128: the refusal statement is shared with the till's hold, and at the chair \
+             no line names a service — it travels as an explicit NULL, never as an unbound param"
+        );
         // The caller gets the authoritative id back (hub#70) — appointments links the redemption.
         assert_eq!(out.result.unwrap()["redemption_id"], json!("red-1"));
+    }
+
+    /// services#128: a voided voucher answers `voided`, and the caller reads that it was voided —
+    /// not «nobody sold it to this customer», which sends the cashier to sell it again.
+    #[test]
+    fn a_voided_voucher_is_refused_as_voided() {
+        let out = redeem_package_pure(redeem_input(
+            Some(json!({ "redeemable": 0, "reason": "voided" })),
+            redeem_payload(),
+        ))
+        .unwrap();
+        assert_eq!(out.error.map(|e| e.code), Some("services.package_voided".to_string()));
+        assert!(out.operations.is_empty(), "nothing may persist");
+        let out = hold_package_for_line_pure(hold_input(
+            Some(json!([])),
+            Some(json!({ "redeemable": 0, "reason": "voided" })),
+            hold_payload(),
+        ))
+        .unwrap();
+        assert_eq!(out.error.map(|e| e.code), Some("services.package_voided".to_string()));
     }
 
     /// The flag reaches the handler as an INTEGER (the query's `CASE … THEN 1`), but a driver may

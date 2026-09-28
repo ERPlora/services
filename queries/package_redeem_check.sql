@@ -10,7 +10,10 @@
 -- in the hub.
 --
 --   redeemable = 1 when the redemption would pass; 0 when it would not.
---   reason     = 'no_grant' | 'package_not_found' | 'no_uses_left' | 'expired' | ''  (first failure)
+--   reason     = 'voided' | 'no_grant' | 'package_not_found' | 'no_uses_left' | 'expired' | ''
+--                (first failure). `voided` (services#128) goes before `no_grant`: a voided voucher is
+--                no longer a live grant, but «nobody sold it to this customer» would send the
+--                cashier to sell it again — the honest answer is that it was voided.
 --
 -- Bind: :grant_id. The runtime injects :hub_id and :now — and :hub_id is what makes the neighbour's
 -- grant invisible rather than merely unauthorised. Dates go through the `erp_*` bridges (ADR-0007).
@@ -50,8 +53,14 @@ used AS (
     WHERE hub_id = :hub_id AND grant_id = :grant_id AND is_deleted = 0
       AND (expires_at IS NULL OR erp_dt(:now) < erp_dt(expires_at))
 ),
+voided AS (
+    SELECT COUNT(*) AS n
+    FROM services_package_grant
+    WHERE id = :grant_id AND hub_id = :hub_id AND voided_at IS NOT NULL
+),
 checks AS (
     SELECT
+        CASE WHEN (SELECT n FROM voided) > 0 THEN 1 ELSE 0 END AS voided,
         CASE WHEN (SELECT id FROM grant_row) IS NULL THEN 1 ELSE 0 END AS no_grant,
         CASE WHEN (SELECT id FROM grant_row) IS NOT NULL
                   AND (SELECT id FROM pkg) IS NULL
@@ -68,6 +77,7 @@ SELECT
     :grant_id                                                        AS grant_id,
     CASE WHEN no_grant + not_found + no_uses_left + expired = 0 THEN 1 ELSE 0 END AS redeemable,
     CASE
+        WHEN voided       = 1 THEN 'voided'
         WHEN no_grant     = 1 THEN 'no_grant'
         WHEN not_found    = 1 THEN 'package_not_found'
         WHEN no_uses_left = 1 THEN 'no_uses_left'

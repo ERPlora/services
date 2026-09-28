@@ -280,6 +280,7 @@
     "services.package_needs_lines": "A package needs at least one service line: a package with no lines cannot be sold or redeemed.",
     "services.package_no_uses_left": "This voucher has no sessions left.",
     "services.package_expired": "This voucher has expired.",
+    "services.package_voided": "This voucher was voided: it can no longer be used.",
     "services.package_not_redeemable": "This voucher cannot be redeemed right now.",
     "services.package_does_not_cover_service": "This voucher does not cover that service. A voucher of haircuts pays for haircuts, not for the shampoo.",
     "services.hold_not_releasable": "That voucher session can no longer be given back: the sale was already paid. Refunding it is a return, and it goes through its own door.",

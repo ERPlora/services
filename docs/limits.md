@@ -54,10 +54,12 @@
 | `services.category_update_rejected` | The category update matched nothing: the category is not in this hub, or the parent is foreign/deleted/the category itself | Check both |
 | `InvalidPayload` (validation error) | The payload broke the command's contract: unknown key, pricing type outside the enum, negative price, duration 0, capacity 0, percentage above 100, empty batch… | Fix the named field; every public command has a JSON Schema |
 | `services.package_no_grant` | **Nobody sold that voucher to this customer.** The grant does not exist in this hub | Sell it — or grant it with `services.packages.grant`. It is not a matter of reactivating anything |
+| `services.package_voided` | The voucher was sold, then **voided** | Nothing to redeem: the void stands. If it was voided by mistake, sell or grant it again |
 | `services.grant_customer_required` | A grant was attempted with no customer | Pick the customer: a voucher with no owner cannot be redeemed by anyone |
 | `package_not_found` | The grant is real but its voucher template is archived or inactive | Reactivate the package, or check the id |
 | `no_uses_left` | The sessions **of that grant** are already consumed | Sell another one — a second grant of the same voucher is a normal, supported case |
 | `expired` | The validity window has passed since the **purchase** | The voucher is spent; a new one is needed |
+| `services.package_not_redeemable` | The session was refused at the last instant for a reason none of the rules above names | Reload the voucher and try again |
 | `services.grant_void_reason_required` | A void was sent with no reason | Say why it is voided: the reason stays on its record |
 | `services.grant_in_use` | A session of that voucher was already delivered or is held at a till | It cannot be voided; release the hold first, or correct it another way |
 | `services.grant_already_voided` | Someone voided it before you | Nothing to do — reload the list |
@@ -170,9 +172,16 @@ told. Now the whole package is refused and nothing is saved — fix the line and
 
 **"A customer's voucher is not recognised."** The first thing to check is whether they were ever
 **granted** it: the voucher being in the catalogue does not mean this customer owns one. The
-redemption says which of the four it is — `services.package_no_grant` (nobody sold it to them),
-`services.package_no_uses_left`, `services.package_expired` or `services.package_not_found` (the
-template is archived). The check command answers the same four without consuming.
+redemption says which of the five it is — `services.package_no_grant` (nobody sold it to them),
+`services.package_voided` (it was sold and then voided), `services.package_no_uses_left`,
+`services.package_expired` or `services.package_not_found` (the template is archived). The check
+command answers the same five without consuming.
+
+**"Two tills used the same voucher at once and one was refused."** When another till spends the
+last session, or someone voids or corrects the voucher, while a till is redeeming it, the late till
+waits for the first one and is then refused with the **same reason** it would have got a second
+later (`services.package_no_uses_left`, `services.package_voided`, …) — never with a generic «could
+not complete». Nothing is spent on the refused one.
 
 **"They paid for the voucher on the ticket but it is not on their account."** Look at whether the
 sale had a **customer**. A voucher line on an anonymous ticket grants nothing — there is nobody to

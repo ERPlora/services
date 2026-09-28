@@ -163,7 +163,8 @@
       },
       "migrations/postgres/017_category_name_gate.sql",
       "migrations/postgres/018_grant_void.sql",
-      "migrations/postgres/019_grant_adjustment.sql"
+      "migrations/postgres/019_grant_adjustment.sql",
+      "migrations/postgres/020_redeem_refusal_gate.sql"
     ]
   },
   "queries": {
@@ -837,8 +838,17 @@
       "emit": [
         "services.package.redeemed"
       ],
+      "on_unique": {
+        "services_redeem_no_grant": "services.package_no_grant",
+        "services_redeem_voided": "services.package_voided",
+        "services_redeem_package_not_found": "services.package_not_found",
+        "services_redeem_no_uses_left": "services.package_no_uses_left",
+        "services_redeem_expired": "services.package_expired",
+        "services_redeem_does_not_cover_service": "services.package_does_not_cover_service",
+        "services_redeem_not_redeemable": "services.package_not_redeemable"
+      },
       "ai": {
-        "description": "Consumes one session of a voucher the customer OWNS (a grant, i.e. a purchase); refuses with a domain code the caller can translate — services.package_no_grant, services.package_not_found, services.package_no_uses_left or services.package_expired — instead of the raw gate error. A customer with no grant has nothing to redeem, however many vouchers the catalogue offers."
+        "description": "Consumes one session of a voucher the customer OWNS (a grant, i.e. a purchase); refuses with a domain code the caller can translate — services.package_voided, services.package_no_grant, services.package_not_found, services.package_no_uses_left or services.package_expired — instead of the raw gate error, also when another till or a void commits first. A customer with no grant has nothing to redeem, however many vouchers the catalogue offers."
       },
       "expose_api": true
     },
@@ -848,6 +858,7 @@
         "commands/hold_expire.sql",
         "commands/_grant_lock.sql",
         "commands/_redeem_insert.sql",
+        "commands/_redeem_refusal.sql",
         "commands/_redeem_assert.sql",
         "commands/_gate_clear.sql"
       ]
@@ -903,8 +914,17 @@
       "emit": [
         "services.package.held"
       ],
+      "on_unique": {
+        "services_redeem_no_grant": "services.package_no_grant",
+        "services_redeem_voided": "services.package_voided",
+        "services_redeem_package_not_found": "services.package_not_found",
+        "services_redeem_no_uses_left": "services.package_no_uses_left",
+        "services_redeem_expired": "services.package_expired",
+        "services_redeem_does_not_cover_service": "services.package_does_not_cover_service",
+        "services_redeem_not_redeemable": "services.package_not_redeemable"
+      },
       "ai": {
-        "description": "Reserves one session of a voucher the customer OWNS (a grant) to cover one line of the checkout. The session is spent immediately but the redemption stays reversible with services.packages.release_hold until the sale is settled. Refuses with a domain code (services.package_no_grant, services.package_not_found, services.package_no_uses_left, services.package_expired or services.package_does_not_cover_service) instead of the raw gate error. It issues NO fiscal document: a voucher of N sessions is univalent and its record came out when the voucher was SOLD."
+        "description": "Reserves one session of a voucher the customer OWNS (a grant) to cover one line of the checkout. The session is spent immediately but the redemption stays reversible with services.packages.release_hold until the sale is settled. Refuses with a domain code (services.package_voided, services.package_no_grant, services.package_not_found, services.package_no_uses_left, services.package_expired or services.package_does_not_cover_service) instead of the raw gate error, also when another till or a void commits first. It issues NO fiscal document: a voucher of N sessions is univalent and its record came out when the voucher was SOLD."
       },
       "expose_api": true
     },
@@ -956,6 +976,7 @@
         "commands/hold_expire.sql",
         "commands/_grant_lock.sql",
         "commands/_hold_insert.sql",
+        "commands/_redeem_refusal.sql",
         "commands/_redeem_assert.sql",
         "commands/_gate_clear.sql"
       ]
