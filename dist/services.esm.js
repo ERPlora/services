@@ -6890,7 +6890,7 @@ var ErpServicesSessionRefund = class extends i3 {
       this.session = null;
       this.loadFailed = true;
       this.feedback = domainMessage(e6, erplora4().locale, this.t("ui.sessionRefund.loadFailed"));
-      this.setArmed(false);
+      if (this.armed) this.setArmed(false, true);
     } finally {
       this.loading = false;
     }
@@ -6904,15 +6904,18 @@ var ErpServicesSessionRefund = class extends i3 {
     }
     this.setArmed(Number(s5.refundable) === 1);
   }
-  setArmed(on, silent = false) {
+  /** `unknown` retracts an earlier `armed` without claiming the line does not go back. */
+  setArmed(on, unknown = false) {
     this.armed = on;
-    if (silent) return;
     const warning = on ? this.expiryWarning() : "";
+    const detail = { lineRef: this.lineRef };
+    if (warning) detail.warning = warning;
+    if (unknown && !on) detail.unknown = true;
     this.dispatchEvent(
       new CustomEvent(on ? "erp:tender-refund-armed" : "erp:tender-refund-disarmed", {
         bubbles: true,
         composed: true,
-        detail: warning ? { lineRef: this.lineRef, warning } : { lineRef: this.lineRef }
+        detail
       })
     );
   }
