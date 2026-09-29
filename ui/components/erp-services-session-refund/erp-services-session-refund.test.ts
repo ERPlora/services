@@ -102,6 +102,7 @@ type Mounted = HTMLElement & {
   session: typeof SESSION | null;
   armed: boolean;
   toggle(on: boolean): void;
+  load(force?: boolean): Promise<void>;
 };
 
 /** Mounts the way the host does: the four properties BEFORE the insert (sales#166). */
@@ -388,6 +389,63 @@ describe('the read failing is not «nothing to give back»', () => {
     const pending = await commit(el);
     expect(commands).toHaveLength(0);
     expect(pending).toHaveLength(0);
+  });
+
+  // services#139 - `disarmed` is what the hole says when the session does NOT go back (it already
+  // came back, or the operator un-ticked it). The return screen reopened over a recovered document
+  // (sales#465) releases its pending key once every covered line has answered and nothing is armed:
+  // a failed read that said `disarmed` counted as that answer, and closing the screen then lost the
+  // session for good. Not knowing is SILENCE - the host's own reading of a hole that has not spoken.
+  it('🔴 a failed first read tells the host NOTHING - silence is «not known yet»', async () => {
+    queryFails = true;
+    const seen = listenOnHost();
+    await mount();
+    expect(seen.armed).toHaveLength(0);
+    expect(seen.disarmed).toHaveLength(0);
+  });
+
+  it('🔴 a failed RETRY stays silent too - only an answer the hole read speaks', async () => {
+    queryFails = true;
+    const seen = listenOnHost();
+    const el = await mount();
+    el.shadowRoot
+      .querySelector<HTMLElement>('[data-testid="services-session-refund-retry"]')!
+      .click();
+    await el.updateComplete;
+    await new Promise((r) => setTimeout(r, 0));
+    expect(queries).toHaveLength(2);
+    expect(seen.disarmed).toHaveLength(0);
+  });
+
+  it('a retry that reads is the answer: the host hears `armed` then', async () => {
+    queryFails = true;
+    const seen = listenOnHost();
+    const el = await mount();
+    queryFails = false;
+    await el.load(true);
+    await el.updateComplete;
+    expect(seen.armed.map((e) => e.detail)).toEqual([{ lineRef: 'line-1' }]);
+    expect(seen.disarmed).toHaveLength(0);
+  });
+
+  it('🔴 a hole that HAD armed and then cannot read retracts it as UNKNOWN, not as «does not go back»', async () => {
+    const seen = listenOnHost();
+    const el = await mount();
+    expect(seen.armed).toHaveLength(1);
+    queryFails = true;
+    await el.load(true);
+    await el.updateComplete;
+    // Retracted, so the host stops announcing a give-back this hole can no longer promise - and
+    // flagged, so a host that counts answers does not count this one.
+    expect(seen.disarmed.map((e) => e.detail)).toEqual([{ lineRef: 'line-1', unknown: true }]);
+    expect(el.armed).toBe(false);
+  });
+
+  it('a session that does not go back is still a plain `disarmed`: an answer, never `unknown`', async () => {
+    rows = [{ ...SESSION, refundable: 0, reason: 'already_refunded', already_refunded: 1 }];
+    const seen = listenOnHost();
+    await mount();
+    expect(seen.disarmed.map((e) => e.detail)).toEqual([{ lineRef: 'line-1' }]);
   });
 });
 

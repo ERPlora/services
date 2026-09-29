@@ -207,7 +207,12 @@ export class ErpServicesSessionRefund extends LitElement {
       this.session = null;
       this.loadFailed = true;
       this.feedback = domainMessage(e, erplora().locale, this.t('ui.sessionRefund.loadFailed'));
-      this.setArmed(false);
+      // 🔴 Nor is it an ANSWER to the host (services#139). A plain `disarmed` means «this line does
+      // not go back», and the return screen reopened over a recovered document releases its pending
+      // key once every covered line has said so: closing it then lost the session for good. Not
+      // knowing is silence, which the host reads as «not known yet»; only a hole that had promised
+      // a give-back speaks, to retract it - flagged `unknown` so it is not counted as an answer.
+      if (this.armed) this.setArmed(false, true);
     } finally {
       this.loading = false;
     }
@@ -224,15 +229,18 @@ export class ErpServicesSessionRefund extends LitElement {
     this.setArmed(Number(s.refundable) === 1);
   }
 
-  private setArmed(on: boolean, silent = false): void {
+  /** `unknown` retracts an earlier `armed` without claiming the line does not go back. */
+  private setArmed(on: boolean, unknown = false): void {
     this.armed = on;
-    if (silent) return;
     const warning = on ? this.expiryWarning() : '';
+    const detail: { lineRef: string; warning?: string; unknown?: true } = { lineRef: this.lineRef };
+    if (warning) detail.warning = warning;
+    if (unknown && !on) detail.unknown = true;
     this.dispatchEvent(
       new CustomEvent(on ? 'erp:tender-refund-armed' : 'erp:tender-refund-disarmed', {
         bubbles: true,
         composed: true,
-        detail: warning ? { lineRef: this.lineRef, warning } : { lineRef: this.lineRef },
+        detail,
       }),
     );
   }

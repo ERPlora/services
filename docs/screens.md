@@ -249,6 +249,11 @@ attached to the returned Pricing Option as if it were still paid») reached by a
 6. The money refund is `sales`' authority and this screen never brings it down. When the refund
    document exists the session goes back **while the screen waits**; if that half fails, the money
    still came back and the screen says which half did not.
+7. If the sessions **cannot be read** (the hub did not answer), the hole says so with a **Retry**
+   button — and tells the return screen nothing, because it does not know yet (services#139).
+   «This line does not go back» is only said once the read answers. So a return screen reopened
+   to give back a session still owed keeps offering it after being closed during the failed read,
+   instead of treating it as settled and losing the session.
 
 Requires `services.refund_package` — the same permission that guards the command, so a cashier who
 cannot refund never sees the hole. Twins are told apart by the line's ordinal: a mother and her
