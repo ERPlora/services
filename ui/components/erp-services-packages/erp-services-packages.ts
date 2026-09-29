@@ -6,7 +6,7 @@ import '@erplora/outfitkit/ok-inline-feedback';
 import '@erplora/outfitkit/ok-data-table';
 import '@erplora/outfitkit/ok-status-pill';
 import type { DataTableColumn, DataTableAction } from '@erplora/outfitkit';
-import { createListController, majorToMinor, minorToMajor } from '@erplora/module-sdk';
+import { createListController, dataTableShowsLoadError, majorToMinor, minorToMajor } from '@erplora/module-sdk';
 import { formatMoneyInput, normaliseMoneyInput, parseMoneyInput } from '@erplora/module-toolkit/money-input';
 import type { ListController, ListClient, ListParams, ListPage } from '@erplora/module-sdk';
 // Module i18n (ADR-0055): the `ui` catalogues are inlined at build time (esbuild).
@@ -1346,13 +1346,13 @@ export class ErpServicesPackages extends LitElement {
     const fixed = this.form.discountType === 'fixed';
     return html`<div class="page">
       ${this.pageError ? html`<ok-inline-feedback data-testid="services-packages-page-error" tone="danger" icon="alert-circle-outline">${this.pageError}</ok-inline-feedback>` : nothing}
-      ${this.ctrl?.error ? html`<ok-inline-feedback data-testid="services-packages-load-error" tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : nothing}
+      ${this.ctrl?.error && !dataTableShowsLoadError() ? html`<ok-inline-feedback data-testid="services-packages-load-error" tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : nothing}
       ${can('services.view_orphan_grant')
         ? html`<ion-button class="orphans-entry" data-testid="services-packages-open-orphans" size="small" fill="clear" @click=${() => this.openOrphans()}>
             <ion-icon slot="start" name="person-remove-outline"></ion-icon>${t('ui.openOrphans')}
           </ion-button>`
         : nothing}
-      <ok-data-table testid="services-packages-table" .serverSide=${true} .fill=${true} .views=${true} .addable=${can('services.add_package')} .cardTitle=${(row: Record<string, unknown>) => String(row.name ?? '')} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? 'asc'} .searchable=${true} .searchPlaceholder=${t('ui.searchPackagePlaceholder')} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t('ui.loading') : t('ui.emptyPackages')} @rowAction=${(e: CustomEvent<{ actionId: string; row: Record<string, unknown> }>) => this.onRowAction(e)} @rowClick=${(e: CustomEvent<{ row: Record<string, unknown> }>) => this.onRowAction({ detail: { actionId: 'edit', row: e.detail.row } } as CustomEvent<{ actionId: string; row: Record<string, unknown> }>)}
+      <ok-data-table testid="services-packages-table" .error=${this.ctrl?.error ?? ''} @retry=${() => Promise.all([this.ctrl?.load(), this.loadServices()])} .serverSide=${true} .fill=${true} .views=${true} .addable=${can('services.add_package')} .cardTitle=${(row: Record<string, unknown>) => String(row.name ?? '')} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? 'asc'} .searchable=${true} .searchPlaceholder=${t('ui.searchPackagePlaceholder')} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t('ui.loading') : t('ui.emptyPackages')} @rowAction=${(e: CustomEvent<{ actionId: string; row: Record<string, unknown> }>) => this.onRowAction(e)} @rowClick=${(e: CustomEvent<{ row: Record<string, unknown> }>) => this.onRowAction({ detail: { actionId: 'edit', row: e.detail.row } } as CustomEvent<{ actionId: string; row: Record<string, unknown> }>)}
  @pageChange=${(e: CustomEvent<number>) => this.ctrl.setPage(e.detail)} @pageSizeChange=${(e: CustomEvent<number>) => this.ctrl.setPageSize(e.detail)} @sortChange=${(e: CustomEvent<{ sort: string; dir: 'asc' | 'desc' }>) => this.ctrl.setSort(e.detail.sort, e.detail.dir)} @searchChange=${(e: CustomEvent<string>) => this.ctrl.setSearch(e.detail)} @filterChange=${(e: CustomEvent<{ col: string; value: unknown }>) => this.ctrl.setFilter(e.detail.col, e.detail.value)}>
         <form slot="create" class="form" data-testid="services-packages-form" @submit=${(e: Event) => this.save(e)}>
           ${this.editingId && !this.editTitleInHeader
