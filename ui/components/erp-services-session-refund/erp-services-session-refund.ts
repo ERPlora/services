@@ -110,7 +110,8 @@ export class ErpServicesSessionRefund extends LitElement {
     :host { display: block; font-family: system-ui, sans-serif; color: var(--ion-text-color, #1c1b18); }
     .box { display: flex; flex-direction: column; gap: 0.45rem; }
     .head { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
-    .name { font-weight: 600; }
+    /* A voucher name can be a single long code: break it rather than push the card wider. */
+    .name { font-weight: 600; overflow-wrap: anywhere; }
     .counter { font-variant-numeric: tabular-nums; font-size: 0.85rem;
                color: var(--ion-color-medium, #6b6b6b); }
     .choice { display: grid; grid-template-columns: auto 1fr; gap: 0.5rem; align-items: center;
@@ -118,6 +119,8 @@ export class ErpServicesSessionRefund extends LitElement {
               border-radius: 0.6rem; cursor: pointer; }
     .choice[aria-checked='true'] { border-color: var(--ion-color-primary, #3b7d4f);
                                    background: var(--ion-color-step-50, #f7f6f3); }
+    /* Ionic paints the checkbox label nowrap: on a phone the sentence ran off the card (services#137). */
+    ion-checkbox::part(label) { white-space: normal; overflow-wrap: anywhere; }
     .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
   `;
 
