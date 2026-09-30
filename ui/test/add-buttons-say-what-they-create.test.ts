@@ -169,6 +169,22 @@ describe('every create button says what it creates, and no two share a name (ser
           for (const generic of GENERIC[lang]) expect(names).not.toContain(generic);
         });
       }
+
+      // «Create …» is only for a NEW record: editing an existing one keeps «Save changes», and a
+      // save in flight says «Saving…» — the same submit, three states (rv-services-145).
+      it(`${screen.name} · ${lang}: editing says «Save changes» and a save in flight says «Saving…», never «Create …»`, async () => {
+        viewport(false);
+        sdk(lang);
+        document.documentElement.lang = lang;
+        const { el } = await mountWithPanelOpen(screen.tag, screen.load, screen.table);
+        const wc = el as Wc & { onRowAction(ev: unknown): Promise<void>; saving: boolean };
+        await wc.onRowAction({ detail: { actionId: 'edit', row: { id: 'svc-1', name: 'Corte' } } });
+        await settle(el);
+        expect(accessibleName(button(el.shadowRoot, submitId(screen.table)))).toBe(translate(lang, 'ui.btnSave'));
+        wc.saving = true;
+        await settle(el);
+        expect(accessibleName(button(el.shadowRoot, submitId(screen.table)))).toBe(translate(lang, 'ui.btnSaving'));
+      });
     }
   }
 
