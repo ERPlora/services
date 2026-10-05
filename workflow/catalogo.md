@@ -28,9 +28,7 @@ negocio: «Esa categoría no está disponible: no existe en este negocio o se ha
 categorías fiscales: «Todavía no hay categorías fiscales. Configúralas en Impuestos antes de añadir
 servicios.». Lo tecleado se conserva para corregir. Un cajero ve el botón y el panel, pero al
 guardar no pasa nada y no se le dice por qué (no tiene permiso de alta).
-Implicados: pendiente
-Pendiente de enlazar: taxes — el selector de categoría fiscal del servicio (TAXES-F01)
-Pendiente de enlazar: taxes — guardar un servicio con su categoría fiscal; Servicios no comprueba que la clave exista (TAXES-F19)
+Implicados: TAXES-F01, TAXES-F19, REC_PELUQUERIA-F04
 QA: BD-05, B-02
 
 ### SERVICES-F02 Editar un servicio
@@ -49,10 +47,7 @@ Si falla: dentro del panel, «No se ha podido actualizar el servicio: no existe 
 categoría elegida no existe.» (también cuando la categoría que el servicio ya tenía se eliminó,
 aunque el campo Categoría salga vacío) o los motivos de importe de SERVICES-F01. Sin permiso de
 edición, tocar la fila no abre nada.
-Implicados: pendiente
-Pendiente de enlazar: taxes — el selector de categoría fiscal del servicio (TAXES-F01)
-Pendiente de enlazar: staff — la copia del nombre del servicio en cada profesional no se renombra (STAFF-F10)
-Pendiente de enlazar: appointments — la cita conserva nombre, precio y duración del momento de reservar (APPOINTMENTS-F01)
+Implicados: APPOINTMENTS-F01, STAFF-F10, TAXES-F01
 QA: BD-05
 
 ### SERVICES-F03 Poner un servicio a precio abierto
@@ -68,8 +63,7 @@ Sale: el servicio con su tarifa (`services.service.updated` o `services.service.
 tarifa «Gratis» no fuerza el precio a 0: el TPV cobra el precio guardado. Los precios mínimo y
 máximo se guardan y nadie los usa.
 Si falla: el asistente explica el rechazo (una tarifa fuera de las cinco, un precio negativo).
-Implicados: pendiente
-Pendiente de enlazar: sales — un servicio de precio abierto pide su importe al venderse (SALES-F09)
+Implicados: SALES-F09
 QA: ninguno
 
 ### SERVICES-F04 Archivar un servicio
@@ -89,9 +83,7 @@ Agenda, en Personal, en el TPV, en la respuesta de WhatsApp y en el selector de 
 Las citas ya reservadas no cambian. El aviso de citas es un consejo: nunca impide archivar.
 Si falla: arriba de la tabla, «No se pudo archivar el servicio» o «Ese servicio no existe en este
 negocio.». Si la consulta a Citas falla, el diálogo sale sin la línea de citas.
-Implicados: pendiente
-Pendiente de enlazar: appointments — cuántas citas próximas usan un servicio, y la reserva deja de ofrecerlo (APPOINTMENTS-F01)
-Pendiente de enlazar: sales — el servicio desaparece de la rejilla del TPV (SALES-F01)
+Implicados: APPOINTMENTS-F01, SALES-F01
 QA: BD-05
 
 ### SERVICES-F05 Ver y restaurar los servicios archivados
@@ -109,9 +101,7 @@ servicio: no existe en este negocio, o ya se está ofreciendo.». En la vista de
 ofrece Editar ni Archivar, pero tocarla abre «Editando servicio» y **Guardar cambios** se rechaza con
 un texto técnico del validador («payload inválido para `services.services.update`: …») (leído en el
 código, sin ejecutar).
-Implicados: pendiente
-Pendiente de enlazar: appointments — el servicio vuelve a ofrecerse al reservar (APPOINTMENTS-F01)
-Pendiente de enlazar: sales — el servicio vuelve a la rejilla del TPV (SALES-F01)
+Implicados: APPOINTMENTS-F01, SALES-F01
 QA: BD-05
 
 ### SERVICES-F06 Dar de alta muchos servicios de golpe
@@ -130,8 +120,7 @@ negativo o con la duración a 0 rechaza el lote **entero** antes de crear nada (
 `services.services.bulk_create`: …»). Un nombre o una categoría fiscal hechos solo de espacios se
 rechazan línea a línea, con el motivo en inglés, y las demás se crean. Un fallo de la escritura
 (por ejemplo, el nombre repetido) deja el lote entero sin crear.
-Implicados: pendiente
-Pendiente de enlazar: taxes — cada línea del lote exige su categoría fiscal (TAXES-F19)
+Implicados: TAXES-F19
 QA: ninguno
 
 ### SERVICES-F07 Crear y editar categorías
@@ -150,8 +139,7 @@ tildes distintas sí se acepta) sale debajo del campo: «Ya hay una categoría c
 otro nombre.». Un padre eliminado o de otro negocio: «Esa categoría padre no está disponible: no
 existe en este negocio o se ha eliminado.» o «No se ha podido actualizar la categoría…». Sin
 permiso de alta no aparece **Nueva categoría**.
-Implicados: pendiente
-Pendiente de enlazar: sales — las categorías de servicio son pestañas de la rejilla del TPV (SALES-F01)
+Implicados: SALES-F01, REC_PELUQUERIA-F04
 QA: BD-05
 
 ### SERVICES-F08 Eliminar una categoría
@@ -165,8 +153,7 @@ Pasos:
 Entra: la categoría y cuántos servicios en oferta tiene.
 Sale: la categoría eliminada, no borrada; su nombre queda libre para otra. No se emite aviso.
 Si falla: arriba de la tabla, «No se pudo eliminar la categoría» o «Esa categoría no existe en este negocio.».
-Implicados: pendiente
-Pendiente de enlazar: sales — la pestaña de la categoría desaparece del TPV (SALES-F01)
+Implicados: SALES-F01
 QA: BD-05
 
 ### SERVICES-F09 Vender un servicio en el TPV
@@ -179,14 +166,10 @@ Pasos:
 3. Un servicio **Sin configurar** (sin categoría fiscal) sale con la marca «Falta el IVA» y no se vende.
 4. Cobra como cualquier venta (Ventas).
 Entra: los servicios en oferta, sus categorías y su categoría fiscal (Servicios), que el TPV lee al abrirse.
-Sale: la línea de venta con su precio, su IVA y la referencia del servicio; Servicios no anota nada
+Sale: la línea de venta con su precio, su IVA y la referencia del servicio (si Modificadores tiene grupos enganchados a ese servicio, el TPV los pregunta al tocarlo, MODIFIERS-F05); Servicios no anota nada
 por vender un servicio suelto (sí reacciona si la línea la pagó un bono, SERVICES-F24).
 Si falla: si Servicios no responde, el TPV avisa de que el catálogo de servicios no carga, en vez de enseñarse como si el negocio no vendiera servicios (Ventas).
-Implicados: pendiente
-Pendiente de enlazar: sales — la rejilla del TPV vende los servicios del catálogo (SALES-F01)
-Pendiente de enlazar: sales — un servicio de precio abierto pide su importe (SALES-F09)
-Pendiente de enlazar: sales — cobrar una cita lleva su servicio al TPV (SALES-F26)
-Pendiente de enlazar: REC_PELUQUERIA — el día completo del salón
+Implicados: MODIFIERS-F05, SALES-F01, SALES-F09, SALES-F26, REC_PELUQUERIA-F09
 QA: B-05, B-06, BD-05
 
 ### SERVICES-F10 Entregar el catálogo a Citas, Personal, WhatsApp y Combos
@@ -201,14 +184,7 @@ Entra: el catálogo de Servicios.
 Sale: nada; Servicios no guarda quién lo lee. Qué profesional hace cada servicio lo guarda Personal,
 y la regla «si nadie lo tiene asignado, lo hace todo el equipo reservable» es de Citas.
 Si falla: cada lector decide (Citas rechaza reservar sin la ficha del servicio; Personal avisa de que falta el módulo).
-Implicados: pendiente
-Pendiente de enlazar: appointments — el servicio reservable con su precio y duración (APPOINTMENTS-F01)
-Pendiente de enlazar: appointments — nombre, precio y duración del nuevo servicio al mover una cita (APPOINTMENTS-F04)
-Pendiente de enlazar: staff — el catálogo del que se elige el servicio de un profesional (STAFF-F10)
-Pendiente de enlazar: staff — quién puede hacer un servicio; sin nadie asignado decide Citas (STAFF-F12)
-Pendiente de enlazar: whatsapp_inbox — leer servicios y su duración (WHATSAPP_INBOX-F21)
-Pendiente de enlazar: REC_WA_CITA — leer servicios y su duración (REC_WA_CITA-F04)
-Pendiente de enlazar: combos — un menú puede llevar un servicio como componente
+Implicados: APPOINTMENTS-F01, APPOINTMENTS-F04, COMBOS-F06, STAFF-F10, WHATSAPP_INBOX-F21, REC_PELUQUERIA-F06, REC_WA_CITA-F04
 QA: B-02, W-02
 
 ### SERVICES-F11 Cambiar los ajustes de Servicios

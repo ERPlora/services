@@ -42,11 +42,7 @@ se gasta otra, la clienta pierde dos; si no se cobra, vuelve sola al bono al cab
 juntan dos cuentas, la absorbida se anula sin aviso y su sesión retenida no se gasta al cobrar la
 que queda: vuelve sola al bono al cabo de un día, y el hueco de la que queda ofrece gastar otra
 (leído en el código, sin ejecutar).
-Implicados: pendiente
-Pendiente de enlazar: sales — ofrecer el bono por línea, retener la sesión y gastarla al cobrar (SALES-F27)
-Pendiente de enlazar: sales — dividir la cuenta no avisa a Servicios y la sesión retenida se queda en la original (SALES-F23)
-Pendiente de enlazar: sales — juntar cuentas anula la absorbida sin aviso y su sesión retenida no se gasta al cobrar (SALES-F24)
-Pendiente de enlazar: REC_PELUQUERIA — el día completo del salón, cobro con bono
+Implicados: SALES-F17, SALES-F23, SALES-F24, SALES-F27, REC_PELUQUERIA-F10
 QA: B-08
 
 ### SERVICES-F23 Soltar la sesión si la línea o la cuenta desaparecen
@@ -61,9 +57,7 @@ Entra: la cuenta y la línea quitada, o la cuenta anulada (avisa Ventas: `sales.
 Sale: las sesiones retenidas y sin cobrar de esa línea o de esa cuenta vuelven al bono al momento.
 Una sesión ya gastada en una venta cobrada no se toca.
 Si falla: no hay pantalla; repetir el aviso no cambia nada. Si el aviso no llega, la sesión vuelve sola al cabo de un día (SERVICES-F25).
-Implicados: pendiente
-Pendiente de enlazar: sales — quitar una línea lo anuncia, también si no se quitó por estar ya en cocina (SALES-F27)
-Pendiente de enlazar: sales — soltar las sesiones de bono retenidas en esa cuenta (SALES-F18)
+Implicados: SALES-F18, SALES-F27, REC_PELUQUERIA-F10
 QA: B-08
 
 ### SERVICES-F24 Dar por gastadas las sesiones al cobrar
@@ -85,9 +79,7 @@ nunca llega a procesarse, las sesiones siguen retenidas y vuelven solas al bono 
 (SERVICES-F25) aunque la línea se cobró a 0 (leído en el código, sin ejecutar). Eso pasa, por
 ejemplo, si el tique vendía un bono desactivado por la API (SERVICES-F14): falla entero, también el
 gasto de las sesiones.
-Implicados: pendiente
-Pendiente de enlazar: sales — la venta cobrada que avisa a Servicios (SALES-F01)
-Pendiente de enlazar: sales — gastar la sesión al cobrar (SALES-F27)
+Implicados: SALES-F01, SALES-F22, SALES-F23, SALES-F27, REC_PELUQUERIA-F10
 QA: B-08
 
 ### SERVICES-F25 La sesión retenida que nadie cobra vuelve sola
@@ -105,8 +97,7 @@ Sale: la sesión de vuelta en el bono. La tarea de cada hora emite `services.pac
 en cada pasada, haya soltado algo o no y sin decir qué sesiones; si la sesión la libera otro gasto,
 no hay aviso.
 Si falla: no hay pantalla; si la tarea no corre, la sesión vuelve igual en cuanto pasa el plazo.
-Implicados: pendiente
-Pendiente de enlazar: sales — una cuenta aparcada más de un día pierde la sesión retenida (SALES-F17)
+Implicados: SALES-F17, REC_PELUQUERIA-F10
 QA: ninguno
 
 ### SERVICES-F26 Devolver la sesión al devolver la venta
@@ -131,9 +122,7 @@ venta. Inténtalo otra vez antes de terminar la devolución.» con **Reintentar*
 por resuelta. Una sesión ya devuelta: «Esta sesión ya se devolvió en otra devolución.». Si falla al
 devolverla, «No se ha podido devolver esa sesión al bono.» y Ventas avisa de que el dinero volvió
 pero eso no.
-Implicados: pendiente
-Pendiente de enlazar: sales — devolver al bono la sesión de una línea devuelta (SALES-F32)
-Pendiente de enlazar: sales — la ventana de devolución y su documento (SALES-F31)
+Implicados: SALES-F31, SALES-F32, REC_PELUQUERIA-F14
 QA: B-08
 
 ### SERVICES-F27 Devolver la sesión al anular la venta
@@ -147,6 +136,5 @@ Pasos:
 Entra: la venta anulada (Ventas avisa `sale.voided`; Servicios no lo escucha).
 Sale: hoy, nada.
 Si falla: no aplica.
-Implicados: pendiente
-Pendiente de enlazar: sales — la sesión de bono gastada en la venta anulada no vuelve al bono (SALES-F30)
+Implicados: SALES-F30, REC_PELUQUERIA-F14
 QA: B-08

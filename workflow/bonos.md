@@ -27,7 +27,7 @@ no se puede canjear.». Un importe ilegible, ambiguo o negativo, con el nombre d
 («Precio cerrado: Esto no es un importe…»). Un nombre ya usado por otro bono, vivo o eliminado, se
 rechaza sin decir que el nombre está repetido: sale «No se pudo guardar el paquete» o un aviso sin
 frase propia (leído en el código, sin ejecutar).
-Implicados: ninguno
+Implicados: REC_PELUQUERIA-F04, REC_PELUQUERIA-F13
 QA: BD-05, B-08
 
 ### SERVICES-F13 Editar o eliminar un bono
@@ -53,8 +53,7 @@ el bono ya se eliminó en otro dispositivo, **Eliminar** vuelve a responder bien
 **Guardar cambios** se rechaza con un texto técnico del validador («payload inválido para
 `services.packages.update`: …»), no con «Ese paquete no existe en este negocio.» (leído en el código,
 sin ejecutar).
-Implicados: pendiente
-Pendiente de enlazar: sales — el bono eliminado deja de ofrecerse en el hueco del cobro (SALES-F27)
+Implicados: SALES-F27
 QA: BD-05, B-08
 
 ### SERVICES-F14 Vender un bono a una clienta
@@ -84,10 +83,7 @@ la concesión manual se rechaza sin frase propia, y venderlo en un tique hace fa
 la venta cobrada: no se concede, y las sesiones retenidas en ese tique no se dan por gastadas y vuelven
 al bono al cabo de un día (SERVICES-F24) (leído en el código, sin ejecutar). Anular o devolver después la venta del bono no anula el
 bono: hay que anularlo en **Bonos vendidos** si no se ha usado (SERVICES-F17).
-Implicados: pendiente
-Pendiente de enlazar: sales — la venta cobrada lleva la línea del bono y la clienta (SALES-F01)
-Pendiente de enlazar: sales — anular la venta del bono no lo anula (SALES-F30)
-Pendiente de enlazar: sales — devolver la venta del bono no lo anula (SALES-F31)
+Implicados: SALES-F01, SALES-F30, SALES-F31, REC_PELUQUERIA-F13
 QA: B-08, BD-05 (discrepa)
 
 ### SERVICES-F15 Consultar los bonos de una clienta
@@ -104,9 +100,7 @@ Pasos:
 Entra: la clienta (Clientes) y sus bonos vendidos.
 Sale: nada; solo lectura. Dos compras del mismo bono son dos filas, cada una con su saldo y su caducidad.
 Si falla: el asistente dice que no pudo leerlo.
-Implicados: pendiente
-Pendiente de enlazar: sales — el hueco del cobro enseña los bonos de la clienta por servicio (SALES-F27)
-Pendiente de enlazar: customers — la ficha de la clienta no enseña sus bonos
+Implicados: SALES-F27
 QA: B-08
 
 ### SERVICES-F16 Ver quién ha comprado un bono
@@ -120,12 +114,11 @@ Pasos:
    o «No caduca» y, si se regaló o corrigió algo después, «Regalado después: …» o «Corregido después:
    …». Una anulada dice «Anulado por {who} el {when}» y el motivo.
 3. **Cargar más** trae la página siguiente. **Cerrar** vuelve a la tabla.
-Entra: las compras de ese bono; el nombre de cada clienta, de Clientes; el del empleado, de la lista de usuarios del hub.
+Entra: las compras de ese bono; el nombre de cada clienta, de Clientes (CUSTOMERS-F30); el del empleado, de la lista de usuarios del hub.
 Sale: nada; solo lectura. **Ajustar** y **Anular** salen en las filas en que proceden y para quien tiene permiso (SERVICES-F17, SERVICES-F18).
 Si falla: «No se han podido cargar los bonos vendidos». Mientras llega un nombre, «Cargando
 nombre…»; sin Clientes, sin permiso para ver clientes o con la ficha eliminada, sale el identificador.
-Implicados: pendiente
-Pendiente de enlazar: customers — el nombre de la clienta por su identificador
+Implicados: CUSTOMERS-F30, REC_PELUQUERIA-F13
 QA: B-08
 
 ### SERVICES-F17 Anular un bono vendido por error
@@ -149,8 +142,7 @@ Si falla: en la propia confirmación: «Ese bono ya se ha usado: no se puede anu
 estaba anulado.», «Ese bono no se puede anular ahora: se ha usado o anulado mientras tanto. Recarga la
 lista y vuelve a intentarlo.» o «No se ha podido anular el bono». Si otra caja está gastando una
 sesión a la vez, la anulación espera y después se rechaza.
-Implicados: pendiente
-Pendiente de enlazar: sales — el dinero del bono anulado se devuelve con una devolución (SALES-F31)
+Implicados: SALES-F31, REC_PELUQUERIA-F13
 QA: B-08
 
 ### SERVICES-F18 Regalar sesiones, alargar la caducidad o corregir el saldo
@@ -192,11 +184,10 @@ Pasos:
 3. Una sesión devuelta a un bono ya caducado lo dice: «La sesión ha vuelto a un bono que ya estaba
    caducado: consta en el bono, pero no se puede gastar mientras el bono no vuelva a estar vigente.».
 4. **Cargar más** trae la página siguiente.
-Entra: las sesiones y los ajustes de ese bono; nombres de Clientes y de los usuarios del hub.
+Entra: las sesiones y los ajustes de ese bono; nombres de Clientes (CUSTOMERS-F30) y de los usuarios del hub.
 Sale: nada; solo lectura.
 Si falla: «No se han podido cargar los movimientos». Vacía: «Este bono aún no se ha usado.».
-Implicados: pendiente
-Pendiente de enlazar: customers — el nombre de la clienta por su identificador
+Implicados: CUSTOMERS-F30
 QA: B-08
 
 ### SERVICES-F20 Un bono caduca

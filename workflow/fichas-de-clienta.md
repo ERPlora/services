@@ -16,8 +16,7 @@ Entra: la ficha que queda y la absorbida (avisa Clientes: `customer.merged`).
 Sale: los bonos y las sesiones apuntando a la ficha que queda; si alguno estaba en **Bonos sin
 cliente**, sale de ahí. Importes, fechas y movimientos no cambian. Solo dentro de este negocio.
 Si falla: no hay pantalla; repetir el aviso no cambia nada, y unir una ficha consigo misma no hace nada.
-Implicados: pendiente
-Pendiente de enlazar: customers — re-apunta los bonos y las sesiones gastadas (CUSTOMERS-F13)
+Implicados: CUSTOMERS-F13
 QA: L-10
 
 ### SERVICES-F29 Eliminar o anonimizar una ficha: sus bonos quedan sin cliente
@@ -33,9 +32,7 @@ Sale: los bonos sellados como sin cliente. El identificador de la ficha se queda
 único que lo casa con la venta que lo pagó. Las notas y los motivos libres de esos bonos no se vacían
 (hueco de la familia RGPD; ver el inventario del índice). Los bonos anulados no se sellan.
 Si falla: no hay pantalla; repetir el aviso conserva la fecha del primero.
-Implicados: pendiente
-Pendiente de enlazar: customers — marca los bonos de una ficha eliminada para que no se pierdan de vista (CUSTOMERS-F07)
-Pendiente de enlazar: customers — marca como huérfanos los bonos de la ficha borrada (CUSTOMERS-F16)
+Implicados: CUSTOMERS-F07, CUSTOMERS-F16
 QA: L-10
 
 ### SERVICES-F30 Rescatar los bonos sin cliente
@@ -55,7 +52,5 @@ Pasos:
 Entra: los bonos vivos sellados como sin cliente.
 Sale: nada; solo lectura.
 Si falla: «No se han podido cargar los bonos sin cliente.». Vacía: «Ningún bono se ha quedado sin cliente.».
-Implicados: pendiente
-Pendiente de enlazar: customers — la ficha eliminada o anonimizada que deja el bono sin cliente (CUSTOMERS-F07)
-Pendiente de enlazar: sales — devolver el dinero del bono es una devolución de su venta (SALES-F31)
+Implicados: CUSTOMERS-F07, SALES-F31
 QA: L-10
