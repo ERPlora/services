@@ -56,8 +56,8 @@ el motivo debajo, «Sin categoría fiscal: no se puede cobrar») o **Archivado**
 servicio…», filtros por columna (el filtro de Estado en **Archivado** cambia a la vista de
 archivados), vista de lista o de tarjetas. El botón **Nuevo servicio** abre el panel lateral con
 Nombre, Precio, Duración (min), Categoría («Sin categoría» o una de la lista) y Categoría fiscal
-(sin opción vacía) y el botón **Crear servicio** (al editar, **Guardar cambios** y «Cancelar
-edición»). Por fila: **Editar** y **Archivar**; en la vista de archivados, **Restaurar**. Tocar una
+(sin opción vacía) y el botón **Crear servicio** (al editar, el panel se titula «Editando servicio —
+<nombre>» y el botón es **Guardar cambios**). Por fila: **Editar** y **Archivar**; en la vista de archivados, **Restaurar**. Tocar una
 fila abre Editar. **Archivar** abre «Archivar servicio» con «<nombre> — dejará de ofrecerse y de
 poder reservarse. Se conservan su histórico y las citas ya reservadas.», el aviso «{count} cita(s)
 próxima(s) siguen usando este servicio…» si Citas está instalada, y **Archivar** / **Cancelar**.
@@ -94,7 +94,8 @@ paquete», «Añade al menos un servicio: un paquete sin líneas no se puede can
 pudo eliminar el paquete»).
 
 Hojas que se abren encima, todas con **Cerrar**, «Cargando…» mientras llegan, su vacío y su error
-encima de lo ya cargado, y **Cargar más** con «Se muestran {shown} de {total}» cuando hay más:
+encima de lo ya cargado, y **Cargar más** con «Se muestran {shown} de {total}» («{shown} de {total}»
+en Bonos sin cliente) cuando hay más:
 - **Movimientos del bono**: cada sesión de ese bono, de todas las clientas, la más reciente primero,
   con una etiqueta (**Reservada**, **Entregada**, **Liberada**, **Caducada**, **Devuelta**,
   **Cortesía**, **Corrección**), el servicio, la fecha, «Cliente: <nombre>» y «Venta: <identificador
@@ -106,8 +107,8 @@ encima de lo ya cargado, y **Cargar más** con «Se muestran {shown} de {total}�
   motivo. Botones **Ajustar** y **Anular** cuando proceden. Vacía: «Nadie ha comprado este bono
   todavía.» · Error: «No se han podido cargar los bonos vendidos».
 - **Bonos sin cliente**: los bonos cuya ficha se eliminó o se anonimizó, con «Quedan {remaining}
-  sesión(es)» o «Agotado», el importe, «Cliente borrado el {when}», «Caducado» si lo está y
-  «Referencia del cliente: <identificador>». Vacía: «Ningún bono se ha quedado sin cliente.» ·
+  sesión(es)» o «Agotado» (un bono ilimitado sale como «Quedan 0 sesión(es)»), el importe, «Cliente
+  borrado el {when}», «Caducado» si lo está y «Referencia del cliente: <identificador>». Vacía: «Ningún bono se ha quedado sin cliente.» ·
   Error: «No se han podido cargar los bonos sin cliente.».
 
 ### Ajustes de Servicios
@@ -126,7 +127,8 @@ con un bono», «{count} bonos válidos» si hay más de uno, y una tarjeta por 
 «Quedan {before} sesiones · {after} después de esta» (o «Sesiones ilimitadas»), «Caduca el {date}» y,
 en el que se gastará, el porqué («Se gasta primero porque es el que antes caduca.», etc.). Botón
 **Gastar una sesión** («Reservando…»). Hecho: «{name}: sesión gastada. Quedan {after}.» con
-**Deshacer**. Sin bonos: «Este cliente no tiene ningún bono que cubra este servicio.» · Cargando: un
+**Deshacer**; si la pantalla se recarga o se vuelve a una cuenta aparcada, el hueco vuelve a
+enseñarlo así, pero el TPV ya no da la línea por cubierta (SERVICES-F22). Sin bonos: «Este cliente no tiene ningún bono que cubra este servicio.» · Cargando: un
 bloque gris animado · Error: «No se han podido cargar los bonos del cliente. Inténtalo otra vez antes
 de cobrar el precio completo.» con **Reintentar**.
 
@@ -170,7 +172,7 @@ gramática y el mismo prefijo. Antes de tocar código, lee el fichero del flujo 
 | SERVICES-F21 | Gastar una sesión fuera del cobro | parcial | [`workflow/bonos.md`](workflow/bonos.md) |
 | SERVICES-F22 | Pagar una línea con un bono | parcial | [`workflow/cobro-y-devolucion.md`](workflow/cobro-y-devolucion.md) |
 | SERVICES-F23 | Soltar la sesión si la línea o la cuenta desaparecen | parcial | [`workflow/cobro-y-devolucion.md`](workflow/cobro-y-devolucion.md) |
-| SERVICES-F24 | Dar por gastadas las sesiones al cobrar | hecho | [`workflow/cobro-y-devolucion.md`](workflow/cobro-y-devolucion.md) |
+| SERVICES-F24 | Dar por gastadas las sesiones al cobrar | parcial | [`workflow/cobro-y-devolucion.md`](workflow/cobro-y-devolucion.md) |
 | SERVICES-F25 | La sesión retenida que nadie cobra vuelve sola | hecho | [`workflow/cobro-y-devolucion.md`](workflow/cobro-y-devolucion.md) |
 | SERVICES-F26 | Devolver la sesión al devolver la venta | parcial | [`workflow/cobro-y-devolucion.md`](workflow/cobro-y-devolucion.md) |
 | SERVICES-F27 | Devolver la sesión al anular la venta | no hecho | [`workflow/cobro-y-devolucion.md`](workflow/cobro-y-devolucion.md) |
@@ -197,9 +199,9 @@ gramática y el mismo prefijo. Antes de tocar código, lee el fichero del flujo 
 | Elemento (bonos: Mindbody, Vagaro, Boulevard, Fresha) | Estado | Flujo |
 |---|---|---|
 | Bono de N sesiones de servicios concretos | parcial — el límite es «Usos» para el bono entero; las «Sesiones» de cada servicio no limitan nada | SERVICES-F12 |
-| Vender el bono a una clienta en el TPV | parcial — el TPV no ofrece bonos; solo por el asistente o la API | SERVICES-F14 |
+| Vender el bono a una clienta en el TPV | parcial — el TPV no ofrece bonos; solo por el asistente o la API, con la línea marcada como servicio | SERVICES-F14 |
 | Caducidad que cuenta desde la compra | hecho | SERVICES-F20 |
-| Gastar en el cobro con vista previa del saldo y del bono elegido | hecho | SERVICES-F22 |
+| Gastar en el cobro con vista previa del saldo y del bono elegido | parcial — tras recargar o volver a una cuenta aparcada, el TPV cobra la línea y además se gasta la sesión; dividir la cuenta o cobrar solo una parte gasta sesiones de líneas que no se cobran | SERVICES-F22, SERVICES-F24 |
 | Deshacer el canje antes de cobrar | hecho | SERVICES-F22, SERVICES-F23 |
 | Saldo de bonos visible en la ficha de la clienta | parcial — solo en el cobro, servicio a servicio, y por el asistente | SERVICES-F15 |
 | La sesión vuelve al devolver la venta | parcial — no si la venta mezcló bono y dinero y ya se devolvió todo el dinero (sales#512) | SERVICES-F26 |
@@ -227,11 +229,12 @@ gramática y el mismo prefijo. Antes de tocar código, lee el fichero del flujo 
 | Venta, cuenta, línea y documento de devolución | Ventas | solo sus identificadores, que llegan en los avisos de Ventas y en los huecos del cobro y la devolución |
 | Citas futuras de un servicio | Citas | lectura opcional al archivar; Servicios no la guarda |
 | Quién puede hacer cada servicio | Personal | Servicios no lo guarda ni lo decide |
-| Nombres del equipo | Hub | lista de usuarios del hub para «Anulado por» y «Regalado por» |
+| Nombres del equipo | Hub | lista de usuarios del hub para «Anulado por», «Regalado por», «Corregido por» y «Devuelta por» |
 
 **Datos personales (inventario RGPD, recorriendo las migraciones):**
-- **Bono vendido:** el identificador de la clienta (sin nombre ni contacto), la venta y su
-  referencia, una nota libre (en la venta del TPV, el nombre del bono; en la concesión manual,
+- **Bono vendido:** el identificador de la clienta (sin nombre ni contacto), la fecha de compra y
+  el importe pagado (total, base e IVA), que juntos son su historial de compras de bonos, la venta y
+  su referencia, una nota libre (en la venta del TPV, el nombre del bono; en la concesión manual,
   hasta 500 caracteres de texto libre), el motivo libre de una anulación y quién la hizo, y la fecha
   en que se eliminó la ficha.
 - **Sesiones:** el identificador de la clienta, la cita y la venta enlazadas, una nota libre, quién
@@ -252,10 +255,11 @@ gramática y el mismo prefijo. Antes de tocar código, lee el fichero del flujo 
 
 ## Reglas que no se rompen
 - **Sin categoría fiscal no hay servicio:** el alta, la edición y cada línea del alta por lote
-  exigen la categoría; la pantalla no ofrece la opción vacía.
+  exigen la categoría; la pantalla no ofrece la opción vacía. (Una clave hecha solo de espacios,
+  por el asistente o la API, pasa en el alta suelta y el servicio sale **Sin configurar**.)
 - **Dinero en la unidad mínima de la moneda, entero y nunca negativo:** precio, coste, precio
-  cerrado y descuento fijo; un importe ilegible o ambiguo se rechaza con su motivo, nunca se guarda
-  como 0.
+  cerrado y descuento fijo: el servidor rechaza lo que no sea un número entero no negativo. (Que un
+  importe ilegible o ambiguo se rechace con su motivo, y no como 0, lo hace la pantalla.)
 - **Aislamiento por hub:** la categoría de un servicio, la categoría padre y los servicios de un
   bono tienen que ser de este negocio (el alta por lote no lo comprueba para la categoría,
   SERVICES-F06); una lectura nunca cruza de negocio.
@@ -266,7 +270,8 @@ gramática y el mismo prefijo. Antes de tocar código, lee el fichero del flujo 
 - **Una línea, una sesión:** la misma línea de la misma cuenta no se cubre dos veces.
 - **Dos cajas sobre el mismo bono van en fila**, y la que llega tarde recibe el motivo real.
 - **Lo cobrado no se deshace:** una sesión de una venta cobrada no se suelta; solo vuelve por una
-  devolución, una sola vez por documento.
+  devolución, y una sola vez: el mismo documento repetido no devuelve otra, y otro documento sobre la
+  misma sesión se rechaza («Esa sesión del bono ya se devolvió en otra devolución.»).
 - **Las condiciones vendidas se congelan:** cambiar «Usos» o «Vigencia (días)» del catálogo no toca
   los bonos ya vendidos; regalar o corregir es un movimiento aparte con motivo, de hasta 100
   sesiones (sumar o quitar) y hasta 366 días (solo alargar), y nunca quita más sesiones de las que
@@ -274,7 +279,7 @@ gramática y el mismo prefijo. Antes de tocar código, lee el fichero del flujo 
 - **Anular solo un bono intacto**, con motivo.
 - **Ningún movimiento de bono mueve dinero ni emite documento fiscal**: el registro fiscal sale con
   la venta del bono.
-- **Permisos:** empleado ve todo, da de alta servicios y gasta sesiones; cajero ve, gasta sesiones
+- **Permisos:** empleado ve todo salvo **Bonos sin cliente**, da de alta servicios y gasta sesiones; cajero ve, gasta sesiones
   y concede bonos;
   responsable además edita servicios, categorías y bonos, anula y ajusta bonos vendidos, devuelve
   sesiones y ve los bonos sin cliente; administrador además archiva servicios, borra categorías y
@@ -319,6 +324,7 @@ Contra el código de `origin/main` (v1.5.71), una línea por discrepancia:
 - `docs/concepts.md` («Deleting one cascades to its descendants»): eliminar una categoría no toca sus subcategorías, que siguen vivas con un padre eliminado (SERVICES-F08).
 - `docs/concepts.md` («deleting a package does not currently cascade the soft-delete to its lines») y («Variants and add-ons exist in the data»): desactualizados; las líneas se borran con el bono y las variantes y extras se retiraron.
 - `docs/overview.md` («the clock runs from the customer's first live use, so returning the use that started it un-starts it»): la caducidad cuenta desde la compra (ADR-0390) y devolver una sesión no la mueve (SERVICES-F20).
+- `schemas/package_create.json` y `schemas/package_update.json` (`validity_days`: «after its first use»): la vigencia cuenta desde la compra, que es lo que lee el asistente al crear o editar un bono (SERVICES-F20).
 - `docs/overview.md` (eventos que escucha): solo nombra la venta cobrada; también escucha quitar una línea y anular una cuenta de Ventas, y eliminar, anonimizar y unir fichas de Clientes.
 - `hand-book/modulos/services.md`: llama «Paquetes» a la pestaña «Bonos y paquetes»; dice que los ajustes están «en los ajustes del Hub» (es la pestaña Ajustes del módulo); pide activar «Reservable» y «Reserva online» y elegir tipo de precio, márgenes y capacidad, que no están en la pantalla; y pide comprobar «el saldo del cliente», que no tiene pantalla (SERVICES-F15).
 - `locales/es.json` (`ui.packageLinesFixed`): «archiva este paquete y crea uno nuevo»; no hay archivar para bonos, solo **Eliminar**, y uno nuevo con el mismo nombre se rechaza (SERVICES-F12, SERVICES-F13).

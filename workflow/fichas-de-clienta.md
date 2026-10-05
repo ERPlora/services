@@ -39,18 +39,19 @@ Pendiente de enlazar: customers — marca como huérfanos los bonos de la ficha 
 QA: L-10
 
 ### SERVICES-F30 Rescatar los bonos sin cliente
-Estado: parcial — la hoja solo enseña la lista: no tiene ninguna acción, no enlaza la venta que pagó el bono, y pasar el bono a otra ficha, que su texto sugiere, no existe (services#79, ADR-0390)
+Estado: parcial — la hoja solo enseña la lista: no tiene ninguna acción, no enlaza la venta que pagó el bono, y pasar el bono a otra ficha, que su texto sugiere, no existe (services#79, ADR-0390); y un bono ilimitado sale como «Quedan 0 sesión(es)», aunque no está agotado
 Actor: responsable
 Pantalla: Bonos y paquetes
 Pasos:
 1. En **Bonos y paquetes** pulsa **Bonos sin cliente**.
 2. Sale cada bono cuya ficha se eliminó o se anonimizó, el más reciente primero: «Quedan {remaining}
    sesión(es)» o «Agotado», el bono, el importe pagado, «Cliente borrado el {when}», «Caducado» si lo
-   está y «Referencia del cliente: <identificador>». No hay nombre, correo ni teléfono.
+   está y «Referencia del cliente: <identificador>». No hay nombre, correo ni teléfono. Un bono
+   ilimitado sale como «Quedan 0 sesión(es)», aunque no está agotado.
 3. Para devolver el dinero, busca la venta en **Ventas** y haz una devolución; para anular el bono si
    no se usó, ábrelo desde **Bonos vendidos** de ese bono, donde sale con el identificador en lugar
    del nombre (SERVICES-F17).
-4. **Cargar más** trae la página siguiente; **Cerrar** vuelve a la tabla.
+4. **Cargar más** (con «{shown} de {total}») trae la página siguiente; **Cerrar** vuelve a la tabla.
 Entra: los bonos vivos sellados como sin cliente.
 Sale: nada; solo lectura.
 Si falla: «No se han podido cargar los bonos sin cliente.». Vacía: «Ningún bono se ha quedado sin cliente.».

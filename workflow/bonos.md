@@ -45,21 +45,26 @@ Sale: al editar, el bono cambiado (`services.package.updated`); «Usos» y «Vig
 valen para las ventas futuras: los bonos ya vendidos conservan lo que se vendió. El nombre nuevo se
 ve también en los bonos ya vendidos. Al eliminar, el bono y sus líneas salen del catálogo
 (`services.package.deleted`); sus bonos vendidos dejan de ofrecerse en el cobro, gastarlos se
-rechaza con «Ese paquete no existe en este negocio.» y solo siguen visibles si su clienta está en
-**Bonos sin cliente**.
-Si falla: «No se pudo guardar el paquete» en el panel o «No se pudo eliminar el paquete» arriba;
-«Ese paquete no existe en este negocio.» si ya se eliminó en otro dispositivo.
+rechaza con «Ese paquete no existe en este negocio.» y solo siguen visibles en **Bonos sin cliente**
+(si su clienta se eliminó) y cuando se le pregunta al asistente por los bonos de la clienta
+(SERVICES-F15).
+Si falla: «No se pudo guardar el paquete» en el panel o «No se pudo eliminar el paquete» arriba. Si
+el bono ya se eliminó en otro dispositivo, **Eliminar** vuelve a responder bien y no avisa de nada, y
+**Guardar cambios** se rechaza con un texto técnico del validador («payload inválido para
+`services.packages.update`: …»), no con «Ese paquete no existe en este negocio.» (leído en el código,
+sin ejecutar).
 Implicados: pendiente
 Pendiente de enlazar: sales — el bono eliminado deja de ofrecerse en el hueco del cobro (SALES-F27)
 QA: BD-05, B-08
 
 ### SERVICES-F14 Vender un bono a una clienta
-Estado: parcial — no hay pantalla: el TPV no ofrece los bonos como artículo y no hay botón de venta manual; solo con el asistente o la API (cobrando un tique con la línea del bono, o con la concesión manual); y anular o devolver la venta del bono no lo anula
+Estado: parcial — no hay pantalla: el TPV no ofrece los bonos como artículo y no hay botón de venta manual; solo con el asistente o la API (cobrando un tique con la línea del bono marcada como servicio, o con la concesión manual); y anular o devolver la venta del bono no lo anula
 Actor: cajero, responsable, asistente
 Pantalla: asistente
 Pasos:
 1. Con la clienta elegida, cobra un tique cuya línea es el bono del catálogo (por el asistente o la
-   API: la línea lleva el bono como artículo, con su precio y su IVA). Al cobrarse, cada unidad de esa
+   API: la línea lleva el id del bono como artículo y marcada como servicio, con el precio y el IVA
+   que se manden; nadie los contrasta con «Precio cerrado» ni con «Descuento»). Al cobrarse, cada unidad de esa
    línea se convierte en un bono vendido a esa clienta, con su parte del importe y del IVA.
 2. O pide al asistente que conceda el bono a la clienta (concesión manual), con la venta y el
    importe si los hay, para un bono entregado fuera del TPV.
@@ -73,7 +78,11 @@ venta no concede dos veces. Ningún documento fiscal sale aquí: lo emite la ven
 Si falla: un tique sin clienta no concede nada y no se avisa en ninguna pantalla (la venta se cobra
 igual): hay que concederlo a mano. La concesión manual se rechaza con «Elige el cliente al que
 pertenece el bono: un bono sin dueño no lo puede canjear nadie.» o «Ese paquete no existe en este
-negocio.» (también si el bono se eliminó). Anular o devolver después la venta del bono no anula el
+negocio.» (también si el bono se eliminó). Si la línea del bono no va marcada como servicio, Ventas
+rechaza la venta entera porque ese artículo no está en su catálogo. Un bono desactivado por la API:
+la concesión manual se rechaza sin frase propia, y venderlo en un tique hace fallar entero el aviso de
+la venta cobrada: no se concede, y las sesiones retenidas en ese tique no se dan por gastadas y vuelven
+al bono al cabo de un día (SERVICES-F24) (leído en el código, sin ejecutar). Anular o devolver después la venta del bono no anula el
 bono: hay que anularlo en **Bonos vendidos** si no se ha usado (SERVICES-F17).
 Implicados: pendiente
 Pendiente de enlazar: sales — la venta cobrada lleva la línea del bono y la clienta (SALES-F01)
@@ -88,6 +97,7 @@ Pantalla: asistente
 Pasos:
 1. Pregunta al asistente por los bonos de la clienta: responde una fila por compra, con el bono,
    cuándo se compró, lo pagado, las sesiones usadas y las que quedan, cuándo caduca y si ya caducó.
+   También salen los de un bono eliminado del catálogo, que ya no se pueden gastar (SERVICES-F13).
 2. En el cobro, el hueco de cada línea de servicio enseña los bonos de esa clienta que cubren ese
    servicio, con las sesiones que quedan y la caducidad (SERVICES-F22).
 3. En **Bonos y paquetes → Bonos vendidos** se ve cada compra de un bono concreto (SERVICES-F16).

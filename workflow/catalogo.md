@@ -40,7 +40,7 @@ Pantalla: Servicios
 Pasos:
 1. Toca la fila del servicio o su **Editar**: el panel se abre con el título «Editando servicio — <nombre>» y los datos cargados.
 2. Cambia Nombre, Precio, Duración (min), Categoría o Categoría fiscal (esta no se puede vaciar).
-3. Pulsa **Guardar cambios**: el panel se cierra y la tabla se recarga. «Cancelar edición» vuelve al formulario de alta vacío.
+3. Pulsa **Guardar cambios**: el panel se cierra y la tabla se recarga. Para volver al alta sin guardar, cierra el panel y pulsa **Nuevo servicio**.
 Entra: el servicio completo (Servicios) y las categorías fiscales (Impuestos).
 Sale: el servicio cambiado (`services.service.updated`); lo que el panel no enseña se conserva. Las
 citas ya reservadas conservan el nombre, el precio y la duración que tenían; los bonos ya vendidos no
@@ -106,25 +106,30 @@ Entra: los servicios archivados o desactivados.
 Sale: el servicio otra vez en oferta y reservable (`services.service.updated`).
 Si falla: arriba de la tabla, «No se pudo restaurar el servicio» o «No se ha podido recuperar el
 servicio: no existe en este negocio, o ya se está ofreciendo.». En la vista de archivados la fila no
-ofrece Editar ni Archivar, pero tocarla abre «Editando servicio» y **Guardar cambios** responde «No
-se ha podido actualizar el servicio: no existe en este negocio, o la categoría elegida no existe.».
+ofrece Editar ni Archivar, pero tocarla abre «Editando servicio» y **Guardar cambios** se rechaza con
+un texto técnico del validador («payload inválido para `services.services.update`: …») (leído en el
+código, sin ejecutar).
 Implicados: pendiente
 Pendiente de enlazar: appointments — el servicio vuelve a ofrecerse al reservar (APPOINTMENTS-F01)
 Pendiente de enlazar: sales — el servicio vuelve a la rejilla del TPV (SALES-F01)
 QA: BD-05
 
 ### SERVICES-F06 Dar de alta muchos servicios de golpe
-Estado: parcial — no hay importador en pantalla (las tablas de Servicios no ofrecen importar un fichero): solo con el asistente o la API; dos servicios del lote con el mismo nombre (o uno igual a otro creado antes por lote) hacen fallar el lote entero, y la categoría de cada línea no se comprueba que sea de este negocio (leído en el código, sin ejecutar)
+Estado: parcial — no hay importador en pantalla (las tablas de Servicios no ofrecen importar un fichero): solo con el asistente o la API; una sola línea mal formada (sin nombre, sin categoría fiscal, tarifa no válida, precio negativo, duración 0) rechaza el lote entero; dos servicios del lote con el mismo nombre (o uno igual a otro creado antes por lote) hacen fallar el lote entero, y la categoría de cada línea no se comprueba que sea de este negocio (leído en el código, sin ejecutar)
 Actor: responsable, asistente
 Pantalla: asistente
 Pasos:
 1. Pide al asistente que cree una lista de servicios, cada uno con nombre, precio, duración y categoría fiscal (hasta 500).
-2. El asistente responde cuántos se crearon y cuáles no, con su motivo (sin nombre, sin categoría fiscal, tarifa no válida, precio negativo, duración 0).
+2. Si todas las líneas están bien formadas, el asistente responde cuántos se crearon. Solo una línea cuyo nombre o categoría fiscal son espacios en blanco se rechaza por separado, con su motivo, sin parar a las demás.
 3. Recarga **Servicios** para verlos: la lista no se refresca sola con un alta por lote.
 Entra: la lista de servicios.
-Sale: los servicios válidos, en una sola escritura; los inválidos se informan uno a uno y no paran
-a los demás. Sin duración se guarda 60 min, sin mirar los ajustes. No se emite ningún aviso.
-Si falla: el asistente explica los motivos por línea (en inglés). Un fallo de la escritura deja el lote entero sin crear.
+Sale: los servicios, en una sola escritura. Sin duración se guarda 60 min, sin margen y con reserva
+online, sin mirar los ajustes (SERVICES-F11). No se emite ningún aviso.
+Si falla: una línea sin nombre, sin categoría fiscal, con una tarifa fuera de las cinco, con el precio
+negativo o con la duración a 0 rechaza el lote **entero** antes de crear nada («payload inválido para
+`services.services.bulk_create`: …»). Un nombre o una categoría fiscal hechos solo de espacios se
+rechazan línea a línea, con el motivo en inglés, y las demás se crean. Un fallo de la escritura
+(por ejemplo, el nombre repetido) deja el lote entero sin crear.
 Implicados: pendiente
 Pendiente de enlazar: taxes — cada línea del lote exige su categoría fiscal (TAXES-F19)
 QA: ninguno
@@ -207,7 +212,7 @@ Pendiente de enlazar: combos — un menú puede llevar un servicio como componen
 QA: B-02, W-02
 
 ### SERVICES-F11 Cambiar los ajustes de Servicios
-Estado: parcial — los ajustes no cambian nada de lo que se hace en pantalla: «Duración por defecto (min)», «Tiempo de margen por defecto (min)» y «Permitir reserva online» solo cuentan en un alta por el asistente o la API que no los mande; «Tipo de IVA por defecto», «Mostrar precios», «Mostrar duración», «Precios con IVA incluido» y «Moneda» no los lee nadie
+Estado: parcial — los ajustes no cambian nada de lo que se hace en pantalla: «Duración por defecto (min)», «Tiempo de margen por defecto (min)» y «Permitir reserva online» solo cuentan en el alta de un servicio suelto por el asistente o la API que no los mande (el alta por lote, SERVICES-F06, tampoco los usa); «Tipo de IVA por defecto», «Mostrar precios», «Mostrar duración», «Precios con IVA incluido» y «Moneda» no los lee nadie
 Actor: administrador
 Pantalla: Ajustes de Servicios
 Pasos:
@@ -215,8 +220,8 @@ Pasos:
 2. Cambia los campos y pulsa **Guardar**.
 3. Sale «Ajustes guardados.».
 Entra: los ajustes guardados (o los de fábrica: 60 min, 0 min, reserva online sí, IVA incluido sí, EUR).
-Sale: los ajustes del negocio, que el alta de servicios por el asistente o la API usa como relleno
-de duración, márgenes y reserva online cuando no los recibe. El panel de **Nuevo servicio** no los
+Sale: los ajustes del negocio, que el alta de un servicio suelto por el asistente o la API usa como
+relleno de duración, márgenes y reserva online cuando no los recibe; el alta por lote no. El panel de **Nuevo servicio** no los
 usa: con la duración vacía guarda 60 min.
 Si falla: «No se pudieron guardar los ajustes.»; un valor no admitido se marca en su campo con
 «Este valor no se admite.». Quien no es administrador ve los campos en solo lectura con «Solo un
