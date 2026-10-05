@@ -134,7 +134,7 @@ de cobrar el precio completo.» con **Reintentar**.
 
 ### Hueco del bono en la devolución
 Lo pinta Servicios dentro de la ventana **Devolver** de Ventas, en cada línea que pagó un bono
-(SALES-F32). Muestra la casilla «Devolver la sesión a {name}», marcada de entrada, con «Quedan
+(SALES-F32), cuando en el tique hubo dinero: en uno pagado entero con bono (0,00 €) la ventana dice «No queda nada por devolver en esta venta.» y el hueco no sale (SERVICES-F26). Muestra la casilla «Devolver la sesión a {name}», marcada de entrada, con «Quedan
 {before} sesiones · {after} tras esta devolución»; si el bono ya caducó, «{name} caducó el {date}. La
 sesión vuelve al bono igualmente.». Una sesión que no puede volver enseña su motivo («Esta sesión ya
 se devolvió en otra devolución.», «Esta sesión nunca se cobró, así que no hay nada que devolver.»).
@@ -204,7 +204,7 @@ gramática y el mismo prefijo. Antes de tocar código, lee el fichero del flujo 
 | Gastar en el cobro con vista previa del saldo y del bono elegido | parcial — tras recargar o volver a una cuenta aparcada, el TPV cobra la línea y además se gasta la sesión; dividir la cuenta o cobrar solo una parte gasta sesiones de líneas que no se cobran | SERVICES-F22, SERVICES-F24 |
 | Deshacer el canje antes de cobrar | hecho | SERVICES-F22, SERVICES-F23 |
 | Saldo de bonos visible en la ficha de la clienta | parcial — solo en el cobro, servicio a servicio, y por el asistente | SERVICES-F15 |
-| La sesión vuelve al devolver la venta | parcial — no si la venta mezcló bono y dinero y ya se devolvió todo el dinero (sales#512) | SERVICES-F26 |
+| La sesión vuelve al devolver la venta | parcial — solo junto con una devolución de dinero: no en un tique pagado entero con bono (0,00 €) ni si ya se devolvió todo el dinero; entonces, solo con Ajustar | SERVICES-F26, SERVICES-F18 |
 | La sesión vuelve al anular la venta | no hecho | SERVICES-F27 |
 | Anular la venta de un bono hecha por error | hecho | SERVICES-F17 |
 | Regalar sesiones, alargar la caducidad, corregir el saldo | hecho | SERVICES-F18 |
@@ -225,7 +225,7 @@ gramática y el mismo prefijo. Antes de tocar código, lee el fichero del flujo 
 | Cortesías y correcciones de un bono vendido | Servicios | propio |
 | Ajustes de Servicios | Servicios | propio |
 | Categoría fiscal y su tipo | Impuestos | la lista de categorías para elegir; Servicios guarda solo la clave y no comprueba que exista al guardar |
-| Clienta | Clientes | solo su identificador en el bono; el nombre se pide a Clientes al pintar las hojas, si está instalado y hay permiso |
+| Clienta | Clientes | solo su identificador en el bono; el nombre se pide a Clientes al pintar las hojas, si está instalado y hay permiso: Clientes devuelve la ficha entera (NIF, dirección, notas, cumpleaños) y Servicios solo usa el nombre (CUSTOMERS-F30, duda de minimización en Clientes) |
 | Venta, cuenta, línea y documento de devolución | Ventas | solo sus identificadores, que llegan en los avisos de Ventas y en los huecos del cobro y la devolución |
 | Citas futuras de un servicio | Citas | lectura opcional al archivar; Servicios no la guarda |
 | Quién puede hacer cada servicio | Personal | Servicios no lo guarda ni lo decide |
@@ -330,4 +330,4 @@ Contra el código de `origin/main` (v1.5.71), una línea por discrepancia:
 - `locales/es.json` (`ui.packageLinesFixed`): «archiva este paquete y crea uno nuevo»; no hay archivar para bonos, solo **Eliminar**, y uno nuevo con el mismo nombre se rechaza (SERVICES-F12, SERVICES-F13).
 - `locales/es.json` (`ui.orphansHint`): «devuélvelo o pásalo a otra ficha»; la hoja no tiene ninguna acción y pasar un bono a otra ficha no existe (SERVICES-F30).
 - `locales/es.json` (`settings.fields.default_tax_category_key`): se llama «Tipo de IVA por defecto» pero guarda una clave de categoría escrita a mano y no se usa (SERVICES-F11).
-- B-08 (`qa-hub.md` §6) y BD-05 (`qa-business-day.md`) esperan crear y vender bonos desde la pantalla; se crean, pero venderlos no tiene pantalla (SERVICES-F14).
+- BD-05 (`qa-business-day.md`) espera que lo creado aparezca disponible para vender; los bonos se crean, pero venderlos no tiene pantalla (SERVICES-F14). B-08 (`qa-hub.md` §6) solo pide «bono/paquete de sesiones» y no discrepa por eso.

@@ -101,7 +101,7 @@ Implicados: SALES-F17, REC_PELUQUERIA-F10
 QA: ninguno
 
 ### SERVICES-F26 Devolver la sesión al devolver la venta
-Estado: parcial — en un tique pagado con bono y dinero no se puede devolver solo la sesión mientras quede dinero (sales#512), y una vez devuelto todo el dinero la venta pasa a Devuelta y **Devolver** queda desactivado, así que la sesión ya no se puede devolver desde Ventas; solo compensarla con **Ajustar** (SERVICES-F18)
+Estado: parcial — la sesión solo vuelve junto con una devolución de dinero: en un tique pagado entero con bono (0,00 €), **Devolver** dice «No queda nada por devolver en esta venta.» y no enseña este hueco (el servidor de Ventas rechaza además una devolución sin dinero), así que la sesión solo se repone con **Ajustar → Añadir sesiones** (SERVICES-F18); en un tique pagado con bono y dinero la sesión sola no se puede devolver mientras quede dinero (hay que devolver algo de dinero a la vez, sales#512), y una vez devuelto todo el dinero la venta pasa a Devuelta y **Devolver** queda desactivado: también entonces, solo **Ajustar**
 Actor: responsable
 Pantalla: Ventas: Devolver
 Pasos:
@@ -109,7 +109,7 @@ Pasos:
    Servicios con «Devolver la sesión a {name}» ya marcado y «Quedan {before} sesiones · {after} tras
    esta devolución». Desmárcalo si la sesión no debe volver.
 2. Si el bono ya caducó, el aviso «{name} caducó el {date}. La sesión vuelve al bono igualmente.» sale junto al botón de devolver.
-3. Pulsa el botón de devolver de Ventas. Cuando el documento de devolución existe, Servicios devuelve
+3. Pulsa el botón de devolver de Ventas, con algún importe de dinero. Cuando el documento de devolución existe, Servicios devuelve
    la sesión y la ventana espera a que termine: «{name}: la sesión ha vuelto al bono.».
 4. Dos líneas del mismo servicio en el tique (madre e hija con el mismo corte) devuelven cada una su sesión.
 Entra: la venta, sus líneas pagadas por bono y el documento de devolución (Ventas); las sesiones gastadas en esa venta.

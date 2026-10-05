@@ -167,7 +167,7 @@ Si falla: en el formulario: «Indica por qué se ajusta este bono: el motivo que
 que le quedan al cliente.», «Ese bono no tiene límite de sesiones…», «Ese bono no caduca…», «Ese bono
 no se puede ajustar ahora: se ha anulado, o se han usado sus sesiones, mientras tanto. Recarga la
 lista y vuelve a intentarlo.» o «No se pudo ajustar el bono». La caducidad no se puede adelantar.
-Implicados: ninguno
+Implicados: SALES-F32, REC_PELUQUERIA-F14
 QA: B-08
 
 ### SERVICES-F19 Ver los movimientos de un bono
