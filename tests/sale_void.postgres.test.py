@@ -13,7 +13,9 @@ this sale's out of the reach of a void:
      already gave back, not a row of the neighbour hub carrying the same sale id.
   2. VOUCHERS SOLD ON THE VOIDED SALE are voided while intact (SERVICES-F14) — and nothing else is:
      not one already used or held, not a manual grant that names the sale, not one sold on another
-     sale, not one already voided (its trail is not re-stamped), not the neighbour's.
+     sale, not one already voided (its trail is not re-stamped), not the neighbour's. The
+     sessions come back BEFORE the vouchers are judged: one whose only session was spent on the
+     very sale that sold it is intact again by then, and is voided.
   3. A redelivered `sale.voided` touches nothing.
   4. RACE: a till holding a session of a voucher sold on the sale, at the same instant, makes the
      void WAIT; it then reads the held session and leaves the voucher live.
@@ -367,7 +369,11 @@ def expired_and_unsigned(
     # (ids are opaque: only the hub_id keeps it out) makes it unexpired.
     adjust = {"uses_delta": 0, "days_delta": 30, "reason": "Closed for holidays"}
     withdrawn = str(uuid.uuid4())
-    run(db, "services._adjust_grant", {"adjustment_id": withdrawn, "grant_id": g, **adjust})
+    run(
+        db,
+        "services._adjust_grant",
+        {"adjustment_id": withdrawn, "grant_id": g, **adjust},
+    )
     theirs_g = grant(db, other_pkg, "cus-old", source="manual", hub=OTHER_HUB)
     stray = str(uuid.uuid4())
     run(
@@ -537,6 +543,30 @@ def vouchers_sold_on_it(db: ScratchDb, svc: str, pkg: str, other_pkg: str) -> No
     )
 
 
+def sold_and_spent_on_the_same_sale(db: ScratchDb, svc: str, pkg: str) -> None:
+    print(
+        "\n2b · a voucher whose only session was spent on the very sale that sold it is voided too"
+    )
+    # The void reverses the WHOLE ticket, so the sessions come back FIRST and the in-use check of
+    # the voucher reads what is left: nothing. With the two statements the other way round the
+    # voucher would still count its own session as a use and stay live — the customer would get
+    # the money back and keep the voucher. The order in the manifest is the rule this pins.
+    sale = "sale-same"
+    g = grant(db, pkg, "cus-same", sale_id=sale)
+    rid = spent_on(db, g, svc, sale)
+    void_sale(db, sale)
+    check(
+        "the session spent on the voided sale comes back",
+        [1, sale],
+        [session(db, rid)["is_deleted"], session(db, rid)["refund_ref"]],
+    )
+    check(
+        "… and the voucher, intact again, is voided with its sale",
+        1,
+        grant_trail(db, g)["is_deleted"],
+    )
+
+
 # ── 4 · the race with a till ─────────────────────────────────────────────────
 
 
@@ -657,6 +687,7 @@ def main() -> int:
         sessions_come_back(db, svc, pkg, other_svc, other_pkg)
         expired_and_unsigned(db, svc, pkg, other_svc, other_pkg)
         vouchers_sold_on_it(db, svc, pkg, other_pkg)
+        sold_and_spent_on_the_same_sale(db, svc, pkg)
         the_till_wins_the_race(db, svc, pkg)
     finally:
         db.drop()
