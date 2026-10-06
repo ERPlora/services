@@ -150,5 +150,5 @@ Si falla: no hay pantalla; repetir el aviso no devuelve ni anula dos veces. Un b
 venta que ya se usó sigue vivo: se corrige con **Ajustar** (SERVICES-F18). Si una caja está
 reservando una sesión de ese bono en el mismo instante, la anulación la espera y, como el bono ya
 está en uso, no lo anula.
-Implicados: SALES-F30, REC_PELUQUERIA-F14
+Implicados: SALES-F30, REC_PELUQUERIA-F13, REC_PELUQUERIA-F14
 QA: B-08
