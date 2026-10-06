@@ -238,6 +238,11 @@ def main() -> int:
         "the give-back points at the voided sale", back.get("refund_ref"), sale_id
     )
     hub.check(
+        "the give-back is signed by whoever voided the sale, not by the listener",
+        back.get("refunded_by"),
+        hub.user,
+    )
+    hub.check(
         "remaining after the void",
         balance_of(hub, customer, grant_id).get("remaining"),
         3,
@@ -281,6 +286,11 @@ def main() -> int:
     )
     hub.check(
         "its void carries the sale's reason", voided.get("void_reason"), void_reason
+    )
+    hub.check(
+        "its void is signed by whoever voided the sale, not by the listener",
+        voided.get("voided_by"),
+        hub.user,
     )
     hub.check_true(
         "the voided voucher cannot be spent any more",
