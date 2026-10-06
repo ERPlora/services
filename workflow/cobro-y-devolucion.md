@@ -102,7 +102,7 @@ Implicados: SALES-F17, REC_PELUQUERIA-F10
 QA: ninguno
 
 ### SERVICES-F26 Devolver la sesión al devolver la venta
-Estado: parcial — la sesión solo vuelve junto con una devolución de dinero: en un tique pagado entero con bono (0,00 €), **Devolver** dice «No queda nada por devolver en esta venta.» y no enseña este hueco (el servidor de Ventas rechaza además una devolución sin dinero), así que la sesión solo vuelve anulando la venta (SERVICES-F27) o con **Ajustar → Añadir sesiones** (SERVICES-F18); en un tique pagado con bono y dinero la sesión sola no se puede devolver mientras quede dinero (hay que devolver algo de dinero a la vez, sales#512), y una vez devuelto todo el dinero la venta pasa a Devuelta y **Devolver** queda desactivado: también entonces, solo **Ajustar**
+Estado: parcial — la sesión solo vuelve junto con una devolución de dinero: en un tique pagado entero con bono (0,00 €), **Devolver** dice «No queda nada por devolver en esta venta.» y no enseña este hueco (el servidor de Ventas rechaza además una devolución sin dinero, sales#531), así que la sesión solo vuelve anulando la venta (SERVICES-F27) o con **Ajustar → Añadir sesiones** (SERVICES-F18); en un tique pagado con bono y dinero la sesión sola no se puede devolver mientras quede dinero (hay que devolver algo de dinero a la vez, sales#512), y una vez devuelto todo el dinero la venta pasa a Devuelta y **Devolver** queda desactivado: también entonces, solo **Ajustar**
 Actor: responsable
 Pantalla: Ventas: Devolver
 Pasos:

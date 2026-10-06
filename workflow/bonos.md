@@ -31,7 +31,7 @@ Implicados: REC_PELUQUERIA-F04, REC_PELUQUERIA-F13
 QA: BD-05, B-08
 
 ### SERVICES-F13 Editar o eliminar un bono
-Estado: parcial — eliminar un bono del catálogo deja sus bonos vendidos sin poder gastarse en el cobro y sin poder abrir sus «Bonos vendidos» ni sus «Movimientos», aunque el aviso dice que «conservan su saldo»; el texto de edición manda «archivar» un bono y no hay archivar, solo **Eliminar**; un bono no se puede desactivar desde la pantalla
+Estado: parcial — eliminar un bono del catálogo deja sus bonos vendidos sin poder gastarse en el cobro y sin poder abrir sus «Bonos vendidos» ni sus «Movimientos», aunque el aviso dice que «conservan su saldo» (services#153); el texto de edición manda «archivar» un bono y no hay archivar, solo **Eliminar**; un bono no se puede desactivar desde la pantalla
 Actor: responsable, administrador
 Pantalla: Bonos y paquetes
 Pasos:
@@ -57,7 +57,7 @@ Implicados: SALES-F27
 QA: BD-05, B-08
 
 ### SERVICES-F14 Vender un bono a una clienta
-Estado: parcial — no hay pantalla: el TPV no ofrece los bonos como artículo y no hay botón de venta manual; solo con el asistente o la API (cobrando un tique con la línea del bono marcada como servicio, o con la concesión manual); y devolver la venta del bono no lo anula
+Estado: parcial — no hay pantalla: el TPV no ofrece los bonos como artículo y no hay botón de venta manual; solo con el asistente o la API (cobrando un tique con la línea del bono marcada como servicio, o con la concesión manual); y devolver la venta del bono no lo anula (services#154)
 Actor: cajero, responsable, asistente
 Pantalla: asistente
 Pasos:
