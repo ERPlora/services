@@ -1159,6 +1159,15 @@
         "commands/hold_release_on_checkout_voided.sql"
       ]
     },
+    "services._on_sale_voided": {
+      "permission": "services.refund_package",
+      "transaction": true,
+      "sql": [
+        "commands/sale_void_lock.sql",
+        "commands/sale_void_return_sessions.sql",
+        "commands/sale_void_grants.sql"
+      ]
+    },
     "services._on_customer_deleted": {
       "permission": "services.view_orphan_grant",
       "transaction": true,
@@ -1234,6 +1243,9 @@
       },
       "customer.merged": {
         "command": "services._on_customer_merged"
+      },
+      "sale.voided": {
+        "command": "services._on_sale_voided"
       }
     },
     "emits": [
