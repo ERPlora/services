@@ -157,7 +157,7 @@ Implicados: SALES-F01
 QA: BD-05
 
 ### SERVICES-F09 Vender un servicio en el TPV
-Estado: parcial — el servidor de Ventas cobra el precio y la categoría fiscal que manda la pantalla sin contrastarlos con este catálogo: por el asistente o la API un servicio se cobra a cualquier precio
+Estado: parcial — el servidor de Ventas cobra el precio que manda la pantalla sin contrastarlo con este catálogo: por el asistente o la API un servicio se cobra a cualquier precio (la categoría fiscal sí sale de este catálogo, SALES-F26)
 Actor: cajero, empleado, responsable
 Pantalla: Ventas: Vender
 Pasos:
@@ -165,10 +165,10 @@ Pasos:
 2. Toca el servicio: entra como línea con el precio de este catálogo. Uno de precio abierto pide el importe (SERVICES-F03).
 3. Un servicio **Sin configurar** (sin categoría fiscal) sale con la marca «Falta el IVA» y no se vende.
 4. Cobra como cualquier venta (Ventas).
-Entra: los servicios en oferta, sus categorías y su categoría fiscal (Servicios), que el TPV lee al abrirse.
+Entra: los servicios en oferta, sus categorías y su categoría fiscal (Servicios), que el TPV lee al abrirse; al cobrar, el servidor de Ventas vuelve a leer de este catálogo (archivados incluidos) la categoría fiscal de cada línea que nombra un servicio, y esa es la que vale.
 Sale: la línea de venta con su precio, su IVA y la referencia del servicio (si Modificadores tiene grupos enganchados a ese servicio, el TPV los pregunta al tocarlo, MODIFIERS-F05); Servicios no anota nada
 por vender un servicio suelto (sí reacciona si la línea la pagó un bono, SERVICES-F24).
-Si falla: si Servicios no responde, el TPV avisa de que el catálogo de servicios no carga, en vez de enseñarse como si el negocio no vendiera servicios (Ventas).
+Si falla: si Servicios no responde, el TPV avisa de que el catálogo de servicios no carga, en vez de enseñarse como si el negocio no vendiera servicios (Ventas). Al cobrar, Ventas rechaza sin cobrar nada la línea de un servicio que ya no existe en este catálogo o que no tiene categoría fiscal, con su frase (SALES-F26).
 Implicados: MODIFIERS-F05, SALES-F01, SALES-F09, SALES-F26, REC_PELUQUERIA-F09
 QA: B-05, B-06, BD-05
 
