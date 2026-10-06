@@ -279,7 +279,11 @@ def sessions_come_back(
     )
     theirs_g = grant(db, other_pkg, "cus-a", source="manual", hub=OTHER_HUB)
     theirs = spent_on(db, theirs_g, other_svc, sale, hub=OTHER_HUB)
-    check("before the void, five spent and one returned leave one", 1, remaining(db, "cus-a", g))
+    check(
+        "before the void, five spent and one returned leave one",
+        1,
+        remaining(db, "cus-a", g),
+    )
 
     touched = void_sale(db, sale)
     back = session(db, mine)
@@ -357,20 +361,50 @@ def expired_and_unsigned(db: ScratchDb, svc: str, pkg: str) -> None:
         db=db.name,
         stdin=f"UPDATE services_package_grant SET granted_at = '2026-07-09T10:00:00Z' WHERE id = '{g}';\n",
     )
+    # Same age, but the manager added 30 days with **Ajustar**: it has NOT expired.
+    extended = grant(db, pkg, "cus-ext", source="manual")
+    rid_ext = spent_on(db, extended, svc, "sale-old")
+    run(
+        db,
+        "services._adjust_grant",
+        {
+            "adjustment_id": str(uuid.uuid4()),
+            "grant_id": extended,
+            "uses_delta": 0,
+            "days_delta": 30,
+            "reason": "Closed for holidays",
+        },
+    )
+    db.psql(
+        [],
+        db=db.name,
+        stdin=f"UPDATE services_package_grant SET granted_at = '2026-07-09T10:00:00Z' WHERE id = '{extended}';\n",
+    )
     void_sale(db, "sale-old")
     check(
         "the session comes back flagged as on an expired voucher",
         1,
         session(db, rid)["refund_expired"],
     )
+    check(
+        "a voucher extended by 30 days is not expired: its session comes back unflagged",
+        0,
+        session(db, rid_ext)["refund_expired"],
+    )
 
     g2 = grant(db, pkg, "cus-blank", source="manual")
     rid2 = spent_on(db, g2, svc, "sale-blank")
+    sold_blank = grant(db, pkg, "cus-blank2", sale_id="sale-blank")
     void_sale(db, "sale-blank", voided_by="  ")
     check(
         "a void without its operator is signed by the caller, never left empty",
         USER,
         session(db, rid2)["refunded_by"],
+    )
+    check(
+        "… and so is the voucher it voids",
+        USER,
+        grant_trail(db, sold_blank)["voided_by"],
     )
 
 
@@ -394,6 +428,12 @@ def vouchers_sold_on_it(db: ScratchDb, svc: str, pkg: str, other_pkg: str) -> No
         db=db.name,
         stdin="UPDATE services_package_redemption SET expires_at = '2026-08-17T10:00:00Z' "
         f"WHERE id = '{stale_hold}';\n",
+    )
+    released = grant(db, pkg, "cus-v8", sale_id=sale)
+    run(
+        db,
+        "services.packages.release_hold",
+        {"redemption_id": hold(db, released, svc)},
     )
     manual = grant(db, pkg, "cus-v5", sale_id=sale, source="manual")
     other = grant(db, pkg, "cus-v6", sale_id="sale-w")
@@ -423,6 +463,11 @@ def vouchers_sold_on_it(db: ScratchDb, svc: str, pkg: str, other_pkg: str) -> No
         "a voucher whose only hold has lapsed counts as intact and is voided",
         1,
         grant_trail(db, stale)["is_deleted"],
+    )
+    check(
+        "a voucher whose hold was undone at the till counts as intact and is voided",
+        1,
+        grant_trail(db, released)["is_deleted"],
     )
     check(
         "a MANUAL grant that names the sale stays live",
