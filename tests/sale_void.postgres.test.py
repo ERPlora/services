@@ -349,7 +349,9 @@ def sessions_come_back(
     )
 
 
-def expired_and_unsigned(db: ScratchDb, svc: str, pkg: str) -> None:
+def expired_and_unsigned(
+    db: ScratchDb, svc: str, pkg: str, other_svc: str, other_pkg: str
+) -> None:
     print(
         "\n1b · an expired voucher still gets its session back; an unsigned void falls back"
     )
@@ -360,6 +362,25 @@ def expired_and_unsigned(db: ScratchDb, svc: str, pkg: str) -> None:
         [],
         db=db.name,
         stdin=f"UPDATE services_package_grant SET granted_at = '2026-07-09T10:00:00Z' WHERE id = '{g}';\n",
+    )
+    # Neither a WITHDRAWN extension nor the neighbour's extension that names this voucher's id
+    # (ids are opaque: only the hub_id keeps it out) makes it unexpired.
+    adjust = {"uses_delta": 0, "days_delta": 30, "reason": "Closed for holidays"}
+    withdrawn = str(uuid.uuid4())
+    run(db, "services._adjust_grant", {"adjustment_id": withdrawn, "grant_id": g, **adjust})
+    theirs_g = grant(db, other_pkg, "cus-old", source="manual", hub=OTHER_HUB)
+    stray = str(uuid.uuid4())
+    run(
+        db,
+        "services._adjust_grant",
+        {"adjustment_id": stray, "grant_id": theirs_g, **adjust},
+        hub=OTHER_HUB,
+    )
+    db.psql(
+        [],
+        db=db.name,
+        stdin=f"UPDATE services_package_grant_adjustment SET is_deleted = 1 WHERE id = '{withdrawn}';\n"
+        f"UPDATE services_package_grant_adjustment SET grant_id = '{g}' WHERE id = '{stray}';\n",
     )
     # Same age, but the manager added 30 days with **Ajustar**: it has NOT expired.
     extended = grant(db, pkg, "cus-ext", source="manual")
@@ -423,12 +444,6 @@ def vouchers_sold_on_it(db: ScratchDb, svc: str, pkg: str, other_pkg: str) -> No
     hold(db, held, svc)
     stale = grant(db, pkg, "cus-v4", sale_id=sale)
     stale_hold = hold(db, stale, svc)
-    db.psql(
-        [],
-        db=db.name,
-        stdin="UPDATE services_package_redemption SET expires_at = '2026-08-17T10:00:00Z' "
-        f"WHERE id = '{stale_hold}';\n",
-    )
     released = grant(db, pkg, "cus-v8", sale_id=sale)
     run(
         db,
@@ -441,6 +456,32 @@ def vouchers_sold_on_it(db: ScratchDb, svc: str, pkg: str, other_pkg: str) -> No
     run(db, "services._void_grant", {"grant_id": already, "reason": "Wrong customer"})
     first_trail = grant_trail(db, already)
     theirs = grant(db, other_pkg, "cus-v1", sale_id=sale, hub=OTHER_HUB)
+    # An intact voucher of this hub that a session of the NEIGHBOUR names by id: only the hub_id
+    # of the in-use check keeps that foreign session from counting as a use.
+    named = grant(db, pkg, "cus-v9", sale_id=sale)
+    foreign_g = grant(db, other_pkg, "cus-v9", source="manual", hub=OTHER_HUB)
+    foreign = str(uuid.uuid4())
+    run(
+        db,
+        "services._redeem",
+        {
+            "redemption_id": foreign,
+            "grant_id": foreign_g,
+            "appointment_id": None,
+            "sale_id": None,
+            "note": "",
+        },
+        hub=OTHER_HUB,
+    )
+    # The hold lapses AFTER every other hold above (each one sweeps lapsed holds first), so the
+    # void is what reads a hold that is still live in the table but past its deadline.
+    db.psql(
+        [],
+        db=db.name,
+        stdin="UPDATE services_package_redemption SET expires_at = '2026-08-17T10:00:00Z' "
+        f"WHERE id = '{stale_hold}';\n"
+        f"UPDATE services_package_redemption SET grant_id = '{named}' WHERE id = '{foreign}';\n",
+    )
 
     void_sale(db, sale, reason="  Sold by mistake  ")
     trail = grant_trail(db, intact)
@@ -463,6 +504,11 @@ def vouchers_sold_on_it(db: ScratchDb, svc: str, pkg: str, other_pkg: str) -> No
         "a voucher whose only hold has lapsed counts as intact and is voided",
         1,
         grant_trail(db, stale)["is_deleted"],
+    )
+    check(
+        "a neighbour's session naming this voucher's id does not make it used",
+        1,
+        grant_trail(db, named)["is_deleted"],
     )
     check(
         "a voucher whose hold was undone at the till counts as intact and is voided",
@@ -609,7 +655,7 @@ def main() -> int:
         other_svc = seed_service(db, OTHER_HUB)
         other_pkg = seed_package(db, OTHER_HUB, other_svc)
         sessions_come_back(db, svc, pkg, other_svc, other_pkg)
-        expired_and_unsigned(db, svc, pkg)
+        expired_and_unsigned(db, svc, pkg, other_svc, other_pkg)
         vouchers_sold_on_it(db, svc, pkg, other_pkg)
         the_till_wins_the_race(db, svc, pkg)
     finally:
