@@ -68,7 +68,8 @@ Pasos:
 1. Se cobra una cuenta con líneas pagadas por bono (Ventas).
 2. Servicios oye la venta cobrada y da por **Entregadas** todas las sesiones retenidas en esa cuenta,
    enlazadas a la venta, sin mirar qué líneas entraron en el cobro. En el mismo paso concede los bonos que se vendieran en ese tique (SERVICES-F14).
-3. Desde ese momento ya no se pueden deshacer: solo vuelven con una devolución (SERVICES-F26).
+3. Desde ese momento ya no se pueden deshacer: solo vuelven con una devolución (SERVICES-F26) o
+   anulando la venta (SERVICES-F27).
 Entra: la venta cobrada, con su cuenta, su clienta y sus líneas (avisa Ventas: `sale.completed`).
 Sale: las sesiones gastadas para siempre y enlazadas a la venta. No emite documento fiscal ni aviso
 propio. Cobrar solo una parte de la cuenta da por gastadas también las sesiones retenidas en líneas
@@ -101,7 +102,7 @@ Implicados: SALES-F17, REC_PELUQUERIA-F10
 QA: ninguno
 
 ### SERVICES-F26 Devolver la sesión al devolver la venta
-Estado: parcial — la sesión solo vuelve junto con una devolución de dinero: en un tique pagado entero con bono (0,00 €), **Devolver** dice «No queda nada por devolver en esta venta.» y no enseña este hueco (el servidor de Ventas rechaza además una devolución sin dinero), así que la sesión solo se repone con **Ajustar → Añadir sesiones** (SERVICES-F18); en un tique pagado con bono y dinero la sesión sola no se puede devolver mientras quede dinero (hay que devolver algo de dinero a la vez, sales#512), y una vez devuelto todo el dinero la venta pasa a Devuelta y **Devolver** queda desactivado: también entonces, solo **Ajustar**
+Estado: parcial — la sesión solo vuelve junto con una devolución de dinero: en un tique pagado entero con bono (0,00 €), **Devolver** dice «No queda nada por devolver en esta venta.» y no enseña este hueco (el servidor de Ventas rechaza además una devolución sin dinero), así que la sesión solo vuelve anulando la venta (SERVICES-F27) o con **Ajustar → Añadir sesiones** (SERVICES-F18); en un tique pagado con bono y dinero la sesión sola no se puede devolver mientras quede dinero (hay que devolver algo de dinero a la vez, sales#512), y una vez devuelto todo el dinero la venta pasa a Devuelta y **Devolver** queda desactivado: también entonces, solo **Ajustar**
 Actor: responsable
 Pantalla: Ventas: Devolver
 Pasos:
@@ -126,15 +127,28 @@ Implicados: SALES-F31, SALES-F32, REC_PELUQUERIA-F14
 QA: B-08
 
 ### SERVICES-F27 Devolver la sesión al anular la venta
-Estado: no hecho — Servicios no escucha la anulación de una venta: las sesiones gastadas en una venta anulada siguen **Entregadas**, y como una venta anulada no se puede devolver, no vuelven por ninguna pantalla salvo **Ajustar**
+Estado: hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
-1. Un responsable anula en Ventas una venta cobrada con líneas pagadas por bono.
-2. Cada sesión gastada en esa venta debería volver a su bono, como en una devolución (SERVICES-F26). Hoy no vuelve ninguna.
-3. Mientras tanto: **Bonos y paquetes → Bonos vendidos → Ajustar → Añadir sesiones**, con el motivo (SERVICES-F18).
-Entra: la venta anulada (Ventas avisa `sale.voided`; Servicios no lo escucha).
-Sale: hoy, nada.
-Si falla: no aplica.
+1. Un responsable anula en Ventas una venta cobrada (SALES-F30). Ventas solo anula una venta sin
+   devoluciones y sin factura completa, así que la anulación deshace el tique entero.
+2. Servicios oye la anulación y devuelve a su bono cada sesión gastada en esa venta, como una
+   devolución completa (SERVICES-F26), aunque el bono haya caducado.
+3. En **Movimientos** cada una sale como **Devuelta**, con quien anuló la venta, la hora y el motivo
+   de la anulación; la venta anulada hace de documento.
+4. Si en ese tique se vendió un bono y no se ha gastado ni reservado ninguna sesión suya, se anula
+   igual que con **Anular** en **Bonos vendidos** (SERVICES-F17): «Anulado por {who} el {when}» y el
+   motivo de la anulación.
+Entra: la venta anulada, quién la anuló y el motivo (avisa Ventas: `sale.voided`); las sesiones
+gastadas en esa venta y los bonos vendidos en ella.
+Sale: las sesiones de vuelta en su bono y los bonos intactos de esa venta anulados. Una sesión ya
+devuelta por otra devolución, una gastada en la silla que solo nombra la venta, y un bono concedido a
+mano, aunque nombre la venta, no se tocan. No mueve dinero ni emite documento fiscal (eso es de
+Ventas) ni emite aviso propio.
+Si falla: no hay pantalla; repetir el aviso no devuelve ni anula dos veces. Un bono vendido en esa
+venta que ya se usó sigue vivo: se corrige con **Ajustar** (SERVICES-F18). Si una caja está
+reservando una sesión de ese bono en el mismo instante, la anulación la espera y, como el bono ya
+está en uso, no lo anula.
 Implicados: SALES-F30, REC_PELUQUERIA-F14
 QA: B-08

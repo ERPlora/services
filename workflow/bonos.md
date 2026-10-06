@@ -57,7 +57,7 @@ Implicados: SALES-F27
 QA: BD-05, B-08
 
 ### SERVICES-F14 Vender un bono a una clienta
-Estado: parcial — no hay pantalla: el TPV no ofrece los bonos como artículo y no hay botón de venta manual; solo con el asistente o la API (cobrando un tique con la línea del bono marcada como servicio, o con la concesión manual); y anular o devolver la venta del bono no lo anula
+Estado: parcial — no hay pantalla: el TPV no ofrece los bonos como artículo y no hay botón de venta manual; solo con el asistente o la API (cobrando un tique con la línea del bono marcada como servicio, o con la concesión manual); y devolver la venta del bono no lo anula
 Actor: cajero, responsable, asistente
 Pantalla: asistente
 Pasos:
@@ -81,8 +81,10 @@ negocio.» (también si el bono se eliminó). Si la línea del bono no va marcad
 rechaza la venta entera porque ese artículo no está en su catálogo. Un bono desactivado por la API:
 la concesión manual se rechaza sin frase propia, y venderlo en un tique hace fallar entero el aviso de
 la venta cobrada: no se concede, y las sesiones retenidas en ese tique no se dan por gastadas y vuelven
-al bono al cabo de un día (SERVICES-F24) (leído en el código, sin ejecutar). Anular o devolver después la venta del bono no anula el
-bono: hay que anularlo en **Bonos vendidos** si no se ha usado (SERVICES-F17).
+al bono al cabo de un día (SERVICES-F24) (leído en el código, sin ejecutar). Anular después la venta
+del bono lo anula solo, con quien anuló la venta, la hora y su motivo, si no se ha gastado ni reservado
+ninguna sesión suya; si ya se usó, sigue vivo y se corrige con **Ajustar** (SERVICES-F18). Devolver la
+venta del bono no lo anula: hay que anularlo en **Bonos vendidos** si no se ha usado (SERVICES-F17).
 Implicados: SALES-F01, SALES-F30, SALES-F31, REC_PELUQUERIA-F13
 QA: B-08, BD-05 (discrepa)
 

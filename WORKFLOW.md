@@ -175,7 +175,7 @@ gramática y el mismo prefijo. Antes de tocar código, lee el fichero del flujo 
 | SERVICES-F24 | Dar por gastadas las sesiones al cobrar | parcial | [`workflow/cobro-y-devolucion.md`](workflow/cobro-y-devolucion.md) |
 | SERVICES-F25 | La sesión retenida que nadie cobra vuelve sola | hecho | [`workflow/cobro-y-devolucion.md`](workflow/cobro-y-devolucion.md) |
 | SERVICES-F26 | Devolver la sesión al devolver la venta | parcial | [`workflow/cobro-y-devolucion.md`](workflow/cobro-y-devolucion.md) |
-| SERVICES-F27 | Devolver la sesión al anular la venta | no hecho | [`workflow/cobro-y-devolucion.md`](workflow/cobro-y-devolucion.md) |
+| SERVICES-F27 | Devolver la sesión al anular la venta | hecho | [`workflow/cobro-y-devolucion.md`](workflow/cobro-y-devolucion.md) |
 | SERVICES-F28 | Unir dos fichas: los bonos pasan a la que queda | hecho | [`workflow/fichas-de-clienta.md`](workflow/fichas-de-clienta.md) |
 | SERVICES-F29 | Eliminar o anonimizar una ficha: sus bonos quedan sin cliente | hecho | [`workflow/fichas-de-clienta.md`](workflow/fichas-de-clienta.md) |
 | SERVICES-F30 | Rescatar los bonos sin cliente | parcial | [`workflow/fichas-de-clienta.md`](workflow/fichas-de-clienta.md) |
@@ -204,9 +204,9 @@ gramática y el mismo prefijo. Antes de tocar código, lee el fichero del flujo 
 | Gastar en el cobro con vista previa del saldo y del bono elegido | parcial — tras recargar o volver a una cuenta aparcada, el TPV cobra la línea y además se gasta la sesión; dividir la cuenta o cobrar solo una parte gasta sesiones de líneas que no se cobran | SERVICES-F22, SERVICES-F24 |
 | Deshacer el canje antes de cobrar | hecho | SERVICES-F22, SERVICES-F23 |
 | Saldo de bonos visible en la ficha de la clienta | parcial — solo en el cobro, servicio a servicio, y por el asistente | SERVICES-F15 |
-| La sesión vuelve al devolver la venta | parcial — solo junto con una devolución de dinero: no en un tique pagado entero con bono (0,00 €) ni si ya se devolvió todo el dinero; entonces, solo con Ajustar | SERVICES-F26, SERVICES-F18 |
-| La sesión vuelve al anular la venta | no hecho | SERVICES-F27 |
-| Anular la venta de un bono hecha por error | hecho | SERVICES-F17 |
+| La sesión vuelve al devolver la venta | parcial — solo junto con una devolución de dinero: no en un tique pagado entero con bono (0,00 €) ni si ya se devolvió todo el dinero; entonces, anulando la venta si aún se puede o con Ajustar | SERVICES-F26, SERVICES-F27, SERVICES-F18 |
+| La sesión vuelve al anular la venta | hecho | SERVICES-F27 |
+| Anular la venta de un bono hecha por error | hecho — a mano en **Bonos vendidos**, o solo al anular su venta mientras el bono esté intacto | SERVICES-F17, SERVICES-F14 |
 | Regalar sesiones, alargar la caducidad, corregir el saldo | hecho | SERVICES-F18 |
 | Historial de movimientos del bono | hecho | SERVICES-F19 |
 | Bonos de una ficha unida, eliminada o anonimizada | hecho | SERVICES-F28, SERVICES-F29 |
@@ -270,13 +270,13 @@ gramática y el mismo prefijo. Antes de tocar código, lee el fichero del flujo 
 - **Una línea, una sesión:** la misma línea de la misma cuenta no se cubre dos veces.
 - **Dos cajas sobre el mismo bono van en fila**, y la que llega tarde recibe el motivo real.
 - **Lo cobrado no se deshace:** una sesión de una venta cobrada no se suelta; solo vuelve por una
-  devolución, y una sola vez: el mismo documento repetido no devuelve otra, y otro documento sobre la
+  devolución o al anular esa venta, y una sola vez: el mismo documento repetido no devuelve otra, y otro documento sobre la
   misma sesión se rechaza («Esa sesión del bono ya se devolvió en otra devolución.»).
 - **Las condiciones vendidas se congelan:** cambiar «Usos» o «Vigencia (días)» del catálogo no toca
   los bonos ya vendidos; regalar o corregir es un movimiento aparte con motivo, de hasta 100
   sesiones (sumar o quitar) y hasta 366 días (solo alargar), y nunca quita más sesiones de las que
   le quedan a la clienta.
-- **Anular solo un bono intacto**, con motivo.
+- **Anular solo un bono intacto**, con motivo: también cuando se anula la venta que lo vendió.
 - **Ningún movimiento de bono mueve dinero ni emite documento fiscal**: el registro fiscal sale con
   la venta del bono.
 - **Permisos:** empleado ve todo salvo **Bonos sin cliente**, da de alta servicios y gasta sesiones; cajero ve, gasta sesiones
@@ -303,8 +303,6 @@ gramática y el mismo prefijo. Antes de tocar código, lee el fichero del flujo 
   el TPV no lo ofrece y «Descuento» y «Precio cerrado» no se usan en ningún cobro.
 - ¿Eliminar o desactivar un bono del catálogo debe dejar de servir los ya vendidos? Hoy deja de
   servirlos y el aviso de borrado dice lo contrario.
-- ¿Anular una venta debe devolver sola la sesión del bono, como la devolución? (La misma duda está
-  en el WORKFLOW de Ventas.)
 - ¿Se ocultan los ajustes que no cambian nada o se hacen efectivos desde la pantalla?
 - ¿El paso «Tu catálogo de servicios» debe exigir un servicio con categoría fiscal?
 
@@ -325,7 +323,7 @@ Contra el código de `origin/main` (v1.5.71), una línea por discrepancia:
 - `docs/concepts.md` («deleting a package does not currently cascade the soft-delete to its lines») y («Variants and add-ons exist in the data»): desactualizados; las líneas se borran con el bono y las variantes y extras se retiraron.
 - `docs/overview.md` («the clock runs from the customer's first live use, so returning the use that started it un-starts it»): la caducidad cuenta desde la compra (ADR-0390) y devolver una sesión no la mueve (SERVICES-F20).
 - `schemas/package_create.json` y `schemas/package_update.json` (`validity_days`: «after its first use»): la vigencia cuenta desde la compra, que es lo que lee el asistente al crear o editar un bono (SERVICES-F20).
-- `docs/overview.md` (eventos que escucha): solo nombra la venta cobrada; también escucha quitar una línea y anular una cuenta de Ventas, y eliminar, anonimizar y unir fichas de Clientes.
+- `docs/overview.md` (eventos que escucha): solo nombra la venta cobrada y la anulada; también escucha quitar una línea y anular una cuenta de Ventas, y eliminar, anonimizar y unir fichas de Clientes.
 - `hand-book/modulos/services.md`: llama «Paquetes» a la pestaña «Bonos y paquetes»; dice que los ajustes están «en los ajustes del Hub» (es la pestaña Ajustes del módulo); pide activar «Reservable» y «Reserva online» y elegir tipo de precio, márgenes y capacidad, que no están en la pantalla; y pide comprobar «el saldo del cliente», que no tiene pantalla (SERVICES-F15).
 - `locales/es.json` (`ui.packageLinesFixed`): «archiva este paquete y crea uno nuevo»; no hay archivar para bonos, solo **Eliminar**, y uno nuevo con el mismo nombre se rechaza (SERVICES-F12, SERVICES-F13).
 - `locales/es.json` (`ui.orphansHint`): «devuélvelo o pásalo a otra ficha»; la hoja no tiene ninguna acción y pasar un bono a otra ficha no existe (SERVICES-F30).

@@ -22,6 +22,8 @@
   there is no prior art to copy and ours has to be designed (services#81).
 - **A voucher sold by mistake can be voided; a used one is corrected, not voided.** Voiding
   (`services.packages.void_grant`, services#82) only works while nothing has been spent from it.
+  Voiding the SALE that sold it voids it on its own under the same rule, and gives back every
+  session spent on that sale (services#151); a used voucher sold on a voided sale stays live.
   «Adjust» (`services.packages.adjust_grant`) ADDS sessions to a voucher with a limit and days to
   one that expires (services#118), and REMOVES sessions as a balance correction (services#119) —
   never more than the customer has left (`services.grant_adjust_below_used`), up to 100 sessions /
