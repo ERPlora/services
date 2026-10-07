@@ -49,13 +49,17 @@ LEFT JOIN (SELECT hub_id, grant_id, CAST(SUM(uses_delta) AS BIGINT) AS uses_delt
        ON adj.grant_id = g.id AND adj.hub_id = g.hub_id
 JOIN services_package p ON p.id = g.package_id AND p.hub_id = g.hub_id
 WHERE g.id = :grant_id AND g.hub_id = :hub_id AND g.is_deleted = 0
-  AND p.is_deleted = 0 AND p.is_active = 1
+  -- 🔴 NO catalogue-state filter on `p` (services#153): deleting or deactivating a package stops
+  -- SELLING it (`_grant_insert.sql`), it does not take back what was sold. The JOIN stays — it is
+  -- what keeps a grant pointing at another hub's package id out of reach.
   -- Guard 0: the voucher must COVER this line's service. A voucher of haircuts is N uses of
   -- haircuts — modelling it as a balance is what would let it pay for the shampoo (ADR-0386).
   AND EXISTS (
     SELECT 1 FROM services_packageitem i
      WHERE i.hub_id = :hub_id AND i.package_id = g.package_id
-       AND i.service_id = :service_id AND i.is_deleted = 0
+       AND i.service_id = :service_id
+       -- No `i.is_deleted` (services#153): deleting the package cascades the soft-delete to its
+       -- lines, and a voucher already sold keeps covering what it was sold with.
   )
   -- Guard 1: sessions left on THIS grant, against the `max_uses` it was sold with. HELD ones count
   -- — a hold is a spent session until it is released. NULL = unlimited.

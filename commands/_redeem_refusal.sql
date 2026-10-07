@@ -39,7 +39,7 @@ CROSS JOIN (
            WHEN CAST(:service_id AS TEXT) IS NOT NULL
                 AND NOT EXISTS (SELECT 1 FROM services_packageitem i
                                  WHERE i.hub_id = :hub_id AND i.package_id = g.package_id
-                                   AND i.service_id = CAST(:service_id AS TEXT) AND i.is_deleted = 0)
+                                   AND i.service_id = CAST(:service_id AS TEXT))
              THEN 'does_not_cover_service'
            ELSE 'not_redeemable'
          END AS reason
@@ -50,8 +50,10 @@ CROSS JOIN (
               WHERE is_deleted = 0
               GROUP BY hub_id, grant_id) adj
          ON adj.grant_id = g.id AND adj.hub_id = g.hub_id
+  -- No catalogue-state filter (services#153): a retired package's sold vouchers are still spent,
+  -- and covered by every line they were sold with, deleted with the package or not.
   LEFT JOIN services_package p
-         ON p.id = g.package_id AND p.hub_id = g.hub_id AND p.is_deleted = 0 AND p.is_active = 1
+         ON p.id = g.package_id AND p.hub_id = g.hub_id
 ) AS why
 WHERE NOT EXISTS (SELECT 1 FROM services_package_redemption
                    WHERE id = :redemption_id AND hub_id = :hub_id);

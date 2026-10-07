@@ -50,7 +50,9 @@ LEFT JOIN (SELECT hub_id, grant_id, CAST(SUM(uses_delta) AS BIGINT) AS uses_delt
        ON adj.grant_id = g.id AND adj.hub_id = g.hub_id
 JOIN services_package p ON p.id = g.package_id AND p.hub_id = g.hub_id
 WHERE g.id = :grant_id AND g.hub_id = :hub_id AND g.is_deleted = 0
-  AND p.is_deleted = 0 AND p.is_active = 1
+  -- 🔴 NO catalogue-state filter on `p` (services#153): deleting or deactivating a package stops
+  -- SELLING it (`_grant_insert.sql`), it does not take back what was sold. The JOIN stays — it is
+  -- what keeps a grant pointing at another hub's package id out of reach.
   -- Guard 1: sessions left, counted over THIS grant against the `max_uses` THIS grant was sold
   -- with. NULL = unlimited.
   AND (

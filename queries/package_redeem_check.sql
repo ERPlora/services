@@ -41,7 +41,8 @@ pkg AS (
     FROM services_package p
     WHERE p.hub_id = :hub_id
       AND p.id = (SELECT package_id FROM grant_row)
-      AND p.is_deleted = 0 AND p.is_active = 1
+      -- No catalogue-state filter (services#153): retiring a package stops selling it, not spending
+      -- what was sold. `package_not_found` is only a grant whose package is not this hub's.
 ),
 used AS (
     -- A hold whose deadline has passed does NOT count: an abandoned checkout gives the session

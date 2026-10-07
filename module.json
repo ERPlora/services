@@ -306,6 +306,7 @@
           "discount_amount_cents",
           "fixed_price",
           "is_active",
+          "status",
           "items"
         ],
         "default_sort": "name",
@@ -330,6 +331,9 @@
             "op": "range"
           },
           "is_active": {
+            "op": "eq"
+          },
+          "status": {
             "op": "eq"
           },
           "items": {

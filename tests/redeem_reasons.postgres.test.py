@@ -7,7 +7,7 @@ The runtime halves of the fix live elsewhere: the reason→code mapping is the W
 the issue's acceptance criteria:
 
   1. `services.packages.redeem_check` — the read the handler now refuses with — answers the
-     RIGHT reason for each scenario: no grant at all, exhausted, expired, archived voucher (and
+     RIGHT reason for each scenario: no grant at all, exhausted, expired (and
      an other-hub grant is unknown, not "yours"). Since services#73 the question is asked about a
      GRANT — the customer's purchase — so `no_grant` is the first and most common refusal: it is
      what a customer who never bought the voucher gets, where the old model handed them five free
@@ -282,13 +282,18 @@ def main() -> int:
         refused(db, "a redemption with no purchase behind it", lambda: redeem(db, ghost), "services_redeem_no_grant")
         check("no residue at all", (0, 0), residue(db, ghost))
 
-        print("\nD. archived voucher — the grant is real, the template is gone")
+        print("\nD. a deactivated voucher — the grant is real, so it is still spent (services#153)")
+        # Retiring a package stops SELLING it; what was sold stays the customer's (Square, Fresha,
+        # Booksy, Mindbody, Vagaro). Until services#153 this case answered `package_not_found`,
+        # which is what left every buyer of a retired voucher unable to spend it.
+        # `package_not_found` is now only a grant whose template is not this hub's (section «moved»).
         archived = seed_package(db, HUB, "Bono retirado", max_uses=2, validity_days=None)
         archived_grant = seed_grant(db, archived)
         db.psql(["-c", f"UPDATE services_package SET is_active = 0 WHERE id = '{archived}'"], db=db.name)
-        check_reason(db, "archived voucher", "package_not_found", archived_grant)
-        refused(db, "a use of an archived voucher", lambda: redeem(db, archived_grant), "services_redeem_package_not_found")
-        check("nothing was written", (0, 0), residue(db, archived_grant))
+        row = reason_of(db, archived_grant)
+        check("redeem_check · deactivated voucher", (1, ""), (row.get("redeemable"), row.get("reason")))
+        redeem(db, archived_grant)
+        check("the use was written and the guard is empty", (1, 0), residue(db, archived_grant))
 
         print("\nE. another hub's GRANT is UNKNOWN here, not shared")
         seed_service(db, OTHER_HUB, "Cut")
