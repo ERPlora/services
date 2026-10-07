@@ -51,6 +51,9 @@ Usage: `erplora test <dir> --against-hub [dev|stable|sha256:…]`. Never on its 
 runtime it fails, it does not skip.
 """
 
+import os
+import shlex
+import subprocess
 import sys
 import time
 import uuid
@@ -205,6 +208,36 @@ def movement_of(hub: Hub, package_id: str, redemption_id: str) -> dict | None:
         "services.packages.redemption_history", {"package_id": package_id, "limit": 200}
     )
     return next((r for r in rows if r.get("redemption_id") == redemption_id), None)
+
+
+def deliveries_to(hub: Hub, listener: str, event: str, sale_id: str) -> int:
+    """How many `event`s about `sale_id` the relay has DELIVERED to `listener`, read from the hub's
+    own outbox through the psql session the runner hands over (`ERPLORA_HUB_PSQL`, as
+    `grant_race.hub` does). A negative read off the voucher's row («still active») is also green
+    when the listener blows up and the event dies in the outbox; this is what tells them apart."""
+    words = shlex.split(os.environ.get("ERPLORA_HUB_PSQL", ""))
+    if not words:
+        print(
+            "sale_void.hub: hub_psql_missing — ERPLORA_HUB_PSQL is empty. The runner that starts "
+            "the hub (`erplora test --against-hub`, or the hub's `run-module-hub-batteries.sh`) "
+            "hands over a psql session on its database; without it this is NOT a skip, it is a "
+            "failure."
+        )
+        sys.exit(1)
+    done = subprocess.run(
+        [
+            *words,
+            "-tAc",
+            "SELECT count(*) FROM _event_delivery d JOIN _event_outbox o ON o.id = d.event_id "
+            f"WHERE o.hub_id = '{hub.hub_id}' AND o.event_name = '{event}' "
+            f"AND o.payload LIKE '%{sale_id}%' AND d.listener_command = '{listener}'",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if done.returncode != 0:
+        raise AssertionError(f"reading the outbox failed: {done.stderr.strip()}")
+    return int(done.stdout.strip() or 0)
 
 
 def main() -> int:
@@ -473,8 +506,18 @@ def main() -> int:
     hub.check("the sale minted the voucher to refund", len(refund_rows), 1)
     refund_grant = refund_rows[0]["grant_id"] if refund_rows else ""
     refund(hub, refund_sale_id, 3000, f"Parte {run}")
-    # A negative never resolves by waiting: give the relay its ticks, then read it outright.
-    time.sleep(3)
+    # A negative never resolves by waiting on the row: wait for the listener to have HEARD the
+    # partial refund, then read the voucher outright.
+    hub.check(
+        "the partial refund reached the listener (delivered, not dead in the outbox)",
+        wait_until(
+            lambda: deliveries_to(
+                hub, "services._on_sale_refunded", "sale.refunded", refund_sale_id
+            ),
+            lambda n: n >= 1,
+        ),
+        1,
+    )
     hub.check(
         "a PARTIAL refund cannot name the voucher's line: the voucher stays live",
         (grant_row(hub, refund_package, refund_grant) or {}).get("status"),
