@@ -4810,7 +4810,21 @@ var es_default = {
     movementCorrectedBy: "Corregido por {who}",
     errNotAnAmount: "Esto no es un importe. Escribe una cifra, por ejemplo 12,50.",
     errAmbiguousAmount: "Este importe se puede leer de dos maneras: \xAB{typed}\xBB tanto puede ser {grouped} como {decimal}. Escribe los decimales para que no haya duda.",
-    errNegativeAmount: "Este importe no puede ser negativo."
+    errNegativeAmount: "Este importe no puede ser negativo.",
+    saleReversal: {
+      void: {
+        intact: "{name} se vendi\xF3 en esta venta y se anular\xE1 con ella. No se ha usado ninguna sesi\xF3n.",
+        used: "{name} se vendi\xF3 en esta venta y se anular\xE1 con ella: las {used} sesi\xF3n(es) ya usadas no vuelven y se pierden las {remaining} que quedan.",
+        usedNoMore: "{name} se vendi\xF3 en esta venta y se anular\xE1 con ella: las {used} sesi\xF3n(es) ya usadas no vuelven y ya no se podr\xE1 usar."
+      },
+      refund: {
+        intact: "{name} se vendi\xF3 en esta venta. Si devuelves la venta entera, se anula; no se ha usado ninguna sesi\xF3n. Una devoluci\xF3n parcial no lo toca.",
+        used: "{name} se vendi\xF3 en esta venta. Si devuelves la venta entera, se anula: las {used} sesi\xF3n(es) ya usadas no vuelven y se pierden las {remaining} que quedan. Una devoluci\xF3n parcial no lo toca.",
+        usedNoMore: "{name} se vendi\xF3 en esta venta. Si devuelves la venta entera, se anula: las {used} sesi\xF3n(es) ya usadas no vuelven y ya no se podr\xE1 usar. Una devoluci\xF3n parcial no lo toca."
+      },
+      loadFailed: "No se han podido leer los bonos vendidos en esta venta. Int\xE9ntalo otra vez antes de confirmar: se anulan con la venta.",
+      btnRetry: "Reintentar"
+    }
   },
   errors: {
     "services.category_unavailable": "Esa categor\xEDa no est\xE1 disponible: no existe en este negocio o se ha eliminado.",
@@ -5122,7 +5136,21 @@ var en_default = {
     movementCorrectedBy: "Corrected by {who}",
     errNotAnAmount: "This is not an amount. Type a figure, for example 12.50.",
     errAmbiguousAmount: "This amount can be read in two ways: \xAB{typed}\xBB could be {grouped} or {decimal}. Write the decimals so there is no doubt.",
-    errNegativeAmount: "This amount cannot be negative."
+    errNegativeAmount: "This amount cannot be negative.",
+    saleReversal: {
+      void: {
+        intact: "{name} was sold on this sale and will be voided with it. None of its sessions has been used.",
+        used: "{name} was sold on this sale and will be voided with it: the {used} session(s) already used stay used and the {remaining} left are lost.",
+        usedNoMore: "{name} was sold on this sale and will be voided with it: the {used} session(s) already used stay used and it cannot be used any more."
+      },
+      refund: {
+        intact: "{name} was sold on this sale. Refunding the whole sale voids it; none of its sessions has been used. A partial refund leaves it as it is.",
+        used: "{name} was sold on this sale. Refunding the whole sale voids it: the {used} session(s) already used stay used and the {remaining} left are lost. A partial refund leaves it as it is.",
+        usedNoMore: "{name} was sold on this sale. Refunding the whole sale voids it: the {used} session(s) already used stay used and it cannot be used any more. A partial refund leaves it as it is."
+      },
+      loadFailed: "The vouchers sold on this sale could not be read. Try again before confirming: they are voided with the sale.",
+      btnRetry: "Try again"
+    }
   },
   errors: {
     "services.category_unavailable": "That category is not available: it does not exist in this business or it has been deleted.",
@@ -7408,15 +7436,132 @@ __decorateClass([
 ], ErpServicesPackages.prototype, "adjustError", 2);
 define("erp-services-packages", ErpServicesPackages);
 
-// ui/components/erp-services-session-refund/erp-services-session-refund.ts
+// ui/components/erp-services-sale-reversal/erp-services-sale-reversal.ts
 var CATALOG4 = { es: es_default, en: en_default };
+function erplora4() {
+  const c5 = globalThis.erplora;
+  if (!c5) throw new Error("erplora SDK not initialised by the shell");
+  return c5;
+}
+var ErpServicesSaleReversal = class extends i3 {
+  constructor() {
+    super(...arguments);
+    this.saleId = "";
+    this.action = "void";
+    this.vouchers = [];
+    this.loading = false;
+    this.loadFailed = false;
+    this.loadedSale = "";
+  }
+  static {
+    this.styles = i`
+    :host { display: block; font-family: system-ui, sans-serif; }
+    .box { display: flex; flex-direction: column; gap: 0.45rem; }
+    ok-inline-feedback { overflow-wrap: anywhere; }
+  `;
+  }
+  connectedCallback() {
+    super.connectedCallback();
+    void this.load();
+  }
+  updated(changed) {
+    if (changed.has("saleId")) void this.load();
+  }
+  t(key, params) {
+    return erplora4().t(CATALOG4, key, params);
+  }
+  async load(force = false) {
+    if (!this.saleId) {
+      this.vouchers = [];
+      this.loading = false;
+      this.loadFailed = false;
+      this.loadedSale = "";
+      return;
+    }
+    if (!force && this.saleId === this.loadedSale) return;
+    const sale = this.saleId;
+    this.loadedSale = sale;
+    this.loading = true;
+    this.loadFailed = false;
+    try {
+      const rows = await erplora4().query("services.packages.sold_on_sale", { sale_id: sale });
+      if (sale !== this.saleId) return;
+      this.vouchers = Array.isArray(rows) ? rows : [];
+    } catch {
+      if (sale !== this.saleId) return;
+      this.vouchers = [];
+      this.loadFailed = true;
+    } finally {
+      if (sale === this.saleId) this.loading = false;
+    }
+  }
+  /** The sentence for one voucher: nothing used, some left to lose, or nothing left to lose. */
+  message(v3) {
+    const door = this.action === "refund" ? "refund" : "void";
+    const used = Number(v3.used) || 0;
+    const name = v3.package_name;
+    if (used === 0) return this.t(`ui.saleReversal.${door}.intact`, { name });
+    const remaining = v3.remaining === null || v3.remaining === void 0 ? null : Number(v3.remaining);
+    if (remaining === null || remaining <= 0) {
+      return this.t(`ui.saleReversal.${door}.usedNoMore`, { name, used });
+    }
+    return this.t(`ui.saleReversal.${door}.used`, { name, used, remaining });
+  }
+  render() {
+    if (this.loading) {
+      return b2`<div class="box"><ion-skeleton-text animated style="height: 2.75rem"></ion-skeleton-text></div>`;
+    }
+    if (this.loadFailed) {
+      return b2`<div class="box">
+        <ok-inline-feedback data-testid="services-sale-reversal-load-error" tone="danger" icon="alert-circle-outline"
+          >${this.t("ui.saleReversal.loadFailed")}</ok-inline-feedback
+        >
+        <div>
+          <ion-button fill="clear" size="small" data-testid="services-sale-reversal-retry" @click=${() => this.load(true)}
+            >${this.t("ui.saleReversal.btnRetry")}</ion-button
+          >
+        </div>
+      </div>`;
+    }
+    if (!this.vouchers.length) return A;
+    return b2`<div class="box">
+      ${this.vouchers.map(
+      (v3) => b2`<ok-inline-feedback
+          data-testid=${`services-sale-reversal-voucher-${v3.grant_id}`}
+          tone="warning"
+          icon="alert-circle-outline"
+          >${this.message(v3)}</ok-inline-feedback
+        >`
+    )}
+    </div>`;
+  }
+};
+__decorateClass([
+  n4({ type: String, attribute: "sale-id" })
+], ErpServicesSaleReversal.prototype, "saleId", 2);
+__decorateClass([
+  n4({ type: String })
+], ErpServicesSaleReversal.prototype, "action", 2);
+__decorateClass([
+  r5()
+], ErpServicesSaleReversal.prototype, "vouchers", 2);
+__decorateClass([
+  r5()
+], ErpServicesSaleReversal.prototype, "loading", 2);
+__decorateClass([
+  r5()
+], ErpServicesSaleReversal.prototype, "loadFailed", 2);
+define("erp-services-sale-reversal", ErpServicesSaleReversal);
+
+// ui/components/erp-services-session-refund/erp-services-session-refund.ts
+var CATALOG5 = { es: es_default, en: en_default };
 var REASONS = ["already_refunded", "not_settled"];
 function checkedOf(e6) {
   const detail = e6.detail;
   if (detail && typeof detail.checked === "boolean") return detail.checked;
   return !!e6.target?.checked;
 }
-function erplora4() {
+function erplora5() {
   const c5 = globalThis.erplora;
   if (!c5) throw new Error("erplora SDK no inicializado por el shell");
   return c5;
@@ -7492,7 +7637,7 @@ var ErpServicesSessionRefund = class extends i3 {
     }
   }
   t(key, params) {
-    return erplora4().t(CATALOG4, key, params);
+    return erplora5().t(CATALOG5, key, params);
   }
   key() {
     return `${this.saleId}|${this.serviceId}|${this.lineIndex}`;
@@ -7510,7 +7655,7 @@ var ErpServicesSessionRefund = class extends i3 {
     this.loadFailed = false;
     this.feedback = "";
     try {
-      const rows = await erplora4().query(
+      const rows = await erplora5().query(
         "services.packages.redemptions_for_sale",
         { sale_id: this.saleId }
       );
@@ -7520,7 +7665,7 @@ var ErpServicesSessionRefund = class extends i3 {
     } catch (e6) {
       this.session = null;
       this.loadFailed = true;
-      this.feedback = domainMessage(e6, erplora4().locale, this.t("ui.sessionRefund.loadFailed"));
+      this.feedback = domainMessage(e6, erplora5().locale, this.t("ui.sessionRefund.loadFailed"));
       if (this.armed) this.setArmed(false, true);
     } finally {
       this.loading = false;
@@ -7556,7 +7701,7 @@ var ErpServicesSessionRefund = class extends i3 {
     if (!s5 || Number(s5.voucher_expired) !== 1) return "";
     return this.t("ui.sessionRefund.expired", {
       name: s5.package_name,
-      date: s5.expires_at ? new Date(s5.expires_at).toLocaleDateString(erplora4().locale) : ""
+      date: s5.expires_at ? new Date(s5.expires_at).toLocaleDateString(erplora5().locale) : ""
     });
   }
   /** The operator's choice. It changes what this hole promises; it never changes the money. */
@@ -7572,13 +7717,13 @@ var ErpServicesSessionRefund = class extends i3 {
     this.busy = true;
     this.feedback = "";
     try {
-      await erplora4().command("services.packages.refund_redemption", {
+      await erplora5().command("services.packages.refund_redemption", {
         redemption_id: session.redemption_id,
         refund_ref: refundRef
       });
       this.refunded = true;
     } catch (e6) {
-      this.feedback = domainMessage(e6, erplora4().locale, this.t("ui.sessionRefund.refundFailed"));
+      this.feedback = domainMessage(e6, erplora5().locale, this.t("ui.sessionRefund.refundFailed"));
       throw e6;
     } finally {
       this.busy = false;
@@ -7731,7 +7876,7 @@ __decorateClass([
 define("erp-services-session-refund", ErpServicesSessionRefund);
 
 // ui/components/erp-services-voucher-tender/erp-services-voucher-tender.ts
-var CATALOG5 = { es: es_default, en: en_default };
+var CATALOG6 = { es: es_default, en: en_default };
 var REASONS2 = [
   "only_option",
   "finite_before_unlimited",
@@ -7741,13 +7886,13 @@ var REASONS2 = [
   "oldest_voucher",
   "stable_order"
 ];
-function erplora5() {
+function erplora6() {
   const c5 = globalThis.erplora;
   if (!c5) throw new Error("erplora SDK no inicializado por el shell");
   return c5;
 }
 function can4(permission) {
-  const client = erplora5();
+  const client = erplora6();
   return typeof client.hasPermission === "function" ? client.hasPermission(permission) : true;
 }
 var ErpServicesVoucherTender = class extends i3 {
@@ -7795,7 +7940,7 @@ var ErpServicesVoucherTender = class extends i3 {
     }
   }
   t(key, params) {
-    return erplora5().t(CATALOG5, key, params);
+    return erplora6().t(CATALOG6, key, params);
   }
   async load() {
     if (!this.customerId || !this.serviceId) {
@@ -7813,7 +7958,7 @@ var ErpServicesVoucherTender = class extends i3 {
         this.announceHeld(mine.held, mine.grantId, mine.packageId);
         return;
       }
-      const rows = await erplora5().query("services.packages.tender_options", {
+      const rows = await erplora6().query("services.packages.tender_options", {
         customer_id: this.customerId,
         service_id: this.serviceId
       });
@@ -7825,7 +7970,7 @@ var ErpServicesVoucherTender = class extends i3 {
     } catch (e6) {
       this.options = [];
       this.loadFailed = true;
-      this.feedback = domainMessage(e6, erplora5().locale, this.t("ui.tender.loadFailed"));
+      this.feedback = domainMessage(e6, erplora6().locale, this.t("ui.tender.loadFailed"));
     } finally {
       this.loading = false;
     }
@@ -7843,7 +7988,7 @@ var ErpServicesVoucherTender = class extends i3 {
    */
   async recoverHold() {
     if (!this.checkoutRef || !this.lineRef) return null;
-    const rows = await erplora5().query("services.packages.holds_for_checkout", {
+    const rows = await erplora6().query("services.packages.holds_for_checkout", {
       checkout_ref: this.checkoutRef
     });
     const mine = (Array.isArray(rows) ? rows : []).find((r6) => r6.line_ref === this.lineRef);
@@ -7891,7 +8036,7 @@ var ErpServicesVoucherTender = class extends i3 {
     this.busy = true;
     this.feedback = "";
     try {
-      const out = await erplora5().command("services.packages.hold_for_line", {
+      const out = await erplora6().command("services.packages.hold_for_line", {
         grant_id: option.grant_id,
         customer_id: this.customerId,
         service_id: this.serviceId,
@@ -7906,7 +8051,7 @@ var ErpServicesVoucherTender = class extends i3 {
       this.held = held;
       this.announceHeld(held, option.grant_id, option.package_id);
     } catch (e6) {
-      this.feedback = domainMessage(e6, erplora5().locale, this.t("ui.tender.holdFailed"));
+      this.feedback = domainMessage(e6, erplora6().locale, this.t("ui.tender.holdFailed"));
     } finally {
       this.busy = false;
     }
@@ -7918,7 +8063,7 @@ var ErpServicesVoucherTender = class extends i3 {
     this.busy = true;
     this.feedback = "";
     try {
-      await erplora5().command("services.packages.release_hold", {
+      await erplora6().command("services.packages.release_hold", {
         redemption_id: held.redemption_id
       });
       this.held = null;
@@ -7931,7 +8076,7 @@ var ErpServicesVoucherTender = class extends i3 {
       );
       await this.load();
     } catch (e6) {
-      this.feedback = domainMessage(e6, erplora5().locale, this.t("ui.tender.releaseFailed"));
+      this.feedback = domainMessage(e6, erplora6().locale, this.t("ui.tender.releaseFailed"));
     } finally {
       this.busy = false;
     }
@@ -7973,7 +8118,7 @@ var ErpServicesVoucherTender = class extends i3 {
           ${this.renderCounter(o7)}
           ${o7.expires_at ? b2`<span
                 >${this.t("ui.tender.expires", {
-      date: new Date(o7.expires_at).toLocaleDateString(erplora5().locale)
+      date: new Date(o7.expires_at).toLocaleDateString(erplora6().locale)
     })}</span
               >` : A}
         </div>
