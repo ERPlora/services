@@ -200,7 +200,7 @@ Sale: los ajustes del negocio, que el alta de un servicio suelto por el asistent
 relleno de duración, márgenes y reserva online cuando no los recibe; el alta por lote no. El panel de **Nuevo servicio** no los
 usa: con la duración vacía guarda 60 min.
 Si falla: «No se pudieron guardar los ajustes.»; un valor no admitido se marca en su campo con
-«Este valor no se admite.». Quien no es administrador ve los campos en solo lectura con «Solo un
-administrador puede cambiar estos ajustes.».
+«Este valor no se admite.». Sin el permiso de cambiarlos (`services.manage_settings`; de fábrica solo lo
+tiene el administrador) el hub no enseña la pestaña (HUB_SHELL-F43, hub#2588).
 Implicados: ninguno
 QA: ninguno
