@@ -2366,6 +2366,18 @@ mod tests {
         assert_eq!(out.operations.len(), 1, "{:?}", out.operations);
         assert_eq!(out.operations[0].command, "services._settle_hold_for_line");
         assert_eq!(out.operations[0].params["line_id"], json!("line-1"));
+
+        // The covered part first: a later uncovered part must not undo it.
+        let out = on_sale_completed_pure(sale_input(
+            json!([
+                { "product_id": "svc-cut", "quantity": 1_000_000, "order_item_id": "line-1", "covered": true },
+                { "product_id": "svc-cut", "quantity": 1_000_000, "order_item_id": "line-1", "covered": false }
+            ]),
+            "cus-1",
+        ))
+        .unwrap();
+        assert_eq!(out.operations.len(), 1, "{:?}", out.operations);
+        assert_eq!(out.operations[0].command, "services._settle_hold_for_line");
     }
 
     /// A `sales` older than sales#520 does not name the rows: the listener keeps settling the whole
