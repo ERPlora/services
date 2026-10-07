@@ -22,6 +22,13 @@ return. So:
      sessions it delivered happened. It stays live for the manager to correct with **Adjust**,
      the same rule the manual void enforces (`services.grant_in_use`).
 
+And the other end of the same ticket (sales#520): a paid sale spends the held session only of the
+line the sale says the voucher paid. A line the till charged with money — what it did after a reload
+or a resumed check, when it lost the «covered» mark — gives its session back:
+
+  4. hold a session on the line, charge the line at its price → the sale is 25,00 € and the session
+     is **Released**, not **Delivered**: the customer pays once.
+
 What only a runtime can prove, and the reason this speaks HTTP: the event is `sales`' own
 (`sale.voided`, emitted by its WASM handler after its own transaction), the listener runs with the
 module's authority through the outbox relay, and the effect is read back through the same public
@@ -343,8 +350,70 @@ def main() -> int:
         1,
     )
 
+    print(
+        "4 · a held line the till charged WITH MONEY gives its session back (sales#520, SERVICES-F24)"
+    )
+    # What a till does after a reload or a resumed check: the voucher slot still shows the session
+    # as spent, but the till lost the «covered» mark and charges the cut at its price. Until
+    # sales#520 the sale then spent the session as well, and the customer paid twice.
+    reloaded = tag("cust-reload")
+    reload_package = create_package(
+        hub,
+        f"Bono recarga {run}",
+        max_uses=3,
+        validity_days=None,
+        service_id=service_id,
+    )
+    reload_grant = grant(hub, reload_package, reloaded)
+    reload_order, reload_line, reload_payload = charge(
+        hub, sale_line(service_id, service_name, PRICE, is_service=True), reloaded
+    )
+    reload_held = hub.run(
+        "services.packages.hold_for_line",
+        {
+            "grant_id": reload_grant,
+            "customer_id": reloaded,
+            "service_id": service_id,
+            "checkout_ref": reload_order,
+            "line_ref": reload_line,
+        },
+    )
+    reload_redemption = (reload_held.get("result") or {}).get("redemption_id")
+    hub.check_true(
+        "the slot held a session for the line",
+        bool(reload_redemption),
+        f"{reload_held}",
+    )
+    reload_sale = complete(hub, reload_payload)
+    header = hub.query("sales.get", {"sale_id": reload_sale})
+    hub.check(
+        "the line is charged at its price",
+        int(round(float(header[0].get("total")))) if header else None,
+        PRICE,
+    )
+    handed_back = wait_until(
+        lambda: movement_of(hub, reload_package, reload_redemption) or {},
+        lambda m: m.get("movement") == "released",
+    )
+    hub.check(
+        "the session of a line paid with money goes back to the voucher",
+        handed_back.get("movement"),
+        "released",
+    )
+    hub.check(
+        "it is not tied to the sale that charged the money",
+        handed_back.get("sale_id") or "",
+        "",
+    )
+    hub.check(
+        "remaining after a sale that charged the cut",
+        balance_of(hub, reloaded, reload_grant).get("remaining"),
+        3,
+    )
+
     return hub.finish(
-        "voiding a paid sale gives back its voucher sessions and voids the intact vouchers it sold"
+        "a paid sale spends only the sessions of the lines the voucher paid; voiding it gives them"
+        " back and voids the intact vouchers it sold"
     )
 
 
