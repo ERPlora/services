@@ -387,6 +387,55 @@ describe('services#77 · a taken session survives the screen reloading', () => {
     expect(el.shadowRoot.querySelector('[data-testid="services-voucher-tender-retry"]')).not.toBeNull();
   });
 
+  // sales#520 — painting the recovered hold was only half of it. The till learns that a line is
+  // covered from `erp:voucher-held`, and only `confirm()` used to send it: after a reload or a
+  // resumed check the slot said «session spent» while the till still charged the line, and the
+  // sale then spent the session too. The customer paid twice.
+  const heldEvents = () => {
+    const seen: CustomEvent[] = [];
+    const listener = (e: Event) => seen.push(e as CustomEvent);
+    document.addEventListener('erp:voucher-held', listener);
+    return { seen, stop: () => document.removeEventListener('erp:voucher-held', listener) };
+  };
+
+  it('🔴 a recovered hold tells the till the line is covered, like confirming does', async () => {
+    sdk.query = async (name: string) =>
+      name === 'services.packages.holds_for_checkout' ? [HELD_ROW] : options;
+    const events = heldEvents();
+    try {
+      await mount();
+    } finally {
+      events.stop();
+    }
+    // The mount reads twice (connect + first update), so it may say it twice: the host keeps a
+    // Map keyed by line, so the contract is «at least once, always the same», not «exactly once».
+    expect(events.seen.length).toBeGreaterThan(0);
+    for (const e of events.seen) {
+      expect(e.detail).toEqual({
+        redemptionId: 'red-9',
+        grantId: 'g-cuts',
+        packageId: 'p-cuts',
+        lineRef: 'line-1',
+        checkoutRef: 'order-7',
+      });
+      expect(e.bubbles && e.composed).toBe(true);
+    }
+  });
+
+  it('nothing recovered, or a hold of another line: the till is told nothing', async () => {
+    for (const rows of [[], [{ ...HELD_ROW, redemption_id: 'red-other', line_ref: 'line-9' }]]) {
+      sdk.query = async (name: string) =>
+        name === 'services.packages.holds_for_checkout' ? rows : options;
+      const events = heldEvents();
+      try {
+        await mount();
+      } finally {
+        events.stop();
+      }
+      expect(events.seen).toHaveLength(0);
+    }
+  });
+
   it('an unlimited voucher recovered does not invent a countdown', async () => {
     sdk.query = async (name: string) =>
       name === 'services.packages.holds_for_checkout'
