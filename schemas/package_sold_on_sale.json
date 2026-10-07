@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "services.packages.sold_on_sale params",
+  "description": "Los bonos VENDIDOS en una venta y aún vivos, para el aviso que el TPV enseña ANTES de anular la venta o devolverla entera (services#157, hueco sales.reversal.notice): son justo los que se anularían. Por bono: package_name, used (sesiones ya usadas, que no vuelven; una liquidada en esta misma venta no cuenta, porque la anulación la devuelve antes) y remaining (las que se pierden, con lo ajustado después; null = ilimitado). Una venta que no vendió bonos responde una lista vacía, nunca un error. No muta.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["sale_id"],
+  "properties": {
+    "sale_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Id de la venta que se va a anular o devolver. Opaco para services: lo escribe la concesión al cobrar (sale.completed) y aquí solo se compara."
+    }
+  }
+}
