@@ -987,6 +987,18 @@
         "commands/settle_holds_for_sale.sql"
       ]
     },
+    "services._settle_hold_for_line": {
+      "permission": "services.settle_package",
+      "sql": [
+        "commands/settle_hold_for_line.sql"
+      ]
+    },
+    "services._release_hold_for_line": {
+      "permission": "services.hold_package",
+      "sql": [
+        "commands/hold_release_on_line_removed.sql"
+      ]
+    },
     "services.packages.refund_redemption": {
       "permission": "services.refund_package",
       "handler": {

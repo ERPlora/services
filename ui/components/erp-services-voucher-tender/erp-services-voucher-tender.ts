@@ -79,6 +79,8 @@ interface HeldSession {
  */
 interface CheckoutHold {
   redemption_id: string;
+  grant_id: string;
+  package_id: string;
   package_name: string;
   line_ref: string;
   remaining_after: number | null;
@@ -184,8 +186,12 @@ export class ErpServicesVoucherTender extends LitElement {
       // is what charged the customer for a haircut they had already paid for.
       const mine = await this.recoverHold();
       if (mine) {
-        this.held = mine;
+        this.held = mine.held;
         this.options = [];
+        // sales#520 — the host keeps «this line is covered» in memory only, so after a reload or a
+        // resumed check it no longer knows. Painting «session spent» without telling it left the
+        // till charging the line at full price while the sale then spent the session too.
+        this.announceHeld(mine.held, mine.grantId, mine.packageId);
         return;
       }
       const rows = await erplora().query<TenderOption[]>('services.packages.tender_options', {
@@ -223,14 +229,14 @@ export class ErpServicesVoucherTender extends LitElement {
    * deadline — so a settled session (the sale was paid; giving it back is a refund, with its own
    * audited door) never arrives here to be offered an «undo» the runtime would then refuse.
    */
-  private async recoverHold(): Promise<HeldSession | null> {
+  private async recoverHold(): Promise<{ held: HeldSession; grantId: string; packageId: string } | null> {
     if (!this.checkoutRef || !this.lineRef) return null;
     const rows = await erplora().query<CheckoutHold[]>('services.packages.holds_for_checkout', {
       checkout_ref: this.checkoutRef,
     });
     const mine = (Array.isArray(rows) ? rows : []).find((r) => r.line_ref === this.lineRef);
     if (!mine) return null;
-    return {
+    const held: HeldSession = {
       redemption_id: String(mine.redemption_id ?? ''),
       package_name: String(mine.package_name ?? ''),
       // `remaining_after` is NULL exactly when the voucher was sold as unlimited — the query
@@ -240,6 +246,28 @@ export class ErpServicesVoucherTender extends LitElement {
       // what holds it to that.
       remaining_after: mine.remaining_after ?? null,
     };
+    return { held, grantId: String(mine.grant_id ?? ''), packageId: String(mine.package_id ?? '') };
+  }
+
+  /**
+   * Tells whoever hosts this slot that the line is covered, so it stops charging money for it.
+   * Sent when the operator confirms AND when a hold is recovered: the host only ever learns it
+   * from here.
+   */
+  private announceHeld(held: HeldSession, grantId: string, packageId: string): void {
+    this.dispatchEvent(
+      new CustomEvent('erp:voucher-held', {
+        bubbles: true,
+        composed: true,
+        detail: {
+          redemptionId: held.redemption_id,
+          grantId,
+          packageId,
+          lineRef: this.lineRef,
+          checkoutRef: this.checkoutRef,
+        },
+      }),
+    );
   }
 
   select(grantId: string): void {
@@ -261,25 +289,13 @@ export class ErpServicesVoucherTender extends LitElement {
         checkout_ref: this.checkoutRef,
         line_ref: this.lineRef,
       });
-      this.held = {
+      const held: HeldSession = {
         redemption_id: String(out?.redemption_id ?? ''),
         package_name: String(out?.package_name ?? option.package_name),
         remaining_after: out?.remaining_after ?? option.remaining_after,
       };
-      // The line is covered: whoever hosts this slot needs to stop charging money for it.
-      this.dispatchEvent(
-        new CustomEvent('erp:voucher-held', {
-          bubbles: true,
-          composed: true,
-          detail: {
-            redemptionId: this.held.redemption_id,
-            grantId: option.grant_id,
-            packageId: option.package_id,
-            lineRef: this.lineRef,
-            checkoutRef: this.checkoutRef,
-          },
-        }),
-      );
+      this.held = held;
+      this.announceHeld(held, option.grant_id, option.package_id);
     } catch (e) {
       this.feedback = domainMessage(e, erplora().locale, this.t('ui.tender.holdFailed'));
     } finally {

@@ -831,9 +831,10 @@ fn split_cents(total: i64, units: i64, index: i64) -> i64 {
 /// It does the two things this module owes a finished sale, in ONE transaction, because they are
 /// delivered by one event and the manifest binds one command per event:
 ///
-///   1. **Settle the holds** of that checkout (`services._settle_holds_for_sale`). A hold nobody
-///      settles stays releasable forever — a session that could be handed back after the customer
-///      already had the haircut.
+///   1. **Settle the holds** of the lines the voucher paid (`services._settle_hold_for_line`) and
+///      hand back the ones of lines charged with money (`services._release_hold_for_line`) — see
+///      [`settle_ops`] (sales#520). A hold nobody settles stays releasable forever — a session that
+///      could be handed back after the customer already had the haircut.
 ///   2. **Grant the vouchers that were SOLD on the ticket** (`services._grant`, one per unit). This
 ///      is the half services#73 was missing: without it the voucher was charged for and the
 ///      customer walked out owning nothing this module could see.
@@ -857,6 +858,58 @@ fn split_cents(total: i64, units: i64, index: i64) -> i64 {
 /// (`<sale_id>#<line>#<unit>`), the conditional INSERT skips a ref a live grant already holds, and
 /// the assert still passes on that no-op. Same shape as the refund's idempotence on `refund_ref`
 /// (services#71), and the unique index of migration 013 is what makes it true under concurrency.
+/// Step 1 of [`on_sale_completed_pure`]: what the sale does to the sessions held on its checkout.
+///
+/// 🔴 BY LINE, NOT BY CHECKOUT (sales#520). The sale names, per item, the check row it came from
+/// (`order_item_id`, the `line_ref` a session is held on) and whether a tender other than money
+/// paid it (`covered`). A held session is spent only for a row the sale says the voucher paid; the
+/// session of a row charged with money goes back to the voucher — otherwise a till that lost its
+/// «covered» mark (a reload, a resumed check) charged the service AND spent the session. A row
+/// split in several items (by VAT) is spent if ANY part was covered. Rows of the check that are not
+/// in this sale (a partial charge) keep their hold: they are still to be charged.
+///
+/// A sale that names no row (a `sales` older than sales#520) settles the whole checkout, as before:
+/// leaving every session held for a day would hand back sessions already enjoyed.
+fn settle_ops(payload: &Value, ops: &mut Vec<Operation>) {
+    let order_id = payload.get("order_id").cloned().unwrap_or(Value::Null);
+    let sale_id = payload.get("sale_id").cloned().unwrap_or(Value::Null);
+    let items = payload.get("items").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+
+    let mut rows: Vec<(String, bool)> = Vec::new();
+    for item in &items {
+        let row = str_field(item, "order_item_id").trim().to_string();
+        if row.is_empty() {
+            continue;
+        }
+        let covered = item.get("covered").map(|v| as_bool(v, false)).unwrap_or(false);
+        match rows.iter_mut().find(|(id, _)| *id == row) {
+            Some(entry) => entry.1 |= covered,
+            None => rows.push((row, covered)),
+        }
+    }
+
+    if rows.is_empty() {
+        let mut settle = Map::new();
+        settle.insert("order_id".into(), order_id);
+        settle.insert("sale_id".into(), sale_id);
+        ops.push(Operation::sql("services._settle_holds_for_sale", settle));
+        return;
+    }
+    for (row, _) in rows.iter().filter(|(_, covered)| *covered) {
+        let mut settle = Map::new();
+        settle.insert("order_id".into(), order_id.clone());
+        settle.insert("sale_id".into(), sale_id.clone());
+        settle.insert("line_id".into(), json!(row));
+        ops.push(Operation::sql("services._settle_hold_for_line", settle));
+    }
+    for (row, _) in rows.iter().filter(|(_, covered)| !*covered) {
+        let mut release = Map::new();
+        release.insert("order_id".into(), order_id.clone());
+        release.insert("line_id".into(), json!(row));
+        ops.push(Operation::sql("services._release_hold_for_line", release));
+    }
+}
+
 pub fn on_sale_completed_pure(input: Value) -> Result<Output, String> {
     let payload = input.get("payload").cloned().unwrap_or(Value::Null);
     let context = input.get("context").cloned().unwrap_or(Value::Null);
@@ -865,12 +918,9 @@ pub fn on_sale_completed_pure(input: Value) -> Result<Output, String> {
 
     let mut ops: Vec<Operation> = Vec::new();
 
-    // 1 · the settle, always and first. It is a conditional UPDATE keyed on `checkout_ref =
-    // :order_id`, so a quick sale (no order) touches zero rows — correct, not a swallowed failure.
-    let mut settle = Map::new();
-    settle.insert("order_id".into(), payload.get("order_id").cloned().unwrap_or(Value::Null));
-    settle.insert("sale_id".into(), payload.get("sale_id").cloned().unwrap_or(Value::Null));
-    ops.push(Operation::sql("services._settle_holds_for_sale", settle));
+    // 1 · the settle, always and first. Conditional UPDATEs keyed on `checkout_ref = :order_id`, so
+    // a quick sale (no order) touches zero rows — correct, not a swallowed failure.
+    settle_ops(&payload, &mut ops);
 
     // 2 · the grants. Fail closed on the catalogue read: without it there is no way to tell a
     // voucher line from a shampoo line, and guessing would either mint entitlements for products or
@@ -2267,6 +2317,80 @@ mod tests {
         assert_eq!(out.operations[0].command, "services._settle_holds_for_sale");
         assert_eq!(out.operations[0].params["order_id"], json!("order-7"));
         assert_eq!(out.result.unwrap()["granted"], json!(0));
+    }
+
+    /// sales#520 — the session is spent for the line the sale says the voucher paid, and only for
+    /// it. After a reload or a resumed check the till could lose its «covered» mark and charge the
+    /// cut at full price; settling every hold of the checkout then spent the session as well, and
+    /// the customer paid twice. A line charged with money hands its held session back instead.
+    #[test]
+    fn a_sale_spends_the_session_of_a_covered_line_and_hands_back_the_one_charged_with_money() {
+        let out = on_sale_completed_pure(sale_input(
+            json!([
+                { "product_id": "svc-cut", "quantity": 1_000_000, "order_item_id": "line-1", "covered": true },
+                { "product_id": "svc-dye", "quantity": 1_000_000, "order_item_id": "line-2", "covered": false },
+                { "product_id": "prod-shampoo", "quantity": 1_000_000 }
+            ]),
+            "cus-1",
+        ))
+        .unwrap();
+        let ops: Vec<(&str, &Map<String, Value>)> =
+            out.operations.iter().map(|o| (o.command.as_str(), &o.params)).collect();
+        assert_eq!(ops.len(), 2, "one settle for the covered line, one release for the paid one: {ops:?}");
+        assert_eq!(ops[0].0, "services._settle_hold_for_line");
+        assert_eq!(ops[0].1["order_id"], json!("order-7"));
+        assert_eq!(ops[0].1["line_id"], json!("line-1"));
+        assert_eq!(ops[0].1["sale_id"], json!("sale-7"));
+        assert_eq!(ops[1].0, "services._release_hold_for_line");
+        assert_eq!(ops[1].1["order_id"], json!("order-7"));
+        assert_eq!(ops[1].1["line_id"], json!("line-2"));
+        assert!(
+            out.operations.iter().all(|o| o.command != "services._settle_holds_for_sale"),
+            "no blanket settle of the whole checkout"
+        );
+    }
+
+    /// A line of the check that is NOT in this sale (a partial charge) keeps its hold: it is still
+    /// to be charged. And a row that comes twice (a line split by VAT) is spent if ANY of its parts
+    /// was covered — never released by the other part.
+    #[test]
+    fn a_row_named_twice_is_spent_once_and_never_handed_back_by_its_other_part() {
+        let out = on_sale_completed_pure(sale_input(
+            json!([
+                { "product_id": "svc-cut", "quantity": 1_000_000, "order_item_id": "line-1", "covered": false },
+                { "product_id": "svc-cut", "quantity": 1_000_000, "order_item_id": "line-1", "covered": true }
+            ]),
+            "cus-1",
+        ))
+        .unwrap();
+        assert_eq!(out.operations.len(), 1, "{:?}", out.operations);
+        assert_eq!(out.operations[0].command, "services._settle_hold_for_line");
+        assert_eq!(out.operations[0].params["line_id"], json!("line-1"));
+
+        // The covered part first: a later uncovered part must not undo it.
+        let out = on_sale_completed_pure(sale_input(
+            json!([
+                { "product_id": "svc-cut", "quantity": 1_000_000, "order_item_id": "line-1", "covered": true },
+                { "product_id": "svc-cut", "quantity": 1_000_000, "order_item_id": "line-1", "covered": false }
+            ]),
+            "cus-1",
+        ))
+        .unwrap();
+        assert_eq!(out.operations.len(), 1, "{:?}", out.operations);
+        assert_eq!(out.operations[0].command, "services._settle_hold_for_line");
+    }
+
+    /// A `sales` older than sales#520 does not name the rows: the listener keeps settling the whole
+    /// checkout, as it did, rather than leaving every session held for a day.
+    #[test]
+    fn a_sale_that_names_no_row_still_settles_the_whole_checkout() {
+        let out = on_sale_completed_pure(sale_input(
+            json!([{ "product_id": "svc-cut", "quantity": 1_000_000, "covered": true }]),
+            "cus-1",
+        ))
+        .unwrap();
+        assert_eq!(out.operations.len(), 1);
+        assert_eq!(out.operations[0].command, "services._settle_holds_for_sale");
     }
 
     /// 🔴 Lo que services#73 arregla: la línea que VENDE un bono concede la titularidad. La marca
