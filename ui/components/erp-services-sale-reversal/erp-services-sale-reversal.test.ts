@@ -103,6 +103,8 @@ describe('erp-services-sale-reversal — the voucher warning before a void or a 
     const el = await mount();
     expect(el.shadowRoot.querySelector('ok-inline-feedback')).toBeNull();
     expect(el.shadowRoot.querySelector('ion-skeleton-text')).toBeNull();
+    // Not even an empty box: the hole must take no room in the window.
+    expect(el.shadowRoot.querySelector('.box')).toBeNull();
   });
 
   it('without a sale it asks nothing and paints nothing', async () => {
@@ -149,6 +151,28 @@ describe('erp-services-sale-reversal — the voucher warning before a void or a 
       await new Promise((r) => setTimeout(r, 0));
     }
     expect(queries.map((q) => q.params.sale_id)).toEqual(['sale-1', 'sale-2']);
+  });
+
+  it('a late answer for the previous sale never paints over the current one', async () => {
+    const pending: Record<string, (r: unknown[]) => void> = {};
+    (globalThis as unknown as { erplora: { query: unknown } }).erplora.query = (
+      _name: string,
+      params: Record<string, unknown>,
+    ) => new Promise((resolve) => { pending[String(params.sale_id)] = resolve; });
+    const el = await mount();
+    el.saleId = 'sale-2';
+    for (let i = 0; i < 3; i++) {
+      await el.updateComplete;
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    pending['sale-2']([USED]);
+    pending['sale-1']([INTACT]);
+    for (let i = 0; i < 3; i++) {
+      await el.updateComplete;
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    expect(notice(el, 'g-2')).not.toBeNull();
+    expect(notice(el, 'g-1')).toBeNull();
   });
 
   it('every key it paints exists in en AND es', () => {
