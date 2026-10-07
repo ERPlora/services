@@ -225,6 +225,26 @@ describe('the hold is explicit, and undoable while the sale is not paid', () => 
     expect(el.shadowRoot.querySelector('[data-testid="services-voucher-tender-confirm"]')).toBeFalsy();
   });
 
+  it('confirming tells the till the line is covered, with the voucher that was held', async () => {
+    const el = await mount();
+    const seen: CustomEvent[] = [];
+    const listener = (e: Event) => seen.push(e as CustomEvent);
+    document.addEventListener('erp:voucher-held', listener);
+    try {
+      await el.confirm();
+    } finally {
+      document.removeEventListener('erp:voucher-held', listener);
+    }
+    expect(seen).toHaveLength(1);
+    expect(seen[0].detail).toEqual({
+      redemptionId: 'red-1',
+      grantId: 'g-cuts',
+      packageId: 'p-cuts',
+      lineRef: 'line-1',
+      checkoutRef: 'order-7',
+    });
+  });
+
   it('undo releases THAT redemption and puts the choice back on screen', async () => {
     const el = await mount();
     await el.confirm();
