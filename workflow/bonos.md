@@ -82,13 +82,15 @@ rechaza la venta entera porque ese artículo no está en su catálogo. Un bono d
 la concesión manual se rechaza sin frase propia, y venderlo en un tique hace fallar entero el aviso de
 la venta cobrada: no se concede, y las sesiones retenidas en ese tique no se dan por gastadas y vuelven
 al bono al cabo de un día (SERVICES-F24) (leído en el código, sin ejecutar). Anular después la venta
-del bono lo anula solo, con quien anuló la venta, la hora y su motivo, si no se ha gastado ni reservado
-ninguna sesión suya; si ya se usó, sigue vivo y se corrige con **Ajustar** (SERVICES-F18). Devolver la
-venta del bono **entera** hace lo mismo: cuando la devolución que deja la venta **Devuelta** llega a
-Servicios (`sale.refunded`), el bono se anula solo, con quien devolvió, la hora y el motivo de la
-devolución, si no se ha gastado ni reservado ninguna sesión suya fuera de esa venta; si ya se usó, sigue
-vivo y se corrige con **Ajustar**. Una devolución de solo una parte no lo anula (Ventas no dice qué
-líneas vuelven): hay que anularlo en **Bonos vendidos** si no se ha usado (SERVICES-F17).
+del bono lo anula solo, con quien anuló la venta, la hora y su motivo, **aunque ya se haya usado**: las
+sesiones usadas siguen usadas (también una retenida en una caja en ese momento) y las que quedaban se
+pierden, porque el dinero vuelve. Devolver la venta del bono **entera** hace lo mismo: cuando la
+devolución que deja la venta **Devuelta** llega a Servicios (`sale.refunded`), el bono se anula solo,
+con quien devolvió, la hora y el motivo de la devolución. Antes de confirmar, las ventanas **Anular
+venta** y **Devolver** dicen qué le pasará a cada bono (Aviso al anular o devolver la venta de un
+bono). Una devolución de solo una parte no lo anula (Ventas no dice qué líneas vuelven): hay que
+anularlo en **Bonos vendidos** si no se ha usado (SERVICES-F17) o corregirlo con **Ajustar**
+(SERVICES-F18).
 Implicados: SALES-F01, SALES-F30, SALES-F31, REC_PELUQUERIA-F13, REC_PELUQUERIA-F14
 QA: B-08, BD-05 (discrepa)
 
@@ -133,7 +135,8 @@ Actor: responsable
 Pantalla: Bonos y paquetes
 Pasos:
 1. En **Bonos vendidos**, en la compra equivocada (a otra clienta, otro bono, cobrado dos veces),
-   pulsa **Anular**. Solo sale si no se ha gastado ni reservado ninguna sesión de ese bono.
+   pulsa **Anular**. Solo sale si no se ha gastado ni reservado ninguna sesión de ese bono (uno ya
+   usado se anula anulando o devolviendo entera su venta, SERVICES-F27, o se corrige con **Ajustar**).
 2. Lee «¿Anular este bono?»: «El bono del cliente {customer} ({amount}) deja de poder usarse y queda
    en la lista como anulado. El dinero no se devuelve aquí: si se cobró, devuelve la venta desde
    Ventas con una devolución.».
