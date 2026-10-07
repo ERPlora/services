@@ -1320,6 +1320,12 @@
       "component": "erp-services-session-refund",
       "permission": "services.refund_package",
       "priority": 100
+    },
+    {
+      "slot": "sales.reversal.notice",
+      "component": "erp-services-sale-reversal",
+      "permission": "services.view_package_balance",
+      "priority": 100
     }
   ]
 }

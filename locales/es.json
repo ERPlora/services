@@ -269,7 +269,21 @@
     "movementCorrectedBy": "Corregido por {who}",
     "errNotAnAmount": "Esto no es un importe. Escribe una cifra, por ejemplo 12,50.",
     "errAmbiguousAmount": "Este importe se puede leer de dos maneras: «{typed}» tanto puede ser {grouped} como {decimal}. Escribe los decimales para que no haya duda.",
-    "errNegativeAmount": "Este importe no puede ser negativo."
+    "errNegativeAmount": "Este importe no puede ser negativo.",
+    "saleReversal": {
+      "void": {
+        "intact": "{name} se vendió en esta venta y se anulará con ella. No se ha usado ninguna sesión.",
+        "used": "{name} se vendió en esta venta y se anulará con ella: las {used} sesión(es) ya usadas no vuelven y se pierden las {remaining} que quedan.",
+        "usedNoMore": "{name} se vendió en esta venta y se anulará con ella: las {used} sesión(es) ya usadas no vuelven y ya no se podrá usar."
+      },
+      "refund": {
+        "intact": "{name} se vendió en esta venta. Si devuelves la venta entera, se anula; no se ha usado ninguna sesión. Una devolución parcial no lo toca.",
+        "used": "{name} se vendió en esta venta. Si devuelves la venta entera, se anula: las {used} sesión(es) ya usadas no vuelven y se pierden las {remaining} que quedan. Una devolución parcial no lo toca.",
+        "usedNoMore": "{name} se vendió en esta venta. Si devuelves la venta entera, se anula: las {used} sesión(es) ya usadas no vuelven y ya no se podrá usar. Una devolución parcial no lo toca."
+      },
+      "loadFailed": "No se han podido leer los bonos vendidos en esta venta. Inténtalo otra vez antes de confirmar: se anulan con la venta.",
+      "btnRetry": "Reintentar"
+    }
   },
   "errors": {
     "services.category_unavailable": "Esa categoría no está disponible: no existe en este negocio o se ha eliminado.",
