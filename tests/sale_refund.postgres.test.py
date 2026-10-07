@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""services#154 — refunding IN FULL the sale that sold a voucher voids that voucher while it is
-intact, statement by statement.
+"""services#154, services#157 — refunding IN FULL the sale that sold a voucher voids that voucher,
+used or not, statement by statement.
 
 `sales.refund` gives money back, not lines (SALES-F31): its `sale.refunded` says how much went
 back and whether the sale is now refunded IN FULL (`fully_refunded`), never which line. So the only
@@ -12,18 +12,20 @@ cannot name the voucher's line, so it leaves the voucher alone.
 `sale.refunded` reaches `services._on_sale_refunded`). This battery proves each guard against a
 REAL Postgres:
 
-  1. A FULL refund voids every voucher sold on that sale that is still intact, stamped with who
-     refunded it, when and the refund's reason — and nothing else: not one already used or held,
-     not a manual grant that names the sale, not one sold on another sale, not one already voided
-     (its trail is not re-stamped), not the neighbour hub's.
+  1. A FULL refund voids every voucher sold on that sale, used or not (services#157): the money
+     goes back, so the voucher goes with it — what was already used stays used (its sessions are
+     not touched, a session held at a till right now included) and what was left is lost. Stamped
+     with who refunded it, when and the refund's reason — and nothing else is voided: not a manual
+     grant that names the sale, not one sold on another sale, not one already voided (its trail is
+     not re-stamped), not the neighbour hub's.
   2. A PARTIAL refund (or an event that does not say) voids nothing.
-  3. A voucher whose only session was settled on the very sale being refunded is intact for this
-     refund (the whole ticket goes back, as in the void); the listener does NOT give that session back itself —
+  3. A voucher with a session settled on the very sale being refunded is voided — and so is one
+     also spent on another visit or at the chair; the listener does NOT give a session back itself —
      that is the return window's job (SERVICES-F26), which would otherwise answer «already
      returned».
   4. A redelivered `sale.refunded` touches nothing; a blank signer falls back to the caller.
   5. RACE: a till holding a session of the sold voucher at the same instant makes the refund
-     WAIT; it then reads the held session and leaves the voucher live.
+     WAIT; it then voids the voucher and leaves the till's session where the till put it.
 
 Usage: tests/sale_refund.postgres.test.py   (exit 0 = green; SKIPPED without the container)
 """
@@ -275,14 +277,14 @@ def full_refund_voids(
     db: ScratchDb, svc: str, pkg: str, other_svc: str, other_pkg: str
 ) -> None:
     print(
-        "\n1 · a FULL refund voids the vouchers sold on that sale while intact, and only those"
+        "\n1 · a FULL refund voids the vouchers sold on that sale, used or not, and only those"
     )
     sale = "sale-r"
     intact = grant(db, pkg, "cus-r1", sale_id=sale)
     used = grant(db, pkg, "cus-r2", sale_id=sale)
-    chair_session(db, used, "sale-later")
+    used_session = chair_session(db, used, "sale-later")
     held = grant(db, pkg, "cus-r3", sale_id=sale)
-    hold(db, held, svc)
+    held_session = hold(db, held, svc)
     stale = grant(db, pkg, "cus-r4", sale_id=sale)
     stale_hold = hold(db, stale, svc)
     released = grant(db, pkg, "cus-r8", sale_id=sale)
@@ -331,11 +333,32 @@ def full_refund_voids(
         "… with the refund's reason, trimmed", "Changed her mind", trail["void_reason"]
     )
     check("… and nothing left to spend", None, remaining(db, "cus-r1", intact))
-    check("a voucher already USED stays live", 0, grant_trail(db, used)["is_deleted"])
+    used_trail = grant_trail(db, used)
     check(
-        "a voucher with a session HELD at a till stays live",
-        0,
+        "a voucher already USED is voided with its sale's full refund too (services#157)",
+        [1, NOW, MANAGER, "Changed her mind"],
+        [
+            used_trail["is_deleted"],
+            used_trail["voided_at"],
+            used_trail["voided_by"],
+            used_trail["void_reason"],
+        ],
+    )
+    check(
+        "… and its session spent on another visit stays spent",
+        [0, None],
+        [session(db, used_session)["is_deleted"], session(db, used_session)["refunded_at"]],
+    )
+    check("… with nothing left to spend", None, remaining(db, "cus-r2", used))
+    check(
+        "a voucher with a session HELD at a till is voided too",
+        1,
         grant_trail(db, held)["is_deleted"],
+    )
+    check(
+        "… and the till's session stays held on it",
+        [0, None],
+        [session(db, held_session)["is_deleted"], session(db, held_session)["refunded_at"]],
     )
     check(
         "a voucher whose only hold has lapsed counts as intact and is voided",
@@ -377,7 +400,7 @@ def full_refund_voids(
         0,
         grant_trail(db, theirs)["is_deleted"],
     )
-    check("exactly the five intact vouchers were touched", 5, touched)
+    check("exactly the seven vouchers sold on this sale and still live were touched", 7, touched)
 
     print("\n1b · a redelivered `sale.refunded` touches nothing")
     check("the second delivery updates no row", 0, refund_sale(db, sale))
@@ -438,28 +461,28 @@ def sold_and_spent_on_the_same_sale(db: ScratchDb, svc: str, pkg: str) -> None:
         [s["is_deleted"], s["status"], s["refunded_at"]],
     )
 
-    print("\n3b · … but one session elsewhere still makes it used")
+    print("\n3b · … and one also spent on another visit is voided as well")
     sale2 = "sale-same-2"
     g2 = grant(db, pkg, "cus-same-2", sale_id=sale2)
     spent_on(db, g2, svc, sale2)
     spent_on(db, g2, svc, "sale-next-visit")
     refund_sale(db, sale2)
     check(
-        "a voucher also spent on ANOTHER sale stays live",
-        0,
+        "a voucher also spent on ANOTHER sale is voided with its sale's full refund",
+        1,
         grant_trail(db, g2)["is_deleted"],
     )
 
     print(
-        "\n3c · a session at the chair that only names the sale still counts as a use"
+        "\n3c · … and so is one spent at the chair that only names the sale"
     )
     sale3 = "sale-same-3"
     g3 = grant(db, pkg, "cus-same-3", sale_id=sale3)
     chair_session(db, g3, sale3)
     refund_sale(db, sale3)
     check(
-        "a voucher spent at the chair (never settled) stays live",
-        0,
+        "a voucher spent at the chair (never settled) is voided too",
+        1,
         grant_trail(db, g3)["is_deleted"],
     )
 
@@ -562,8 +585,8 @@ def the_till_wins_the_race(db: ScratchDb, svc: str, pkg: str) -> None:
     waited = race(db, hold_body(gid, svc), refund_body("sale-race"))
     check("the refund waited for the till", True, waited)
     check(
-        "… and, reading the held session, left the voucher live",
-        0,
+        "… and then voided the voucher with its sale",
+        1,
         grant_trail(db, gid)["is_deleted"],
     )
 
@@ -597,7 +620,7 @@ def main() -> int:
             print(f"  - {f}")
         return 1
     print(
-        "✓ sale_refund: a full refund voids the intact vouchers sold on the sale, nothing else"
+        "✓ sale_refund: a full refund voids the vouchers sold on the sale, used or not, nothing else"
     )
     return 0
 
