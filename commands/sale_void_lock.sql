@@ -1,6 +1,7 @@
 -- Queues the void of a PAID sale behind every door that decides on the vouchers it sold
--- (`services._on_sale_voided`, statement 1 of 3, services#151). Same lock, same order and same
--- reason as `_grant_lock.sql`: statement 3 voids a sold voucher only if no session of it is spent
+-- (`services._on_sale_voided`, statement 1 of 3, services#151; and its full refund,
+-- `services._on_sale_refunded`, statement 1 of 2, services#154). Same lock, same order and same
+-- reason as `_grant_lock.sql`: the last statement voids a sold voucher only if no session of it is spent
 -- or held, and under READ COMMITTED that `NOT EXISTS` reads a snapshot — a till holding a session
 -- of that voucher at the same instant would land on a voided voucher (a write skew). Locking the
 -- whole pair (package + customer) of every voucher this sale minted makes the till wait for the

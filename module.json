@@ -1180,6 +1180,14 @@
         "commands/sale_void_grants.sql"
       ]
     },
+    "services._on_sale_refunded": {
+      "permission": "services.refund_package",
+      "transaction": true,
+      "sql": [
+        "commands/sale_void_lock.sql",
+        "commands/sale_refund_grants.sql"
+      ]
+    },
     "services._on_customer_deleted": {
       "permission": "services.view_orphan_grant",
       "transaction": true,
@@ -1258,6 +1266,9 @@
       },
       "sale.voided": {
         "command": "services._on_sale_voided"
+      },
+      "sale.refunded": {
+        "command": "services._on_sale_refunded"
       }
     },
     "emits": [
