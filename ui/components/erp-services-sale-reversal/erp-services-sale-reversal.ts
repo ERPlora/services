@@ -130,7 +130,7 @@ export class ErpServicesSaleReversal extends LitElement {
     return html`<div class="box">
       ${this.vouchers.map(
         (v) => html`<ok-inline-feedback
-          data-testid=${`services-sale-reversal-${v.grant_id}`}
+          data-testid=${`services-sale-reversal-voucher-${v.grant_id}`}
           tone="warning"
           icon="alert-circle-outline"
           >${this.message(v)}</ok-inline-feedback

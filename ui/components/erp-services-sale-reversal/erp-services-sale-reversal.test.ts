@@ -66,7 +66,7 @@ async function mount(props: Partial<Mounted> = {}): Promise<Mounted> {
 }
 
 const notice = (el: Mounted, grantId: string) =>
-  el.shadowRoot.querySelector<HTMLElement>(`[data-testid="services-sale-reversal-${grantId}"]`);
+  el.shadowRoot.querySelector<HTMLElement>(`[data-testid="services-sale-reversal-voucher-${grantId}"]`);
 
 describe('erp-services-sale-reversal — the voucher warning before a void or a full refund (services#157)', () => {
   it('reads the vouchers sold on THAT sale, once', async () => {
@@ -114,7 +114,7 @@ describe('erp-services-sale-reversal — the voucher warning before a void or a 
   it('loading: a grey block, never «nothing sold here»', async () => {
     let release!: () => void;
     const gate = new Promise<void>((r) => { release = r; });
-    (globalThis as { erplora: { query: unknown } }).erplora.query = async () => { await gate; return rows; };
+    (globalThis as unknown as { erplora: { query: unknown } }).erplora.query = async () => { await gate; return rows; };
     await import('./erp-services-sale-reversal');
     const el = document.createElement('erp-services-sale-reversal') as unknown as Mounted;
     el.saleId = 'sale-1';

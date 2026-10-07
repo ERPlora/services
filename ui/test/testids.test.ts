@@ -181,6 +181,16 @@ const COVERED: Record<
       'services-session-refund-retry',
     ],
   },
+  // What voiding or refunding the sale of a voucher does to it, projected into the sale's Void and
+  // Refund windows (services#157). One notice per voucher, keyed by the grant it is.
+  'components/erp-services-sale-reversal/erp-services-sale-reversal.ts': {
+    prefix: 'services-sale-reversal-',
+    computed: ['services-sale-reversal-voucher-'],
+    contract: [
+      'services-sale-reversal-load-error',
+      'services-sale-reversal-retry',
+    ],
+  },
   // The voucher tender of the TILL: a cashier redeems a session of a customer's voucher.
   'components/erp-services-voucher-tender/erp-services-voucher-tender.ts': {
     prefix: 'services-voucher-tender-',
