@@ -462,6 +462,17 @@ def vouchers_sold_on_it(db: ScratchDb, svc: str, pkg: str, other_pkg: str) -> No
     already = grant(db, pkg, "cus-v7", sale_id=sale)
     run(db, "services._void_grant", {"grant_id": already, "reason": "Wrong customer"})
     first_trail = grant_trail(db, already)
+    # Rows no door writes, one per guard: deleted but never voided, and voided but not deleted.
+    half_deleted = grant(db, pkg, "cus-v10", sale_id=sale)
+    half_voided = grant(db, pkg, "cus-v11", sale_id=sale)
+    db.psql(
+        [],
+        db=db.name,
+        stdin=f"UPDATE services_package_grant SET is_deleted = 1 WHERE id = '{half_deleted}';\n"
+        "UPDATE services_package_grant SET voided_at = '2026-08-01T00:00:00Z', voided_by = 'u-old', "
+        f"void_reason = 'Old' WHERE id = '{half_voided}';\n",
+    )
+    half_trails = [grant_trail(db, half_deleted), grant_trail(db, half_voided)]
     theirs = grant(db, other_pkg, "cus-v1", sale_id=sale, hub=OTHER_HUB)
     # An intact voucher of this hub that a session of the NEIGHBOUR names by id: only the hub_id
     # of the in-use check keeps that foreign session from counting as a use.
@@ -557,6 +568,11 @@ def vouchers_sold_on_it(db: ScratchDb, svc: str, pkg: str, other_pkg: str) -> No
         "a voucher already voided keeps its first trail",
         first_trail,
         grant_trail(db, already),
+    )
+    check(
+        "a row deleted but not voided, or voided but not deleted, is not re-stamped",
+        half_trails,
+        [grant_trail(db, half_deleted), grant_trail(db, half_voided)],
     )
     check(
         "the neighbour hub's voucher on the same sale id stays live",

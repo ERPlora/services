@@ -22,6 +22,9 @@ WHAT IS PROVEN HERE
      not one already voided (there is nothing left to warn about), not the neighbour hub's voucher
      on the same sale id.
   3. A sale that sold no voucher answers an empty list, never an error.
+  4. Every guard has its row: a neighbour hub's adjustment or session that names our voucher, a
+     deleted adjustment, a voucher pointing at another hub's catalogue entry, and a row deleted but
+     not voided (or voided but not deleted) change nothing.
 
 Usage: tests/sold_on_sale.postgres.test.py   (exit 0 = green; SKIPPED without the container)
 """
@@ -204,6 +207,16 @@ def adjust(db: ScratchDb, grant_id: str, uses: int) -> None:
     )
 
 
+def clone(db: ScratchDb, table: str, src_id: str, sets: str) -> None:
+    """Copy one row with some columns overridden — the stray rows no door writes."""
+    db.psql(
+        [],
+        db=db.name,
+        stdin=f"CREATE TEMP TABLE x AS SELECT * FROM {table} WHERE id = '{src_id}';\n"
+        f"UPDATE x SET {sets};\nINSERT INTO {table} SELECT * FROM x;\nDROP TABLE x;\n",
+    )
+
+
 def sold_on(db: ScratchDb, sale_id: str, hub: str = HUB) -> list[dict]:
     sql = query_sql("services.packages.sold_on_sale", {"sale_id": sale_id}, hub=hub)
     out = db.psql(
@@ -323,6 +336,48 @@ def main() -> int:
 
         print("\n3 · a sale that sold no voucher")
         check("answers an empty list", [], sold_on(db, "sale-without-vouchers"))
+
+        print("\n4 · every guard has its row")
+        guards = "sale-guards"
+        mine = grant(db, five, "cus-20", sale_id=guards)
+        topped_adj = db.scalar(
+            f"SELECT id FROM services_package_grant_adjustment WHERE grant_id = '{topped}'"
+        )
+        clone(db, "services_package_grant_adjustment", topped_adj,
+              f"id = 'adj-neighbour', hub_id = '{OTHER_HUB}', grant_id = '{mine}', uses_delta = 3")
+        clone(db, "services_package_grant_adjustment", topped_adj,
+              f"id = 'adj-deleted', grant_id = '{mine}', uses_delta = 4, is_deleted = 1")
+        used_session = db.scalar(
+            f"SELECT id FROM services_package_redemption WHERE grant_id = '{used}'"
+        )
+        clone(db, "services_package_redemption", used_session,
+              f"id = 'red-neighbour', hub_id = '{OTHER_HUB}', grant_id = '{mine}'")
+        clone(db, "services_package_grant", mine,
+              f"id = 'g-crossed', customer_id = 'cus-21', package_id = '{theirs}', "
+              "sale_ref = 'sale-guards:g-crossed'")
+        clone(db, "services_package_grant", mine,
+              "id = 'g-deleted', customer_id = 'cus-22', is_deleted = 1, "
+              "sale_ref = 'sale-guards:g-deleted'")
+        clone(db, "services_package_grant", mine,
+              f"id = 'g-voided', customer_id = 'cus-23', voided_at = '{NOW}', "
+              "sale_ref = 'sale-guards:g-voided'")
+        got = {r["grant_id"]: [r["package_name"], r["used"], r["remaining"]]
+               for r in sold_on(db, guards)}
+        check(
+            "the neighbour's adjustment and session, and a deleted adjustment, change nothing",
+            ["Five haircuts", 0, 5],
+            got.get(mine),
+        )
+        check(
+            "another hub's catalogue entry lends no name",
+            ["", 0, 5],
+            got.get("g-crossed"),
+        )
+        check(
+            "a row deleted but not voided, or voided but not deleted, is not listed",
+            [mine, "g-crossed"],
+            sorted(got, key=lambda k: k != mine),
+        )
     finally:
         db.drop()
 
