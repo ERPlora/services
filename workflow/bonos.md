@@ -57,7 +57,7 @@ Implicados: SALES-F27
 QA: BD-05, B-08
 
 ### SERVICES-F14 Vender un bono a una clienta
-Estado: parcial — no hay pantalla: el TPV no ofrece los bonos como artículo y no hay botón de venta manual; solo con el asistente o la API (cobrando un tique con la línea del bono marcada como servicio, o con la concesión manual); y devolver la venta del bono no lo anula (services#154)
+Estado: parcial — no hay pantalla: el TPV no ofrece los bonos como artículo y no hay botón de venta manual; solo con el asistente o la API (cobrando un tique con la línea del bono marcada como servicio, o con la concesión manual); y devolver solo una parte de la venta del bono no lo anula, aunque lo devuelto sea justo el bono: Ventas devuelve dinero, no líneas, así que solo la devolución que deja la venta **Devuelta** del todo dice que el bono ha vuelto (services#158)
 Actor: cajero, responsable, asistente
 Pantalla: asistente
 Pasos:
@@ -69,7 +69,7 @@ Pasos:
    importe si los hay, para un bono entregado fuera del TPV.
 3. El bono aparece en **Bonos vendidos** de ese bono (SERVICES-F16) y en el hueco del cobro de esa
    clienta (SERVICES-F22).
-Entra: la venta cobrada con su clienta y sus líneas (Ventas) o la petición de concesión; el bono del catálogo, activo.
+Entra: la venta cobrada con su clienta y sus líneas (Ventas) o la petición de concesión; el bono del catálogo, activo. Después, la anulación o la devolución de esa venta (avisa Ventas: `sale.voided`, `sale.refunded`).
 Sale: un bono vendido por unidad, con la titular, la fecha, la venta, el importe y los «Usos» y la
 «Vigencia (días)» del catálogo congelados; la caducidad cuenta desde ese momento. La concesión manual
 avisa (`services.package.granted`); la que nace de la venta cobrada, no. Repetir el aviso de la
@@ -84,8 +84,12 @@ la venta cobrada: no se concede, y las sesiones retenidas en ese tique no se dan
 al bono al cabo de un día (SERVICES-F24) (leído en el código, sin ejecutar). Anular después la venta
 del bono lo anula solo, con quien anuló la venta, la hora y su motivo, si no se ha gastado ni reservado
 ninguna sesión suya; si ya se usó, sigue vivo y se corrige con **Ajustar** (SERVICES-F18). Devolver la
-venta del bono no lo anula: hay que anularlo en **Bonos vendidos** si no se ha usado (SERVICES-F17).
-Implicados: SALES-F01, SALES-F30, SALES-F31, REC_PELUQUERIA-F13
+venta del bono **entera** hace lo mismo: cuando la devolución que deja la venta **Devuelta** llega a
+Servicios (`sale.refunded`), el bono se anula solo, con quien devolvió, la hora y el motivo de la
+devolución, si no se ha gastado ni reservado ninguna sesión suya fuera de esa venta; si ya se usó, sigue
+vivo y se corrige con **Ajustar**. Una devolución de solo una parte no lo anula (Ventas no dice qué
+líneas vuelven): hay que anularlo en **Bonos vendidos** si no se ha usado (SERVICES-F17).
+Implicados: SALES-F01, SALES-F30, SALES-F31, REC_PELUQUERIA-F13, REC_PELUQUERIA-F14
 QA: B-08, BD-05 (discrepa)
 
 ### SERVICES-F15 Consultar los bonos de una clienta

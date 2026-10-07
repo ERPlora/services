@@ -206,7 +206,7 @@ gramática y el mismo prefijo. Antes de tocar código, lee el fichero del flujo 
 | Saldo de bonos visible en la ficha de la clienta | parcial — solo en el cobro, servicio a servicio, y por el asistente | SERVICES-F15 |
 | La sesión vuelve al devolver la venta | parcial — solo junto con una devolución de dinero: no en un tique pagado entero con bono (0,00 €) ni si ya se devolvió todo el dinero; entonces, anulando la venta si aún se puede o con Ajustar | SERVICES-F26, SERVICES-F27, SERVICES-F18 |
 | La sesión vuelve al anular la venta | hecho | SERVICES-F27 |
-| Anular la venta de un bono hecha por error | hecho — a mano en **Bonos vendidos**, o solo al anular su venta mientras el bono esté intacto | SERVICES-F17, SERVICES-F14 |
+| Anular la venta de un bono hecha por error | hecho — a mano en **Bonos vendidos**, o solo al anular su venta o devolverla entera mientras el bono esté intacto; una devolución de solo una parte no lo anula (services#158) | SERVICES-F17, SERVICES-F14 |
 | Regalar sesiones, alargar la caducidad, corregir el saldo | hecho | SERVICES-F18 |
 | Historial de movimientos del bono | hecho | SERVICES-F19 |
 | Bonos de una ficha unida, eliminada o anonimizada | hecho | SERVICES-F28, SERVICES-F29 |
@@ -276,7 +276,8 @@ gramática y el mismo prefijo. Antes de tocar código, lee el fichero del flujo 
   los bonos ya vendidos; regalar o corregir es un movimiento aparte con motivo, de hasta 100
   sesiones (sumar o quitar) y hasta 366 días (solo alargar), y nunca quita más sesiones de las que
   le quedan a la clienta.
-- **Anular solo un bono intacto**, con motivo: también cuando se anula la venta que lo vendió.
+- **Anular solo un bono intacto**, con motivo: también cuando se anula la venta que lo vendió o se
+  devuelve entera.
 - **Ningún movimiento de bono mueve dinero ni emite documento fiscal**: el registro fiscal sale con
   la venta del bono.
 - **Permisos:** empleado ve todo salvo **Bonos sin cliente**, da de alta servicios y gasta sesiones; cajero ve, gasta sesiones
@@ -311,7 +312,6 @@ Contra el código de `origin/main` (v1.5.71), una línea por discrepancia:
 - `docs/screens.md` («Create a service»): describe tarifa, precio mínimo y máximo, márgenes, capacidad, reservable, confirmación, reserva online, SKU, código de barras, imagen y destacado en el alta; la pantalla solo pide Nombre, Precio, Duración (min), Categoría y Categoría fiscal (SERVICES-F01, SERVICES-F03).
 - `docs/screens.md` (ajustes): «Default tax category — the category used by services that do not set one», «Show prices, show duration — what the public-facing surfaces display», «Online booking», «Tax included»; nada lee la categoría por defecto, mostrar precios, mostrar duración, IVA incluido ni la moneda, y la duración, el margen y la reserva online por defecto solo cuentan en altas por el asistente o la API (SERVICES-F11).
 - `docs/screens.md` y la frase de `locales/es.json` del aviso de borrado de bono: «vouchers already sold keep their balance» / «los bonos ya vendidos conservan su saldo»; el saldo se conserva pero ya no se puede gastar en el cobro ni se ve en «Bonos vendidos» (SERVICES-F13).
-- `docs/screens.md` («A voucher that was already used cannot be voided; correcting its balance (services#119) is a separate door that does not exist yet»): la corrección ya existe con **Ajustar** (SERVICES-F18).
 - `docs/screens.md` y `hand-book/modulos/services.md` («the voucher goes on the ticket like any other line», «En el TPV… añadir el bono al ticket»): el TPV no ofrece bonos; venderlo solo se puede por el asistente o la API (SERVICES-F14).
 - `docs/screens.md` («done once there is at least one sellable service»): el paso de arranque cuenta también los servicios sin categoría fiscal, que no se pueden cobrar.
 - `docs/screens.md` («a cashier who cannot refund never sees the hole»): el hub no filtra los huecos por el permiso que declara el módulo; con los perfiles de fábrica no se nota porque **Devolver** solo lo abren responsable y administrador.
@@ -323,7 +323,7 @@ Contra el código de `origin/main` (v1.5.71), una línea por discrepancia:
 - `docs/concepts.md` («deleting a package does not currently cascade the soft-delete to its lines») y («Variants and add-ons exist in the data»): desactualizados; las líneas se borran con el bono y las variantes y extras se retiraron.
 - `docs/overview.md` («the clock runs from the customer's first live use, so returning the use that started it un-starts it»): la caducidad cuenta desde la compra (ADR-0390) y devolver una sesión no la mueve (SERVICES-F20).
 - `schemas/package_create.json` y `schemas/package_update.json` (`validity_days`: «after its first use»): la vigencia cuenta desde la compra, que es lo que lee el asistente al crear o editar un bono (SERVICES-F20).
-- `docs/overview.md` (eventos que escucha): solo nombra la venta cobrada y la anulada; también escucha quitar una línea y anular una cuenta de Ventas, y eliminar, anonimizar y unir fichas de Clientes.
+- `docs/overview.md` (eventos que escucha): solo nombra la venta cobrada, la anulada y la devuelta; también escucha quitar una línea y anular una cuenta de Ventas, y eliminar, anonimizar y unir fichas de Clientes.
 - `hand-book/modulos/services.md`: llama «Paquetes» a la pestaña «Bonos y paquetes»; dice que los ajustes están «en los ajustes del Hub» (es la pestaña Ajustes del módulo); pide activar «Reservable» y «Reserva online» y elegir tipo de precio, márgenes y capacidad, que no están en la pantalla; y pide comprobar «el saldo del cliente», que no tiene pantalla (SERVICES-F15).
 - `locales/es.json` (`ui.packageLinesFixed`): «archiva este paquete y crea uno nuevo»; no hay archivar para bonos, solo **Eliminar**, y uno nuevo con el mismo nombre se rechaza (SERVICES-F12, SERVICES-F13).
 - `locales/es.json` (`ui.orphansHint`): «devuélvelo o pásalo a otra ficha»; la hoja no tiene ninguna acción y pasar un bono a otra ficha no existe (SERVICES-F30).

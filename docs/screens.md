@@ -181,8 +181,9 @@ the list is then read again. A refusal (someone spent a session in the meantime,
 voided) is shown on the confirmation itself, with its own sentence.
 
 Voiding moves **no money**: if the voucher was paid, refund the sale from Sales with a return. A
-voucher that was already used cannot be voided; correcting its balance (services#119) is a separate
-door that does not exist yet.
+refund that returns the whole sale voids an intact voucher by itself (services#154); a partial one
+does not. A voucher that was already used cannot be voided; its balance is corrected with
+«Adjust».
 
 ### Adjust a sold voucher: a courtesy (services#118) or a balance correction (services#119)
 

@@ -28,6 +28,18 @@ module's authority through the outbox relay, and the effect is read back through
 queries the screens use. A Postgres battery binding the statements by hand would prove the SQL
 and nothing about the wiring.
 
+Refunding the sale IN FULL (services#154, SERVICES-F14) is the same for the voucher it sold:
+`sales.refund` gives money back, not lines, and its `sale.refunded` only says whether the sale is
+now refunded in full. So:
+
+  4. a partial refund leaves the voucher sold on that sale live (it cannot name the voucher's
+     line); the refund that gives back the last cent voids it, with who and why;
+  5. a voucher sold on that sale that has ALREADY been used stays live, as with the void.
+
+The sessions spent on a refunded sale are not this listener's: they come back through the return
+window (SERVICES-F26). The refund cases live here, not in a battery of their own, because they
+reuse this bench (`sales` next to `services`) and the lock of the void.
+
 Usage: `erplora test <dir> --against-hub [dev|stable|sha256:…]`. Never on its own: without a
 runtime it fails, it does not skip.
 """
@@ -158,6 +170,22 @@ def charge(
 
 def complete(hub: Hub, payload: dict) -> str:
     return hub.run("sales.complete_sale", payload)["new_ids"][0]
+
+
+def refund(hub: Hub, sale_id: str, amount: int, reason: str) -> None:
+    """`sales.refund` of `amount` cents back to the card leg it was charged on (SALES-F31)."""
+    legs = hub.query("sales.refund_options", {"sale_id": sale_id})
+    if not legs:
+        raise AssertionError(f"sale {sale_id} has no leg to refund")
+    hub.run(
+        "sales.refund",
+        {
+            "sale_id": sale_id,
+            "reason": reason,
+            "idempotency_key": f"services-154-{uuid.uuid4().hex[:8]}",
+            "allocations": [{"payment_id": legs[0]["payment_id"], "amount": amount}],
+        },
+    )
 
 
 def grant_row(hub: Hub, package_id: str, grant_id: str) -> dict | None:
@@ -343,8 +371,110 @@ def main() -> int:
         1,
     )
 
+    print(
+        "4 · refunding the sale of a voucher: a partial refund leaves it, the last cent voids it"
+        " (services#154)"
+    )
+    refund_buyer = tag("cust-refund")
+    refund_package = create_package(
+        hub,
+        f"Bono devuelto {run}",
+        max_uses=5,
+        validity_days=None,
+        service_id=service_id,
+    )
+    _, _, sell_refund = charge(
+        hub,
+        sale_line(refund_package, f"Bono devuelto {run}", 10000, is_service=True),
+        refund_buyer,
+    )
+    refund_sale_id = complete(hub, sell_refund)
+    refund_rows = wait_until(
+        lambda: [
+            r
+            for r in hub.query(
+                "services.packages.grants", {"package_id": refund_package}
+            )
+            if r.get("sale_id") == refund_sale_id
+        ],
+        lambda rows: len(rows) == 1,
+    )
+    hub.check("the sale minted the voucher to refund", len(refund_rows), 1)
+    refund_grant = refund_rows[0]["grant_id"] if refund_rows else ""
+    refund(hub, refund_sale_id, 3000, f"Parte {run}")
+    # A negative never resolves by waiting: give the relay its ticks, then read it outright.
+    time.sleep(3)
+    hub.check(
+        "a PARTIAL refund cannot name the voucher's line: the voucher stays live",
+        (grant_row(hub, refund_package, refund_grant) or {}).get("status"),
+        "active",
+    )
+    refund_reason = f"Se arrepiente {run}"
+    refund(hub, refund_sale_id, 7000, refund_reason)
+    refunded = wait_until(
+        lambda: grant_row(hub, refund_package, refund_grant) or {},
+        lambda g: g.get("status") == "voided",
+    )
+    hub.check(
+        "the refund that returns the last cent voids the voucher sold on that sale",
+        refunded.get("status"),
+        "voided",
+    )
+    hub.check(
+        "its void carries the refund's reason",
+        refunded.get("void_reason"),
+        refund_reason,
+    )
+    hub.check(
+        "its void is signed by whoever refunded the sale, not by the listener",
+        refunded.get("voided_by"),
+        hub.user,
+    )
+    hub.check_true(
+        "the refunded voucher cannot be spent any more",
+        not any(
+            r.get("grant_id") == refund_grant
+            for r in hub.query(
+                "services.packages.tender_options",
+                {"customer_id": refund_buyer, "service_id": service_id},
+            )
+        ),
+    )
+
+    print(
+        "5 · a voucher refunded in full whose session was already spent elsewhere stays live"
+    )
+    kept_buyer = tag("cust-kept")
+    kept_package = create_package(
+        hub, f"Bono gastado {run}", max_uses=5, validity_days=None, service_id=service_id
+    )
+    _, _, sell_kept = charge(
+        hub,
+        sale_line(kept_package, f"Bono gastado {run}", 10000, is_service=True),
+        kept_buyer,
+    )
+    kept_sale = complete(hub, sell_kept)
+    kept_rows = wait_until(
+        lambda: [
+            r
+            for r in hub.query("services.packages.grants", {"package_id": kept_package})
+            if r.get("sale_id") == kept_sale
+        ],
+        lambda rows: len(rows) == 1,
+    )
+    kept_grant = kept_rows[0]["grant_id"] if kept_rows else ""
+    hub.run("services.packages.redeem", {"grant_id": kept_grant})
+    refund(hub, kept_sale, 10000, f"Devuelta {run}")
+    time.sleep(3)
+    hub.check(
+        "a voucher already used is not voided by its sale's full refund",
+        (grant_row(hub, kept_package, kept_grant) or {}).get("status"),
+        "active",
+    )
+
     return hub.finish(
-        "voiding a paid sale gives back its voucher sessions and voids the intact vouchers it sold"
+        "voiding a paid sale gives back its voucher sessions and voids the intact vouchers it"
+        " sold; refunding it in full voids them too"
     )
 
 
