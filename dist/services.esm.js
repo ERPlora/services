@@ -7808,8 +7808,9 @@ var ErpServicesVoucherTender = class extends i3 {
     try {
       const mine = await this.recoverHold();
       if (mine) {
-        this.held = mine;
+        this.held = mine.held;
         this.options = [];
+        this.announceHeld(mine.held, mine.grantId, mine.packageId);
         return;
       }
       const rows = await erplora5().query("services.packages.tender_options", {
@@ -7847,7 +7848,7 @@ var ErpServicesVoucherTender = class extends i3 {
     });
     const mine = (Array.isArray(rows) ? rows : []).find((r6) => r6.line_ref === this.lineRef);
     if (!mine) return null;
-    return {
+    const held = {
       redemption_id: String(mine.redemption_id ?? ""),
       package_name: String(mine.package_name ?? ""),
       // `remaining_after` is NULL exactly when the voucher was sold as unlimited — the query
@@ -7857,6 +7858,27 @@ var ErpServicesVoucherTender = class extends i3 {
       // what holds it to that.
       remaining_after: mine.remaining_after ?? null
     };
+    return { held, grantId: String(mine.grant_id ?? ""), packageId: String(mine.package_id ?? "") };
+  }
+  /**
+   * Tells whoever hosts this slot that the line is covered, so it stops charging money for it.
+   * Sent when the operator confirms AND when a hold is recovered: the host only ever learns it
+   * from here.
+   */
+  announceHeld(held, grantId, packageId) {
+    this.dispatchEvent(
+      new CustomEvent("erp:voucher-held", {
+        bubbles: true,
+        composed: true,
+        detail: {
+          redemptionId: held.redemption_id,
+          grantId,
+          packageId,
+          lineRef: this.lineRef,
+          checkoutRef: this.checkoutRef
+        }
+      })
+    );
   }
   select(grantId) {
     this.selectedId = grantId;
@@ -7876,24 +7898,13 @@ var ErpServicesVoucherTender = class extends i3 {
         checkout_ref: this.checkoutRef,
         line_ref: this.lineRef
       });
-      this.held = {
+      const held = {
         redemption_id: String(out?.redemption_id ?? ""),
         package_name: String(out?.package_name ?? option.package_name),
         remaining_after: out?.remaining_after ?? option.remaining_after
       };
-      this.dispatchEvent(
-        new CustomEvent("erp:voucher-held", {
-          bubbles: true,
-          composed: true,
-          detail: {
-            redemptionId: this.held.redemption_id,
-            grantId: option.grant_id,
-            packageId: option.package_id,
-            lineRef: this.lineRef,
-            checkoutRef: this.checkoutRef
-          }
-        })
-      );
+      this.held = held;
+      this.announceHeld(held, option.grant_id, option.package_id);
     } catch (e6) {
       this.feedback = domainMessage(e6, erplora5().locale, this.t("ui.tender.holdFailed"));
     } finally {

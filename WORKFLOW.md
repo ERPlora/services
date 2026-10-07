@@ -127,8 +127,8 @@ con un bono», «{count} bonos válidos» si hay más de uno, y una tarjeta por 
 «Quedan {before} sesiones · {after} después de esta» (o «Sesiones ilimitadas»), «Caduca el {date}» y,
 en el que se gastará, el porqué («Se gasta primero porque es el que antes caduca.», etc.). Botón
 **Gastar una sesión** («Reservando…»). Hecho: «{name}: sesión gastada. Quedan {after}.» con
-**Deshacer**; si la pantalla se recarga o se vuelve a una cuenta aparcada, el hueco vuelve a
-enseñarlo así, pero el TPV ya no da la línea por cubierta (SERVICES-F22). Sin bonos: «Este cliente no tiene ningún bono que cubra este servicio.» · Cargando: un
+**Deshacer**; si se vuelve a una cuenta aparcada, o se recarga la pantalla y se vuelve a asignar la
+clienta, el hueco vuelve a enseñarlo así y la línea sigue cubierta (SERVICES-F22). Sin bonos: «Este cliente no tiene ningún bono que cubra este servicio.» · Cargando: un
 bloque gris animado · Error: «No se han podido cargar los bonos del cliente. Inténtalo otra vez antes
 de cobrar el precio completo.» con **Reintentar**.
 
@@ -201,7 +201,7 @@ gramática y el mismo prefijo. Antes de tocar código, lee el fichero del flujo 
 | Bono de N sesiones de servicios concretos | parcial — el límite es «Usos» para el bono entero; las «Sesiones» de cada servicio no limitan nada | SERVICES-F12 |
 | Vender el bono a una clienta en el TPV | parcial — el TPV no ofrece bonos; solo por el asistente o la API, con la línea marcada como servicio | SERVICES-F14 |
 | Caducidad que cuenta desde la compra | hecho | SERVICES-F20 |
-| Gastar en el cobro con vista previa del saldo y del bono elegido | parcial — tras recargar o volver a una cuenta aparcada, el TPV cobra la línea y además se gasta la sesión; dividir la cuenta o cobrar solo una parte gasta sesiones de líneas que no se cobran | SERVICES-F22, SERVICES-F24 |
+| Gastar en el cobro con vista previa del saldo y del bono elegido | parcial — tras dividir o juntar la cuenta, la sesión retenida se queda en la de origen un día (sales#540); al recargar hay que volver a asignar la clienta (customers#135) | SERVICES-F22, SERVICES-F24 |
 | Deshacer el canje antes de cobrar | hecho | SERVICES-F22, SERVICES-F23 |
 | Saldo de bonos visible en la ficha de la clienta | parcial — solo en el cobro, servicio a servicio, y por el asistente | SERVICES-F15 |
 | La sesión vuelve al devolver la venta | parcial — solo junto con una devolución de dinero: no en un tique pagado entero con bono (0,00 €) ni si ya se devolvió todo el dinero; entonces, anulando la venta si aún se puede o con Ajustar | SERVICES-F26, SERVICES-F27, SERVICES-F18 |

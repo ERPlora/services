@@ -5,7 +5,7 @@ Prefijo: SERVICES
 ## Flujos
 
 ### SERVICES-F22 Pagar una línea con un bono
-Estado: parcial — tras recargar la pantalla o volver a una cuenta aparcada, el hueco enseña la sesión como gastada pero el TPV ya no da la línea por cubierta: la cobra a su precio y al cobrar la sesión también se gasta, así que la clienta paga dos veces; el servidor de Ventas da por pagada con bono la línea que diga el cobro, sin preguntar a Servicios, así que por el asistente o la API una línea se cobra a 0 sin sesión detrás (SALES-F27); si la cuenta se divide o se une a otra, la sesión retenida se queda en la cuenta original (ver Si falla); y cobrar solo una parte de la cuenta gasta también las sesiones de las líneas que no se cobran (SERVICES-F24) (leído en el código, sin ejecutar)
+Estado: parcial — el servidor de Ventas da por pagada con bono la línea que diga el cobro, sin preguntar a Servicios, así que por el asistente o la API una línea se cobra a 0 sin sesión detrás (SALES-F27, sales#539); si la cuenta se divide o se une a otra, la sesión retenida se queda en la cuenta original hasta que vuelve sola al cabo de un día (ver Si falla, sales#540, leído en el código, sin ejecutar); y al recargar la pantalla la cuenta pierde la clienta, así que el hueco no sale hasta que se vuelve a asignar (customers#135; si se cobra antes, la línea se cobra con dinero y la sesión vuelve al bono: no se paga dos veces)
 Actor: cajero, empleado, responsable
 Pantalla: Ventas: Cobro
 Pasos:
@@ -19,11 +19,12 @@ Pasos:
 4. Sale «{name}: sesión gastada. Quedan {after}.» y la línea deja de cobrarse (Ventas). **Deshacer**
    la devuelve mientras la venta no esté cobrada.
 5. Cobra lo demás con su medio (SERVICES-F24). Si se cierra la hoja y se vuelve a abrir sin salir de
-   la cuenta, la línea sigue cubierta. Si se recarga la pantalla, o se aparca la cuenta y se vuelve a
-   ella, el hueco enseña «{name}: sesión gastada. Quedan {after}.» con **Deshacer**, pero el TPV
-   vuelve a cobrar la línea a su precio, y al cobrar la sesión también se da por gastada: la clienta
-   paga el servicio y además pierde la sesión. Hasta que se arregle, pulsa **Deshacer** y vuelve a
-   pulsar **Gastar una sesión** (leído en el código, sin ejecutar).
+   la cuenta, la línea sigue cubierta. Si se aparca la cuenta y se vuelve a ella, el hueco enseña
+   «{name}: sesión gastada. Quedan {after}.» con **Deshacer** y la línea vuelve a salir cubierta: el
+   cobro no la cobra. Si se recarga la pantalla, la cuenta pierde la clienta (CUSTOMERS-F17, customers#135) y el
+   hueco no sale: al volver a asignarla, el hueco recupera la sesión gastada y la línea vuelve a salir
+   cubierta. Si se cobra sin asignarla, la línea se cobra a su precio y esa sesión vuelve al bono en
+   vez de gastarse: la clienta nunca paga el servicio y la sesión a la vez.
 Entra: la clienta, la cuenta, la línea y su servicio (Ventas); los bonos comprados por la clienta (Servicios).
 Sale: una sesión **Reservada** para esa línea durante un día (`services.package.held`), que ya no
 se puede gastar en otra; el aviso al cobro de que la línea está cubierta. No emite documento fiscal:
@@ -36,9 +37,9 @@ sesiones disponibles.», «Este bono ha caducado.», «Este bono está anulado: 
 reservar la sesión de ese bono.». Si otra caja gasta a la vez la última sesión, la segunda espera y
 recibe el motivo real. **Deshacer** tras cobrar: «Esa sesión del bono ya no se puede devolver: la
 venta está cobrada. Devolverla es una devolución, y va por su propia puerta.». Si la cuenta se
-divide, la sesión retenida sigue en la cuenta original: si esa cuenta se cobra antes de que pase el
-día, la sesión se da por gastada con esa venta aunque la línea se cobre en la otra, y si en la nueva
-se gasta otra, la clienta pierde dos; si no se cobra, vuelve sola al bono al cabo de un día. Si se
+divide, la sesión retenida sigue en la cuenta original: cobrar esa cuenta ya no la gasta (la línea no
+está en ese cobro), el hueco de la nueva ofrece gastar otra y la retenida vuelve sola al bono al cabo
+de un día; mientras tanto cuenta como reservada en el saldo. Si se
 juntan dos cuentas, la absorbida se anula sin aviso y su sesión retenida no se gasta al cobrar la
 que queda: vuelve sola al bono al cabo de un día, y el hueco de la que queda ofrece gastar otra
 (leído en el código, sin ejecutar).
@@ -61,20 +62,24 @@ Implicados: SALES-F18, SALES-F27, REC_PELUQUERIA-F10
 QA: B-08
 
 ### SERVICES-F24 Dar por gastadas las sesiones al cobrar
-Estado: parcial — las sesiones se dan por gastadas por cuenta y no por línea: cobrar solo una parte de la cuenta gasta también las sesiones retenidas en las líneas que se quedan sin cobrar, y tras dividir la cuenta, cobrar la original gasta la sesión de una línea que se fue a la otra (leído en el código, sin ejecutar)
+Estado: parcial — si la cuenta se dividió o se juntó, la sesión retenida sigue en la cuenta de origen y cobrar la línea en la nueva no la gasta: vuelve sola al bono al cabo de un día (sales#540, leído en el código, sin ejecutar)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
 1. Se cobra una cuenta con líneas pagadas por bono (Ventas).
-2. Servicios oye la venta cobrada y da por **Entregadas** todas las sesiones retenidas en esa cuenta,
-   enlazadas a la venta, sin mirar qué líneas entraron en el cobro. En el mismo paso concede los bonos que se vendieran en ese tique (SERVICES-F14).
+2. Servicios oye la venta cobrada y mira línea por línea: da por **Entregada**, enlazada a la venta,
+   la sesión retenida de cada línea que el cobro dio por pagada con bono, y devuelve al bono
+   (**Liberada**) la de una línea que se cobró con dinero (por ejemplo, tras recargar la pantalla sin
+   volver a asignar la clienta, SERVICES-F22). Las líneas de la cuenta que no entran en este cobro
+   conservan su sesión retenida para cuando se cobren (SALES-F22). En el mismo paso concede los bonos
+   que se vendieran en ese tique (SERVICES-F14).
 3. Desde ese momento ya no se pueden deshacer: solo vuelven con una devolución (SERVICES-F26) o
    anulando la venta (SERVICES-F27).
 Entra: la venta cobrada, con su cuenta, su clienta y sus líneas (avisa Ventas: `sale.completed`).
-Sale: las sesiones gastadas para siempre y enlazadas a la venta. No emite documento fiscal ni aviso
-propio. Cobrar solo una parte de la cuenta da por gastadas también las sesiones retenidas en líneas
-que se quedan sin cobrar; esas líneas, al cobrarse después, ya no van cubiertas en el TPV (o su hueco
-ofrece gastar otra sesión) (leído en el código, sin ejecutar).
+Sale: las sesiones de las líneas pagadas con bono, gastadas para siempre y enlazadas a la venta; las
+de las líneas cobradas con dinero, de vuelta en el bono. No emite documento fiscal ni aviso propio.
+Cada sesión se gasta o se suelta una sola vez: si el aviso de la venta llega dos veces, el segundo
+no cambia nada.
 Si falla: no hay pantalla; el hub reintenta el aviso. Repetirlo no gasta ni concede dos veces. Si
 nunca llega a procesarse, las sesiones siguen retenidas y vuelven solas al bono al cabo de un día
 (SERVICES-F25) aunque la línea se cobró a 0 (leído en el código, sin ejecutar). Eso pasa, por

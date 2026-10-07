@@ -116,6 +116,8 @@ the schema rather than in a statement.
 At the till the redemption happens in two steps. `services.packages.hold_for_line` **reserves** the
 session (it is spent from that moment: nothing else can take it), and the sale being paid **settles**
 it. Between the two, `services.packages.release_hold` undoes it and the session comes back.
+The sale settles only the sessions of the lines it says a voucher paid; a line it charged with money
+hands its session back instead (sales#520), so the customer never pays for the service and the session.
 
 After settling, it refuses: `services.hold_not_releasable`. Giving that session back is a **refund**,
 not an undo, and it goes through its own audited door. Release and settle are the same conditional

@@ -239,7 +239,9 @@ def _rows_touched(db: ScratchDb, command: str, params: dict, hub: str) -> int:
     out = db.psql(["-e"], db=db.name, stdin=script)
     # `-e` echoes the statements too, so «UPDATE services_package_redemption» is in this stream
     # next to the command tag «UPDATE 1». Only the tag counts, and only its exact shape.
-    return sum(int(m.group(1)) for m in re.finditer(r"^UPDATE (\d+)$", out, re.MULTILINE))
+    return sum(
+        int(m.group(1)) for m in re.finditer(r"^UPDATE (\d+)$", out, re.MULTILINE)
+    )
 
 
 def residue(db: ScratchDb, package_id: str, customer: str = "cus-1") -> tuple[int, int]:
@@ -410,8 +412,16 @@ def main() -> int:
             rows[0]["remaining_after"] if rows else None,
         )
         check("it is the default", 1, rows[0]["is_default"] if rows else None)
-        check("with nothing to break a tie against", "only_option", rows[0]["default_reason"] if rows else None)
-        check("and it says so: one candidate", 1, rows[0]["candidate_count"] if rows else None)
+        check(
+            "with nothing to break a tie against",
+            "only_option",
+            rows[0]["default_reason"] if rows else None,
+        )
+        check(
+            "and it says so: one candidate",
+            1,
+            rows[0]["candidate_count"] if rows else None,
+        )
         check(
             "a cuts voucher does not cover a colour", [], options(db, "cus-1", colour)
         )
@@ -429,7 +439,11 @@ def main() -> int:
         check(
             "the neighbour's voucher is invisible",
             [],
-            [r for r in options(db, "cus-1", cut, hub=HUB) if r["package_id"] == foreign],
+            [
+                r
+                for r in options(db, "cus-1", cut, hub=HUB)
+                if r["package_id"] == foreign
+            ],
         )
         check(
             "and the neighbour cannot see ours either",
@@ -487,13 +501,25 @@ def main() -> int:
         refused(
             "a raw INSERT reusing use_index 1",
             lambda: raw_insert(
-                db, one_shot, "cus-1", 1, one_shot_grant, checkout_ref="chk-x", line_ref="line-x"
+                db,
+                one_shot,
+                "cus-1",
+                1,
+                one_shot_grant,
+                checkout_ref="chk-x",
+                line_ref="line-x",
             ),
         )
         refused(
             "a raw INSERT covering an already covered line",
             lambda: raw_insert(
-                db, one_shot, "cus-1", 2, one_shot_grant, checkout_ref="chk-1", line_ref="line-1"
+                db,
+                one_shot,
+                "cus-1",
+                2,
+                one_shot_grant,
+                checkout_ref="chk-1",
+                line_ref="line-1",
             ),
         )
         check("nothing got in", (1, 0), residue(db, one_shot))
@@ -600,30 +626,186 @@ def main() -> int:
             ),
         )
 
+        print(
+            "\nI2. sales#520: the sale spends the session of the line the voucher paid, and hands"
+            " back the one of a line charged with money"
+        )
+        by_line = seed_package(
+            db, HUB, "Bono por línea", max_uses=5, validity_days=None
+        )
+        seed_item(db, HUB, by_line, cut)
+        by_line_grant = seed_grant(db, by_line, "cus-ln")
+        covered = hold(db, by_line_grant, cut, "order-20", "line-1")
+        charged = hold(db, by_line_grant, cut, "order-20", "line-2")
+        elsewhere = hold(db, by_line_grant, cut, "order-21", "line-1")
+        raw_insert(
+            db,
+            by_line,
+            "cus-ln",
+            4,
+            by_line_grant,
+            status="consumed",
+            checkout_ref="order-22",
+            line_ref="line-1",
+        )
+
+        def settle_line(order: str, line: str, sale: str, hub: str = HUB) -> int:
+            return _rows_touched(
+                db,
+                "services._settle_hold_for_line",
+                {"order_id": order, "line_id": line, "sale_id": sale},
+                hub,
+            )
+
+        def release_line(order: str, line: str, hub: str = HUB) -> int:
+            return _rows_touched(
+                db,
+                "services._release_hold_for_line",
+                {"order_id": order, "line_id": line},
+                hub,
+            )
+
+        def state(rid: str) -> tuple:
+            row = db.scalar(
+                "SELECT status || '|' || is_deleted || '|' || COALESCE(sale_id, '') || '|' "
+                "|| COALESCE(release_reason, '') FROM services_package_redemption "
+                f"WHERE id = '{rid}'"
+            )
+            return tuple(row.split("|"))
+
+        check(
+            "another hub's sale settles nothing here",
+            0,
+            settle_line("order-20", "line-1", "sale-x", OTHER_HUB),
+        )
+        check(
+            "another hub's sale releases nothing here",
+            0,
+            release_line("order-20", "line-2", OTHER_HUB),
+        )
+        check(
+            "the covered line's session is settled, and only it",
+            1,
+            settle_line("order-20", "line-1", "sale-20"),
+        )
+        check(
+            "it is spent and carries the sale",
+            ("consumed", "0", "sale-20", ""),
+            state(covered),
+        )
+        check(
+            "the other line of the same checkout is still held",
+            ("held", "0", "", ""),
+            state(charged),
+        )
+        check(
+            "the same line of another checkout is still held",
+            ("held", "0", "", ""),
+            state(elsewhere),
+        )
+        check(
+            "a redelivered event settles nothing twice",
+            0,
+            settle_line("order-20", "line-1", "sale-20"),
+        )
+        check(
+            "a spent session is never handed back",
+            0,
+            release_line("order-20", "line-1"),
+        )
+        check(
+            "the line charged with money hands its session back",
+            1,
+            release_line("order-20", "line-2"),
+        )
+        check(
+            "as a decision, not a timeout",
+            ("held", "1", "", "released"),
+            state(charged),
+        )
+        check(
+            "a handed-back session is not spent afterwards",
+            0,
+            settle_line("order-20", "line-2", "sale-20"),
+        )
+        check(
+            "a session already redeemed is not settled again",
+            0,
+            settle_line("order-22", "line-1", "sale-22"),
+        )
+        check("nor handed back", 0, release_line("order-22", "line-1"))
+        check(
+            "the other checkout is still held at the end",
+            ("held", "0", "", ""),
+            state(elsewhere),
+        )
+
         print("\nJ. two valid vouchers: the tie-break decides, and it says WHY")
         highlights = seed_service(db, HUB, "Highlights")
         soon = seed_package(db, HUB, "Bono caduca pronto", max_uses=5, validity_days=30)
         seed_item(db, HUB, soon, highlights)
-        never = seed_package(db, HUB, "Bono sin caducidad", max_uses=5, validity_days=None)
+        never = seed_package(
+            db, HUB, "Bono sin caducidad", max_uses=5, validity_days=None
+        )
         seed_item(db, HUB, never, highlights)
         soon_grant = seed_grant(db, soon, "cus-9")
         never_grant = seed_grant(db, never, "cus-9")
-        raw_insert(db, soon, "cus-9", 1, soon_grant, status="consumed", redeemed_at=RECENT)
-        raw_insert(db, never, "cus-9", 2, never_grant, status="consumed", redeemed_at=RECENT)
+        raw_insert(
+            db, soon, "cus-9", 1, soon_grant, status="consumed", redeemed_at=RECENT
+        )
+        raw_insert(
+            db, never, "cus-9", 2, never_grant, status="consumed", redeemed_at=RECENT
+        )
         two = options(db, "cus-9", highlights)
         check("both are offered", 2, len(two))
-        check("the one that EXPIRES is spent first", soon, two[0]["package_id"] if two else None)
-        check("and it is flagged as the default", 1, two[0]["is_default"] if two else None)
-        check("the reason is named, not implied", "expires_first", two[0]["default_reason"] if two else None)
-        check("the operator is told there WAS a choice", 2, two[0]["candidate_count"] if two else None)
-        check("the other is not the default", 0, two[1]["is_default"] if len(two) > 1 else None)
-        check("only the default carries a reason", "", two[1]["default_reason"] if len(two) > 1 else None)
-        check("it had already spent one session", 4, two[0]["remaining_before"] if two else None)
-        check("so the preview says three are left after this one", 3, two[0]["remaining_after"] if two else None)
+        check(
+            "the one that EXPIRES is spent first",
+            soon,
+            two[0]["package_id"] if two else None,
+        )
+        check(
+            "and it is flagged as the default", 1, two[0]["is_default"] if two else None
+        )
+        check(
+            "the reason is named, not implied",
+            "expires_first",
+            two[0]["default_reason"] if two else None,
+        )
+        check(
+            "the operator is told there WAS a choice",
+            2,
+            two[0]["candidate_count"] if two else None,
+        )
+        check(
+            "the other is not the default",
+            0,
+            two[1]["is_default"] if len(two) > 1 else None,
+        )
+        check(
+            "only the default carries a reason",
+            "",
+            two[1]["default_reason"] if len(two) > 1 else None,
+        )
+        check(
+            "it had already spent one session",
+            4,
+            two[0]["remaining_before"] if two else None,
+        )
+        check(
+            "so the preview says three are left after this one",
+            3,
+            two[0]["remaining_after"] if two else None,
+        )
 
-        print("\nJ2. a FINITE voucher is spent before an unlimited one — even if the finite one never expires")
-        unlimited = seed_package(db, HUB, "Bono ilimitado", max_uses=None, validity_days=30)
-        finite = seed_package(db, HUB, "Bono 3 sesiones", max_uses=3, validity_days=None)
+        print(
+            "\nJ2. a FINITE voucher is spent before an unlimited one — even if the finite one never expires"
+        )
+        unlimited = seed_package(
+            db, HUB, "Bono ilimitado", max_uses=None, validity_days=30
+        )
+        finite = seed_package(
+            db, HUB, "Bono 3 sesiones", max_uses=3, validity_days=None
+        )
         blowdry = seed_service(db, HUB, "Blowdry")
         seed_item(db, HUB, unlimited, blowdry)
         seed_item(db, HUB, finite, blowdry)
@@ -632,10 +814,20 @@ def main() -> int:
         vs = options(db, "cus-12", blowdry)
         check("both offered", 2, len(vs))
         check("the finite one goes first", finite, vs[0]["package_id"] if vs else None)
-        check("named reason", "finite_before_unlimited", vs[0]["default_reason"] if vs else None)
-        check("an unlimited voucher previews no count", None, vs[1]["remaining_after"] if len(vs) > 1 else "missing")
+        check(
+            "named reason",
+            "finite_before_unlimited",
+            vs[0]["default_reason"] if vs else None,
+        )
+        check(
+            "an unlimited voucher previews no count",
+            None,
+            vs[1]["remaining_after"] if len(vs) > 1 else "missing",
+        )
 
-        print("\nK. nothing else separates them: the one with FEWER sessions left goes first")
+        print(
+            "\nK. nothing else separates them: the one with FEWER sessions left goes first"
+        )
         big = seed_package(db, HUB, "Bono 10", max_uses=10, validity_days=None)
         small = seed_package(db, HUB, "Bono 2", max_uses=2, validity_days=None)
         trim = seed_service(db, HUB, "Trim")
@@ -646,32 +838,58 @@ def main() -> int:
         pair = options(db, "cus-10", trim)
         check("both offered", 2, len(pair))
         check("the shortest one first", small, pair[0]["package_id"] if pair else None)
-        check("named reason", "fewest_sessions_left", pair[0]["default_reason"] if pair else None)
+        check(
+            "named reason",
+            "fewest_sessions_left",
+            pair[0]["default_reason"] if pair else None,
+        )
 
-        print("\nL. the order is TOTAL — identical vouchers still have one winner, always")
+        print(
+            "\nL. the order is TOTAL — identical vouchers still have one winner, always"
+        )
         twin_a = seed_package(db, HUB, "Bono gemelo A", max_uses=4, validity_days=None)
         twin_b = seed_package(db, HUB, "Bono gemelo B", max_uses=4, validity_days=None)
         wash = seed_service(db, HUB, "Wash")
         seed_item(db, HUB, twin_a, wash)
         seed_item(db, HUB, twin_b, wash)
         twin_a_grant = seed_grant(db, twin_a, "cus-11")
-        twin_b_grant = seed_grant(db, twin_b, "cus-11", granted_at="2026-08-19T10:00:00Z")
+        twin_b_grant = seed_grant(
+            db, twin_b, "cus-11", granted_at="2026-08-19T10:00:00Z"
+        )
         older = options(db, "cus-11", wash)
-        check("the older voucher wins", twin_a, older[0]["package_id"] if older else None)
-        check("named reason", "oldest_voucher", older[0]["default_reason"] if older else None)
+        check(
+            "the older voucher wins", twin_a, older[0]["package_id"] if older else None
+        )
+        check(
+            "named reason",
+            "oldest_voucher",
+            older[0]["default_reason"] if older else None,
+        )
 
-        print("\nM. …and when even the age is identical, the order is still not left to chance")
-        db.psql([], db=db.name, stdin=(
-            f"UPDATE services_package_grant SET granted_at = '{NOW}' WHERE id = '{twin_b_grant}';"))
+        print(
+            "\nM. …and when even the age is identical, the order is still not left to chance"
+        )
+        db.psql(
+            [],
+            db=db.name,
+            stdin=(
+                f"UPDATE services_package_grant SET granted_at = '{NOW}' WHERE id = '{twin_b_grant}';"
+            ),
+        )
         # 🔴 The last-resort key is the GRANT id (services#73), not the package id, so that is what
         # this asserts on. Comparing package ids here passed on a COIN FLIP — two random UUIDs sort
         # the same way about half the time — and it was green locally and red in CI on the same
         # commit. An assertion that is right 50 % of the time is not an assertion.
         runs = [[r["grant_id"] for r in options(db, "cus-11", wash)] for _ in range(4)]
         check("no tie is left to chance", sorted([twin_a_grant, twin_b_grant]), runs[0])
-        check("and it is stable across four looks at the same screen", [runs[0]] * 4, runs)
-        check("the last resort is named too", "stable_order",
-              options(db, "cus-11", wash)[0]["default_reason"])
+        check(
+            "and it is stable across four looks at the same screen", [runs[0]] * 4, runs
+        )
+        check(
+            "the last resort is named too",
+            "stable_order",
+            options(db, "cus-11", wash)[0]["default_reason"],
+        )
     finally:
         db.drop()
 
