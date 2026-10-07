@@ -175,7 +175,7 @@ gramática y el mismo prefijo. Antes de tocar código, lee el fichero del flujo 
 | SERVICES-F24 | Dar por gastadas las sesiones al cobrar | parcial | [`workflow/cobro-y-devolucion.md`](workflow/cobro-y-devolucion.md) |
 | SERVICES-F25 | La sesión retenida que nadie cobra vuelve sola | hecho | [`workflow/cobro-y-devolucion.md`](workflow/cobro-y-devolucion.md) |
 | SERVICES-F26 | Devolver la sesión al devolver la venta | parcial | [`workflow/cobro-y-devolucion.md`](workflow/cobro-y-devolucion.md) |
-| SERVICES-F27 | Devolver la sesión al anular la venta | hecho | [`workflow/cobro-y-devolucion.md`](workflow/cobro-y-devolucion.md) |
+| SERVICES-F27 | Devolver la sesión al anular la venta | parcial | [`workflow/cobro-y-devolucion.md`](workflow/cobro-y-devolucion.md) |
 | SERVICES-F28 | Unir dos fichas: los bonos pasan a la que queda | hecho | [`workflow/fichas-de-clienta.md`](workflow/fichas-de-clienta.md) |
 | SERVICES-F29 | Eliminar o anonimizar una ficha: sus bonos quedan sin cliente | hecho | [`workflow/fichas-de-clienta.md`](workflow/fichas-de-clienta.md) |
 | SERVICES-F30 | Rescatar los bonos sin cliente | parcial | [`workflow/fichas-de-clienta.md`](workflow/fichas-de-clienta.md) |

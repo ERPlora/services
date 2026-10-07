@@ -127,7 +127,7 @@ Implicados: SALES-F31, SALES-F32, REC_PELUQUERIA-F14
 QA: B-08
 
 ### SERVICES-F27 Devolver la sesión al anular la venta
-Estado: hecho
+Estado: parcial — anular la venta de un bono que ya se usó devuelve el dinero y deja el bono vivo sin avisar a quien anula: hay que acordarse de corregirlo en **Bonos vendidos → Ajustar** (services#157)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
