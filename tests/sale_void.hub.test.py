@@ -17,10 +17,10 @@ return. So:
 
   1. a session spent on the voided sale goes back to its voucher, recorded as given back with the
      void's reason (a movement anyone can read in the ledger, not a silent counter);
-  2. a voucher sold on the voided sale is voided too, with who and why — when it is still INTACT;
-  3. a voucher sold on the voided sale that has ALREADY been used elsewhere is NOT voided: the
-     sessions it delivered happened. It stays live for the manager to correct with **Adjust**,
-     the same rule the manual void enforces (`services.grant_in_use`).
+  2. a voucher sold on the voided sale is voided too, with who and why;
+  3. so is one that has ALREADY been used elsewhere (services#157): the money goes back, so the
+     voucher goes with it. The sessions it delivered happened and stay spent; what was left is
+     lost. (Leaving it live gave the customer the money back AND the sessions.)
 
 And the other end of the same ticket (sales#520): a paid sale spends the held session only of the
 line the sale says the voucher paid. A line the till charged with money — what it did after a reload
@@ -41,7 +41,7 @@ now refunded in full. So:
 
   5. a partial refund leaves the voucher sold on that sale live (it cannot name the voucher's
      line); the refund that gives back the last cent voids it, with who and why;
-  6. a voucher sold on that sale that has ALREADY been used stays live, as with the void.
+  6. a voucher sold on that sale that has ALREADY been used is voided too, as with the void.
 
 The sessions spent on a refunded sale are not this listener's: they come back through the return
 window (SERVICES-F26). The refund cases live here, not in a battery of their own, because they
@@ -51,6 +51,9 @@ Usage: `erplora test <dir> --against-hub [dev|stable|sha256:…]`. Never on its 
 runtime it fails, it does not skip.
 """
 
+import os
+import shlex
+import subprocess
 import sys
 import time
 import uuid
@@ -207,6 +210,36 @@ def movement_of(hub: Hub, package_id: str, redemption_id: str) -> dict | None:
     return next((r for r in rows if r.get("redemption_id") == redemption_id), None)
 
 
+def deliveries_to(hub: Hub, listener: str, event: str, sale_id: str) -> int:
+    """How many `event`s about `sale_id` the relay has DELIVERED to `listener`, read from the hub's
+    own outbox through the psql session the runner hands over (`ERPLORA_HUB_PSQL`, as
+    `grant_race.hub` does). A negative read off the voucher's row («still active») is also green
+    when the listener blows up and the event dies in the outbox; this is what tells them apart."""
+    words = shlex.split(os.environ.get("ERPLORA_HUB_PSQL", ""))
+    if not words:
+        print(
+            "sale_void.hub: hub_psql_missing — ERPLORA_HUB_PSQL is empty. The runner that starts "
+            "the hub (`erplora test --against-hub`, or the hub's `run-module-hub-batteries.sh`) "
+            "hands over a psql session on its database; without it this is NOT a skip, it is a "
+            "failure."
+        )
+        sys.exit(1)
+    done = subprocess.run(
+        [
+            *words,
+            "-tAc",
+            "SELECT count(*) FROM _event_delivery d JOIN _event_outbox o ON o.id = d.event_id "
+            f"WHERE o.hub_id = '{hub.hub_id}' AND o.event_name = '{event}' "
+            f"AND o.payload LIKE '%{sale_id}%' AND d.listener_command = '{listener}'",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if done.returncode != 0:
+        raise AssertionError(f"reading the outbox failed: {done.stderr.strip()}")
+    return int(done.stdout.strip() or 0)
+
+
 def main() -> int:
     hub = Hub("sale_void", needs=("taxes", "sales", "services"))
     ensure_business_identity(hub)
@@ -284,7 +317,7 @@ def main() -> int:
     )
 
     print(
-        "2 · a voucher sold on a sale is voided with that sale while it is intact (SERVICES-F14)"
+        "2 · a voucher sold on a sale is voided with that sale (SERVICES-F14)"
     )
     buyer = tag("cust-buy")
     sold_package = create_package(
@@ -338,7 +371,7 @@ def main() -> int:
         ),
     )
 
-    print("3 · a voucher sold on a voided sale that was ALREADY used stays live")
+    print("3 · a voucher sold on a voided sale that was ALREADY used is voided too (services#157)")
     used_buyer = tag("cust-used")
     used_package = create_package(
         hub, f"Bono usado {run}", max_uses=5, validity_days=None, service_id=service_id
@@ -363,18 +396,21 @@ def main() -> int:
         {"grant_id": used_grant},
     )
     hub.run("sales.void", {"sale_id": used_sale, "reason": f"Anulada {run}"})
-    # A negative never resolves by waiting: give the relay its ticks, then read it outright.
-    # Sections 1 and 2 already proved the relay delivers `sale.voided` to this module.
-    time.sleep(3)
-    still = grant_row(hub, used_package, used_grant) or {}
-    hub.check(
-        "a voucher already used is not voided by the sale's void",
-        still.get("status"),
-        "active",
+    still = wait_until(
+        lambda: grant_row(hub, used_package, used_grant) or {},
+        lambda g: g.get("status") == "voided",
     )
     hub.check(
-        "its spent session stays spent",
-        balance_of(hub, used_buyer, used_grant).get("used"),
+        "a voucher already used is voided by its sale's void",
+        still.get("status"),
+        "voided",
+    )
+    hub.check(
+        "… with the void's reason", still.get("void_reason"), f"Anulada {run}"
+    )
+    hub.check(
+        "its spent session stays spent (Sold vouchers still counts it)",
+        still.get("used"),
         1,
     )
 
@@ -470,8 +506,18 @@ def main() -> int:
     hub.check("the sale minted the voucher to refund", len(refund_rows), 1)
     refund_grant = refund_rows[0]["grant_id"] if refund_rows else ""
     refund(hub, refund_sale_id, 3000, f"Parte {run}")
-    # A negative never resolves by waiting: give the relay its ticks, then read it outright.
-    time.sleep(3)
+    # A negative never resolves by waiting on the row: wait for the listener to have HEARD the
+    # partial refund, then read the voucher outright.
+    hub.check(
+        "the partial refund reached the listener (delivered, not dead in the outbox)",
+        wait_until(
+            lambda: deliveries_to(
+                hub, "services._on_sale_refunded", "sale.refunded", refund_sale_id
+            ),
+            lambda n: n >= 1,
+        ),
+        1,
+    )
     hub.check(
         "a PARTIAL refund cannot name the voucher's line: the voucher stays live",
         (grant_row(hub, refund_package, refund_grant) or {}).get("status"),
@@ -510,7 +556,7 @@ def main() -> int:
     )
 
     print(
-        "6 · a voucher refunded in full whose session was already spent elsewhere stays live"
+        "6 · a voucher refunded in full whose session was already spent elsewhere is voided too"
     )
     kept_buyer = tag("cust-kept")
     kept_package = create_package(
@@ -533,16 +579,22 @@ def main() -> int:
     kept_grant = kept_rows[0]["grant_id"] if kept_rows else ""
     hub.run("services.packages.redeem", {"grant_id": kept_grant})
     refund(hub, kept_sale, 10000, f"Devuelta {run}")
-    time.sleep(3)
+    kept = wait_until(
+        lambda: grant_row(hub, kept_package, kept_grant) or {},
+        lambda g: g.get("status") == "voided",
+    )
     hub.check(
-        "a voucher already used is not voided by its sale's full refund",
-        (grant_row(hub, kept_package, kept_grant) or {}).get("status"),
-        "active",
+        "a voucher already used is voided by its sale's full refund",
+        kept.get("status"),
+        "voided",
+    )
+    hub.check(
+        "… with the refund's reason", kept.get("void_reason"), f"Devuelta {run}"
     )
 
     return hub.finish(
         "a paid sale spends only the sessions of the lines the voucher paid; voiding it gives them"
-        " back and voids the intact vouchers it sold; refunding it in full voids them too"
+        " back and voids the vouchers it sold, used or not; refunding it in full voids them too"
     )
 
 

@@ -11,14 +11,15 @@ this sale's out of the reach of a void:
      not a session of another sale, not a session spent at the chair that merely names the sale
      (never settled: the refund CHECK would abort the whole void), not a session another return
      already gave back, not a row of the neighbour hub carrying the same sale id.
-  2. VOUCHERS SOLD ON THE VOIDED SALE are voided while intact (SERVICES-F14) — and nothing else is:
-     not one already used or held, not a manual grant that names the sale, not one sold on another
-     sale, not one already voided (its trail is not re-stamped), not the neighbour's. The
-     sessions come back BEFORE the vouchers are judged: one whose only session was spent on the
-     very sale that sold it is intact again by then, and is voided.
+  2. VOUCHERS SOLD ON THE VOIDED SALE are voided with it, used or not (services#157): the money
+     goes back, so the voucher goes with it — what was already used stays used (its sessions are
+     not touched, a session held at a till right now included) and what was left is lost. Nothing
+     else is voided: not a manual grant that names the sale, not one sold on another sale, not one
+     already voided (its trail is not re-stamped), not the neighbour's. The sessions spent on the
+     voided sale itself come back first, as always.
   3. A redelivered `sale.voided` touches nothing.
   4. RACE: a till holding a session of a voucher sold on the sale, at the same instant, makes the
-     void WAIT; it then reads the held session and leaves the voucher live.
+     void WAIT; it then voids the voucher and leaves the till's session where the till put it.
 
 Usage: tests/sale_void.postgres.test.py   (exit 0 = green; SKIPPED without the container)
 """
@@ -440,14 +441,14 @@ def expired_and_unsigned(
 
 def vouchers_sold_on_it(db: ScratchDb, svc: str, pkg: str, other_pkg: str) -> None:
     print(
-        "\n2 · the vouchers sold on the voided sale are voided while intact, and only those"
+        "\n2 · the vouchers sold on the voided sale are voided with it, used or not, and only those"
     )
     sale = "sale-v"
     intact = grant(db, pkg, "cus-v1", sale_id=sale)
     used = grant(db, pkg, "cus-v2", sale_id=sale)
-    chair_session(db, used, "sale-later")
+    used_session = chair_session(db, used, "sale-later")
     held = grant(db, pkg, "cus-v3", sale_id=sale)
-    hold(db, held, svc)
+    held_session = hold(db, held, svc)
     stale = grant(db, pkg, "cus-v4", sale_id=sale)
     stale_hold = hold(db, stale, svc)
     released = grant(db, pkg, "cus-v8", sale_id=sale)
@@ -461,6 +462,17 @@ def vouchers_sold_on_it(db: ScratchDb, svc: str, pkg: str, other_pkg: str) -> No
     already = grant(db, pkg, "cus-v7", sale_id=sale)
     run(db, "services._void_grant", {"grant_id": already, "reason": "Wrong customer"})
     first_trail = grant_trail(db, already)
+    # Rows no door writes, one per guard: deleted but never voided, and voided but not deleted.
+    half_deleted = grant(db, pkg, "cus-v10", sale_id=sale)
+    half_voided = grant(db, pkg, "cus-v11", sale_id=sale)
+    db.psql(
+        [],
+        db=db.name,
+        stdin=f"UPDATE services_package_grant SET is_deleted = 1 WHERE id = '{half_deleted}';\n"
+        "UPDATE services_package_grant SET voided_at = '2026-08-01T00:00:00Z', voided_by = 'u-old', "
+        f"void_reason = 'Old' WHERE id = '{half_voided}';\n",
+    )
+    half_trails = [grant_trail(db, half_deleted), grant_trail(db, half_voided)]
     theirs = grant(db, other_pkg, "cus-v1", sale_id=sale, hub=OTHER_HUB)
     # An intact voucher of this hub that a session of the NEIGHBOUR names by id: only the hub_id
     # of the in-use check keeps that foreign session from counting as a use.
@@ -500,11 +512,32 @@ def vouchers_sold_on_it(db: ScratchDb, svc: str, pkg: str, other_pkg: str) -> No
     check("… signed by whoever voided the sale", MANAGER, trail["voided_by"])
     check("… with the void's reason, trimmed", "Sold by mistake", trail["void_reason"])
     check("… and nothing left to spend", None, remaining(db, "cus-v1", intact))
-    check("a voucher already USED stays live", 0, grant_trail(db, used)["is_deleted"])
+    used_trail = grant_trail(db, used)
     check(
-        "a voucher with a session HELD at a till stays live",
-        0,
+        "a voucher already USED is voided with its sale too (services#157)",
+        [1, NOW, MANAGER, "Sold by mistake"],
+        [
+            used_trail["is_deleted"],
+            used_trail["voided_at"],
+            used_trail["voided_by"],
+            used_trail["void_reason"],
+        ],
+    )
+    check(
+        "… and its session spent on another visit stays spent",
+        [0, None],
+        [session(db, used_session)["is_deleted"], session(db, used_session)["refunded_at"]],
+    )
+    check("… with nothing left to spend", None, remaining(db, "cus-v2", used))
+    check(
+        "a voucher with a session HELD at a till is voided too",
+        1,
         grant_trail(db, held)["is_deleted"],
+    )
+    check(
+        "… and the till's session stays held on it",
+        [0, None],
+        [session(db, held_session)["is_deleted"], session(db, held_session)["refunded_at"]],
     )
     check(
         "a voucher whose only hold has lapsed counts as intact and is voided",
@@ -535,6 +568,11 @@ def vouchers_sold_on_it(db: ScratchDb, svc: str, pkg: str, other_pkg: str) -> No
         "a voucher already voided keeps its first trail",
         first_trail,
         grant_trail(db, already),
+    )
+    check(
+        "a row deleted but not voided, or voided but not deleted, is not re-stamped",
+        half_trails,
+        [grant_trail(db, half_deleted), grant_trail(db, half_voided)],
     )
     check(
         "the neighbour hub's voucher on the same sale id stays live",
@@ -654,8 +692,8 @@ def the_till_wins_the_race(db: ScratchDb, svc: str, pkg: str) -> None:
     waited = race(db, hold_body(gid, svc), void_body("sale-race"))
     check("the void waited for the till", True, waited)
     check(
-        "… and, reading the held session, left the voucher live",
-        0,
+        "… and then voided the voucher with its sale",
+        1,
         grant_trail(db, gid)["is_deleted"],
     )
     check(
@@ -699,7 +737,7 @@ def main() -> int:
             print(f"  - {f}")
         return 1
     print(
-        "✓ sale_void: voiding a paid sale gives back its sessions and voids its intact vouchers, nothing else"
+        "✓ sale_void: voiding a paid sale gives back its sessions and voids the vouchers it sold, nothing else"
     )
     return 0
 

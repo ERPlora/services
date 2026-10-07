@@ -181,9 +181,21 @@ the list is then read again. A refusal (someone spent a session in the meantime,
 voided) is shown on the confirmation itself, with its own sentence.
 
 Voiding moves **no money**: if the voucher was paid, refund the sale from Sales with a return. A
-refund that returns the whole sale voids an intact voucher by itself (services#154); a partial one
-does not. A voucher that was already used cannot be voided; its balance is corrected with
+refund that returns the whole sale, or voiding that sale, voids the voucher by itself even if it was
+already used (services#157): the used sessions stay used and what was left is lost. A partial refund
+does not. Here, a voucher that was already used cannot be voided; its balance is corrected with
 «Adjust».
+
+### The voucher warning in Sales' void and refund windows (services#157)
+
+Sales cedes the hole `sales.reversal.notice` in its **Void sale** and **Refund** windows, above the
+confirm button, and hands it the sale and the door (`void` or `refund`). Services fills it with
+`erp-services-sale-reversal`, which reads `services.packages.sold_on_sale` and paints one amber
+warning per live voucher sold on that sale: that it will be voided with the sale, how many sessions
+already used do not come back and how many are lost (or that it can no longer be used, when nothing
+is left or it is unlimited). In the refund window the wording says it only happens if the WHOLE sale
+is refunded. It warns, never blocks. Nothing sold → nothing painted · loading → a grey block ·
+failed read → an error line with **Retry**.
 
 ### Adjust a sold voucher: a courtesy (services#118) or a balance correction (services#119)
 

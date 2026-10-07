@@ -132,28 +132,32 @@ Implicados: SALES-F31, SALES-F32, REC_PELUQUERIA-F14
 QA: B-08
 
 ### SERVICES-F27 Devolver la sesión al anular la venta
-Estado: parcial — anular la venta de un bono que ya se usó devuelve el dinero y deja el bono vivo sin avisar a quien anula: hay que acordarse de corregirlo en **Bonos vendidos → Ajustar** (services#157)
-Actor: sistema
-Pantalla: ninguna
+Estado: hecho
+Actor: responsable, sistema
+Pantalla: Ventas: Anular venta
 Pasos:
 1. Un responsable anula en Ventas una venta cobrada (SALES-F30). Ventas solo anula una venta sin
-   devoluciones y sin factura completa, así que la anulación deshace el tique entero.
+   devoluciones y sin factura completa, así que la anulación deshace el tique entero. Si en ella se
+   vendió un bono vivo, la ventana **Anular venta** lo dice antes de confirmar (Aviso al anular o
+   devolver la venta de un bono): qué bono, cuántas sesiones ya usadas no vuelven y cuántas se pierden.
 2. Servicios oye la anulación y devuelve a su bono cada sesión gastada en esa venta, como una
    devolución completa (SERVICES-F26), aunque el bono haya caducado.
 3. En **Movimientos** cada una sale como **Devuelta**, con quien anuló la venta, la hora y el motivo
    de la anulación; la venta anulada hace de documento.
-4. Si en ese tique se vendió un bono y no se ha gastado ni reservado ninguna sesión suya, se anula
-   igual que con **Anular** en **Bonos vendidos** (SERVICES-F17): «Anulado por {who} el {when}» y el
-   motivo de la anulación.
+4. Cada bono vendido en ese tique se anula, se haya usado o no (services#157): como con **Anular** en
+   **Bonos vendidos** (SERVICES-F17), con «Anulado por {who} el {when}» y el motivo de la anulación.
+   Las sesiones ya usadas siguen usadas y las que quedaban se pierden: el dinero vuelve, así que el
+   bono se va con él. Lo mismo hace la devolución entera de la venta (SERVICES-F14).
 Entra: la venta anulada, quién la anuló y el motivo (avisa Ventas: `sale.voided`); las sesiones
 gastadas en esa venta y los bonos vendidos en ella.
-Sale: las sesiones de vuelta en su bono y los bonos intactos de esa venta anulados. Una sesión ya
+Sale: las sesiones de vuelta en su bono y los bonos vendidos en esa venta anulados. Una sesión ya
 devuelta por otra devolución, una gastada en la silla que solo nombra la venta, y un bono concedido a
 mano, aunque nombre la venta, no se tocan. No mueve dinero ni emite documento fiscal (eso es de
 Ventas) ni emite aviso propio.
-Si falla: no hay pantalla; repetir el aviso no devuelve ni anula dos veces. Un bono vendido en esa
-venta que ya se usó sigue vivo: se corrige con **Ajustar** (SERVICES-F18). Si una caja está
-reservando una sesión de ese bono en el mismo instante, la anulación la espera y, como el bono ya
-está en uso, no lo anula.
+Si falla: repetir el aviso no devuelve ni anula dos veces. Si no se pueden leer los bonos vendidos en
+la venta, la ventana lo dice con **Reintentar** («No se han podido leer los bonos vendidos en esta
+venta…») y deja anular igual. Si una caja está reservando una sesión de ese bono en el mismo
+instante, la anulación la espera y después anula el bono; esa sesión ya retenida se queda y, si se
+cobra, se gasta (es una visita hecha).
 Implicados: SALES-F30, REC_PELUQUERIA-F13, REC_PELUQUERIA-F14
 QA: B-08

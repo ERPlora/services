@@ -268,7 +268,21 @@
     "movementCorrectedBy": "Corrected by {who}",
     "errNotAnAmount": "This is not an amount. Type a figure, for example 12.50.",
     "errAmbiguousAmount": "This amount can be read in two ways: «{typed}» could be {grouped} or {decimal}. Write the decimals so there is no doubt.",
-    "errNegativeAmount": "This amount cannot be negative."
+    "errNegativeAmount": "This amount cannot be negative.",
+    "saleReversal": {
+      "void": {
+        "intact": "{name} was sold on this sale and will be voided with it. None of its sessions has been used.",
+        "used": "{name} was sold on this sale and will be voided with it: the {used} session(s) already used stay used and the {remaining} left are lost.",
+        "usedNoMore": "{name} was sold on this sale and will be voided with it: the {used} session(s) already used stay used and it cannot be used any more."
+      },
+      "refund": {
+        "intact": "{name} was sold on this sale. Refunding the whole sale voids it; none of its sessions has been used. A partial refund leaves it as it is.",
+        "used": "{name} was sold on this sale. Refunding the whole sale voids it: the {used} session(s) already used stay used and the {remaining} left are lost. A partial refund leaves it as it is.",
+        "usedNoMore": "{name} was sold on this sale. Refunding the whole sale voids it: the {used} session(s) already used stay used and it cannot be used any more. A partial refund leaves it as it is."
+      },
+      "loadFailed": "The vouchers sold on this sale could not be read. Try again before confirming: they are voided with the sale.",
+      "btnRetry": "Try again"
+    }
   },
   "errors": {
     "services.category_unavailable": "That category is not available: it does not exist in this business or it has been deleted.",

@@ -12,6 +12,7 @@
       "services.packages.orphans",
       "services.packages.redemption_history",
       "services.packages.redemptions_for_sale",
+      "services.packages.sold_on_sale",
       "services.packages.tender_options",
       "services.services.get",
       "services.services.list",

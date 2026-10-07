@@ -537,6 +537,15 @@
       },
       "expose_api": true
     },
+    "services.packages.sold_on_sale": {
+      "permission": "services.view_package_balance",
+      "sql": "queries/package_sold_on_sale.sql",
+      "schema": "schemas/package_sold_on_sale.json",
+      "ai": {
+        "description": "Lists the vouchers (bonos) SOLD on a given sale that are still live — exactly the ones that voiding the sale, or refunding it in full, would void — with the voucher's name, the sessions already used (they stay used; a session settled on this same sale does not count, the void gives it back first) and the sessions that would be lost (remaining; null = unlimited). It is what the till warns about before the operator confirms. A sale that sold no voucher answers an empty list."
+      },
+      "expose_api": true
+    },
     "services.packages.redemption_history": {
       "permission": "services.view_package_balance",
       "sql": "queries/package_redemption_history.sql",
@@ -1310,6 +1319,12 @@
       "slot": "sales.refund.tender",
       "component": "erp-services-session-refund",
       "permission": "services.refund_package",
+      "priority": 100
+    },
+    {
+      "slot": "sales.reversal.notice",
+      "component": "erp-services-sale-reversal",
+      "permission": "services.view_package_balance",
       "priority": 100
     }
   ]

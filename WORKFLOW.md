@@ -142,6 +142,17 @@ Hecho: «{name}: la sesión ha vuelto al bono.» · Cargando: un bloque gris ani
 podido leer las sesiones de bono de esta venta. Inténtalo otra vez antes de terminar la devolución.»
 con **Reintentar**; si falla al devolver: «No se ha podido devolver esa sesión al bono.».
 
+### Aviso al anular o devolver la venta de un bono
+Lo pinta Servicios dentro de las ventanas **Anular venta** y **Devolver** de Ventas, encima del botón
+de confirmar, cuando en esa venta se vendió un bono que sigue vivo (SERVICES-F27, SERVICES-F14). Un
+aviso por bono, en ámbar, que dice qué le pasará: «{name} se vendió en esta venta y se anulará con
+ella. No se ha usado ninguna sesión.»; si ya se usó, «… las {used} sesión(es) ya usadas no vuelven y
+se pierden las {remaining} que quedan.» (o «… y ya no se podrá usar.» si no le queda nada o es
+ilimitado). En **Devolver** el texto empieza por «Si devuelves la venta entera, se anula» y termina
+con «Una devolución parcial no lo toca.». Avisa, no bloquea. Sin bonos vendidos en la venta no sale
+nada · Cargando: un bloque gris animado · Error: «No se han podido leer los bonos vendidos en esta
+venta. Inténtalo otra vez antes de confirmar: se anulan con la venta.» con **Reintentar**.
+
 ## Flujos
 
 El detalle de cada flujo (pasos, datos, fallos, implicados y QA) está en `workflow/`, con la misma
@@ -175,7 +186,7 @@ gramática y el mismo prefijo. Antes de tocar código, lee el fichero del flujo 
 | SERVICES-F24 | Dar por gastadas las sesiones al cobrar | parcial | [`workflow/cobro-y-devolucion.md`](workflow/cobro-y-devolucion.md) |
 | SERVICES-F25 | La sesión retenida que nadie cobra vuelve sola | hecho | [`workflow/cobro-y-devolucion.md`](workflow/cobro-y-devolucion.md) |
 | SERVICES-F26 | Devolver la sesión al devolver la venta | parcial | [`workflow/cobro-y-devolucion.md`](workflow/cobro-y-devolucion.md) |
-| SERVICES-F27 | Devolver la sesión al anular la venta | parcial | [`workflow/cobro-y-devolucion.md`](workflow/cobro-y-devolucion.md) |
+| SERVICES-F27 | Devolver la sesión al anular la venta | hecho | [`workflow/cobro-y-devolucion.md`](workflow/cobro-y-devolucion.md) |
 | SERVICES-F28 | Unir dos fichas: los bonos pasan a la que queda | hecho | [`workflow/fichas-de-clienta.md`](workflow/fichas-de-clienta.md) |
 | SERVICES-F29 | Eliminar o anonimizar una ficha: sus bonos quedan sin cliente | hecho | [`workflow/fichas-de-clienta.md`](workflow/fichas-de-clienta.md) |
 | SERVICES-F30 | Rescatar los bonos sin cliente | parcial | [`workflow/fichas-de-clienta.md`](workflow/fichas-de-clienta.md) |
@@ -206,7 +217,7 @@ gramática y el mismo prefijo. Antes de tocar código, lee el fichero del flujo 
 | Saldo de bonos visible en la ficha de la clienta | parcial — solo en el cobro, servicio a servicio, y por el asistente | SERVICES-F15 |
 | La sesión vuelve al devolver la venta | parcial — solo junto con una devolución de dinero: no en un tique pagado entero con bono (0,00 €) ni si ya se devolvió todo el dinero; entonces, anulando la venta si aún se puede o con Ajustar | SERVICES-F26, SERVICES-F27, SERVICES-F18 |
 | La sesión vuelve al anular la venta | hecho | SERVICES-F27 |
-| Anular la venta de un bono hecha por error | hecho — a mano en **Bonos vendidos**, o solo al anular su venta o devolverla entera mientras el bono esté intacto; una devolución de solo una parte no lo anula (services#158) | SERVICES-F17, SERVICES-F14 |
+| Anular la venta de un bono hecha por error | hecho — a mano en **Bonos vendidos** si está intacto; al anular su venta o devolverla entera se anula aunque se haya usado (lo usado sigue usado, lo que quedaba se pierde) y el TPV lo avisa antes de confirmar; una devolución de solo una parte no lo anula (services#158) | SERVICES-F17, SERVICES-F14, SERVICES-F27 |
 | Regalar sesiones, alargar la caducidad, corregir el saldo | hecho | SERVICES-F18 |
 | Historial de movimientos del bono | hecho | SERVICES-F19 |
 | Bonos de una ficha unida, eliminada o anonimizada | hecho | SERVICES-F28, SERVICES-F29 |
@@ -276,8 +287,9 @@ gramática y el mismo prefijo. Antes de tocar código, lee el fichero del flujo 
   los bonos ya vendidos; regalar o corregir es un movimiento aparte con motivo, de hasta 100
   sesiones (sumar o quitar) y hasta 366 días (solo alargar), y nunca quita más sesiones de las que
   le quedan a la clienta.
-- **Anular solo un bono intacto**, con motivo: también cuando se anula la venta que lo vendió o se
-  devuelve entera.
+- **Anular a mano solo un bono intacto**, con motivo. Anular la venta que lo vendió, o devolverla
+  entera, lo anula aunque se haya usado (el dinero vuelve, así que el bono se va con él): las
+  sesiones usadas siguen usadas, lo que quedaba se pierde, y el TPV lo dice antes de confirmar.
 - **Ningún movimiento de bono mueve dinero ni emite documento fiscal**: el registro fiscal sale con
   la venta del bono.
 - **Permisos:** empleado ve todo salvo **Bonos sin cliente**, da de alta servicios y gasta sesiones; cajero ve, gasta sesiones
