@@ -4604,7 +4604,8 @@ var es_default = {
     status: {
       active: "Activo",
       inactive: "Archivado",
-      unconfigured: "Sin configurar"
+      unconfigured: "Sin configurar",
+      retired: "Eliminado"
     },
     statusReason: {
       unconfigured: "Sin categor\xEDa fiscal: no se puede cobrar"
@@ -4681,7 +4682,7 @@ var es_default = {
     emptyPackages: "No hay paquetes.",
     editingPackageTitle: "Editando paquete",
     deletePackageTitle: "Eliminar paquete",
-    deletePackageHint: "el paquete y sus {count} l\xEDnea(s) desaparecen del cat\xE1logo; los bonos ya vendidos conservan su saldo.",
+    deletePackageHint: "el paquete y sus {count} l\xEDnea(s) salen del cat\xE1logo y ya no se pueden vender; los bonos ya vendidos se siguen pudiendo gastar y los encuentras filtrando Estado por Eliminado.",
     errorPackageNoLines: "A\xF1ade al menos un servicio: un paquete sin l\xEDneas no se puede canjear.",
     errorSavePackage: "No se pudo guardar el paquete",
     errorDeletePackage: "No se pudo eliminar el paquete",
@@ -4930,7 +4931,8 @@ var en_default = {
     status: {
       active: "Active",
       inactive: "Archived",
-      unconfigured: "Not configured"
+      unconfigured: "Not configured",
+      retired: "Deleted"
     },
     statusReason: {
       unconfigured: "No tax category: it cannot be charged"
@@ -5007,7 +5009,7 @@ var en_default = {
     emptyPackages: "No packages.",
     editingPackageTitle: "Editing package",
     deletePackageTitle: "Delete package",
-    deletePackageHint: "the package and its {count} line(s) disappear from the catalogue; vouchers already sold keep their balance.",
+    deletePackageHint: "the package and its {count} line(s) leave the catalogue and can no longer be sold; vouchers already sold can still be spent, and you find them filtering Status by Deleted.",
     errorPackageNoLines: "Add at least one service: a package with no lines cannot be redeemed.",
     errorSavePackage: "Could not save the package",
     errorDeletePackage: "Could not delete the package",
@@ -6352,6 +6354,7 @@ define("ok-status-pill", OkStatusPill);
 
 // ui/components/erp-services-packages/erp-services-packages.ts
 var CATALOG3 = { es: es_default, en: en_default };
+var RETIRED_STATUS = "retired";
 var SESSION_SCALE = 1e6;
 var PERCENT_DECIMALS = 2;
 var EMPTY_FORM = { name: "", discountType: "percentage", discountValue: "", fixedPrice: "", validityDays: "", maxUses: "" };
@@ -6421,6 +6424,7 @@ var ErpServicesPackages = class extends i3 {
     this.formError = "";
     this.pageError = "";
     this.editingId = null;
+    this.showingRetired = false;
     this.editTitleInHeader = false;
     /** pm#459: generation of the last edit opening; a stale wait (package fetch, table render) of an
      *  earlier one sees a newer number and gives up, so the LAST tap wins. */
@@ -6489,18 +6493,23 @@ var ErpServicesPackages = class extends i3 {
       },
       { key: "items", header: t5("ui.colItems"), align: "right", sortable: true },
       {
-        key: "is_active",
+        key: "status",
         header: t5("ui.colStatus"),
         sortable: true,
         filterable: true,
         filterType: "select",
-        options: [{ value: "1", label: t5("ui.status.active") }, { value: "0", label: t5("ui.status.inactive") }],
-        format: (r6) => Number(r6.is_active) ? t5("ui.status.active") : t5("ui.status.inactive")
+        options: ["active", "inactive", RETIRED_STATUS].map((value) => ({ value, label: t5(`ui.status.${value}`) })),
+        format: (r6) => t5(`ui.status.${String(r6.status ?? "active")}`)
       }
     ];
   }
   get actions() {
     const t5 = (k2) => erplora3().t(CATALOG3, k2);
+    const looking = [
+      ...can3("services.view_package_balance") ? [{ id: "movements", label: t5("ui.actionMovements"), icon: "time-outline" }] : [],
+      ...can3("services.view_package_balance") ? [{ id: "grants", label: t5("ui.actionGrants"), icon: "people-outline" }] : []
+    ];
+    if (this.showingRetired) return looking;
     return [
       ...can3("services.change_package") ? [{ id: "edit", label: t5("ui.actionEdit"), icon: "create-outline" }] : [],
       // The voucher's ledger. Gated by the same permission as the balance, because that is what
@@ -6512,6 +6521,25 @@ var ErpServicesPackages = class extends i3 {
       ...can3("services.view_package_balance") ? [{ id: "grants", label: t5("ui.actionGrants"), icon: "people-outline" }] : [],
       ...can3("services.delete_package") ? [{ id: "delete", label: t5("ui.actionDelete"), icon: "trash-outline", color: "danger" }] : []
     ];
+  }
+  /** Filter change of the table. `status = retired` is not one filter more: the deleted packages
+   *  are NOT in the default answer of `services.packages.list` at all (the `sale.completed` listener
+   *  reads that very query to know which ticket lines are vouchers being SOLD), so picking it has to
+   *  widen the SCOPE too — otherwise the filter would only ever paint an empty table. The scope is
+   *  written straight into the controller's context and the reload is left to `setFilter`, so one
+   *  tap is one round trip (same pattern as the archived services, services#44). */
+  onFilterChange(col, value) {
+    if (col === "status") {
+      this.showingRetired = String(value ?? "") === RETIRED_STATUS;
+      this.ctrl.state.context = this.showingRetired ? { include_retired: 1 } : {};
+    }
+    this.ctrl.setFilter(col, value);
+  }
+  /** Tapping a row edits it — except a deleted package, which has nothing to edit: it opens the
+   *  vouchers sold from it, which is what the row is still there for (services#153). */
+  async onRowClick(row) {
+    const actionId = row.status === RETIRED_STATUS ? "grants" : "edit";
+    await this.onRowAction({ detail: { actionId, row } });
   }
   async connectedCallback() {
     super.connectedCallback();
@@ -6578,6 +6606,7 @@ var ErpServicesPackages = class extends i3 {
   async onRowAction(ev) {
     const { actionId, row } = ev.detail;
     const p4 = row;
+    if (p4.status === RETIRED_STATUS && (actionId === "edit" || actionId === "delete")) return;
     if (actionId === "edit" && can3("services.change_package")) {
       const seq = ++this.editSeq;
       this.formError = "";
@@ -7293,8 +7322,8 @@ var ErpServicesPackages = class extends i3 {
       ${can3("services.view_orphan_grant") ? b2`<ion-button class="orphans-entry" data-testid="services-packages-open-orphans" size="small" fill="clear" @click=${() => this.openOrphans()}>
             <ion-icon slot="start" name="person-remove-outline"></ion-icon>${t5("ui.openOrphans")}
           </ion-button>` : A}
-      <ok-data-table testid="services-packages-table" .labels=${{ add: t5("ui.btnNewPackage"), newRecord: t5("ui.btnNewPackage") }} .error=${this.ctrl?.error ?? ""} @retry=${() => Promise.all([this.ctrl?.load(), this.loadServices()])} .serverSide=${true} .fill=${true} .views=${true} .addable=${can3("services.add_package")} .cardTitle=${(row) => String(row.name ?? "")} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "asc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchPackagePlaceholder")} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.emptyPackages")} @rowAction=${(e6) => this.onRowAction(e6)} @rowClick=${(e6) => this.onRowAction({ detail: { actionId: "edit", row: e6.detail.row } })}
- @pageChange=${(e6) => this.ctrl.setPage(e6.detail)} @pageSizeChange=${(e6) => this.ctrl.setPageSize(e6.detail)} @sortChange=${(e6) => this.ctrl.setSort(e6.detail.sort, e6.detail.dir)} @searchChange=${(e6) => this.ctrl.setSearch(e6.detail)} @filterChange=${(e6) => this.ctrl.setFilter(e6.detail.col, e6.detail.value)}>
+      <ok-data-table testid="services-packages-table" .labels=${{ add: t5("ui.btnNewPackage"), newRecord: t5("ui.btnNewPackage") }} .error=${this.ctrl?.error ?? ""} @retry=${() => Promise.all([this.ctrl?.load(), this.loadServices()])} .serverSide=${true} .fill=${true} .views=${true} .addable=${can3("services.add_package")} .cardTitle=${(row) => String(row.name ?? "")} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "asc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchPackagePlaceholder")} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.emptyPackages")} @rowAction=${(e6) => this.onRowAction(e6)} @rowClick=${(e6) => this.onRowClick(e6.detail.row)}
+ @pageChange=${(e6) => this.ctrl.setPage(e6.detail)} @pageSizeChange=${(e6) => this.ctrl.setPageSize(e6.detail)} @sortChange=${(e6) => this.ctrl.setSort(e6.detail.sort, e6.detail.dir)} @searchChange=${(e6) => this.ctrl.setSearch(e6.detail)} @filterChange=${(e6) => this.onFilterChange(e6.detail.col, e6.detail.value)}>
         <form slot="create" class="form" data-testid="services-packages-form" @submit=${(e6) => this.save(e6)}>
           ${this.editingId && !this.editTitleInHeader ? b2`<ok-inline-feedback data-testid="services-packages-editing" tone="info" icon="create-outline">
                 <b>${t5("ui.editingPackageTitle")}</b> — ${this.form.name}
@@ -7344,6 +7373,9 @@ __decorateClass([
 __decorateClass([
   r5()
 ], ErpServicesPackages.prototype, "editingId", 2);
+__decorateClass([
+  r5()
+], ErpServicesPackages.prototype, "showingRetired", 2);
 __decorateClass([
   r5()
 ], ErpServicesPackages.prototype, "editTitleInHeader", 2);
