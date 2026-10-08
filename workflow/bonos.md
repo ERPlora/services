@@ -147,7 +147,8 @@ Pantalla: Bonos y paquetes
 Pasos:
 1. En **Bonos vendidos**, en la compra equivocada (a otra clienta, otro bono, cobrado dos veces),
    pulsa **Anular**. Solo sale si no se ha gastado ni reservado ninguna sesión de ese bono (uno ya
-   usado se anula anulando o devolviendo entera su venta, SERVICES-F27, o se corrige con **Ajustar**).
+   usado se anula anulando su venta, devolviéndola entera o devolviendo la línea del bono, SERVICES-F27 y
+   SERVICES-F14, o se corrige con **Ajustar**).
 2. Lee «¿Anular este bono?»: «El bono del cliente {customer} ({amount}) deja de poder usarse y queda
    en la lista como anulado. El dinero no se devuelve aquí: si se cobró, devuelve la venta desde
    Ventas con una devolución.».
