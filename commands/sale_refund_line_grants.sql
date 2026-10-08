@@ -12,8 +12,8 @@
 -- is the position of the line in that event, not the line's id), so the vouchers of one package
 -- sold on one sale are interchangeable and they are taken in a stable order: the intact ones first
 -- — of two identical vouchers the customer gives back the one she has not used — then the oldest.
--- Two lines of the same package in one refund take DIFFERENT vouchers: each line takes the slots
--- after the units the lines before it took.
+-- Two lines of the same package in one refund take DIFFERENT vouchers: every unit that went back
+-- gets its own slot (in line order) and each slot takes the voucher in the same position.
 --
 -- 🔴 Used or not (services#157), as in the full refund: the visits already made stay made — no
 -- session is touched here — and what was left is lost. The till says so before the operator
@@ -49,10 +49,9 @@ wanted AS (
     SELECT CAST(:hub_id AS TEXT) AS hub_id,
            r.line_id,
            r.package_id,
-           r.units,
-           CAST(SUM(r.units) OVER (PARTITION BY r.package_id ORDER BY r.ord) AS BIGINT)
-               - r.units AS taken_before
+           ROW_NUMBER() OVER (PARTITION BY r.package_id ORDER BY r.ord, u.n) AS slot
       FROM returned r
+     CROSS JOIN LATERAL generate_series(1, r.units) AS u(n)
 ),
 candidates AS (
     SELECT g.id,
@@ -82,8 +81,7 @@ picked AS (
       JOIN wanted w
         ON w.hub_id = c.hub_id
        AND w.package_id = c.package_id
-       AND c.slot > w.taken_before
-       AND c.slot <= w.taken_before + w.units
+       AND w.slot = c.slot
 )
 UPDATE services_package_grant AS g
    SET is_deleted = 1,
