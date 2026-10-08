@@ -5,7 +5,7 @@ Prefijo: SERVICES
 ## Flujos
 
 ### SERVICES-F22 Pagar una línea con un bono
-Estado: parcial — el servidor de Ventas da por pagada con bono la línea que diga el cobro, sin preguntar a Servicios, así que por el asistente o la API una línea se cobra a 0 sin sesión detrás (SALES-F27, sales#539); si la cuenta se divide o se une a otra, la sesión retenida se queda en la cuenta original hasta que vuelve sola al cabo de un día (ver Si falla, sales#540, leído en el código, sin ejecutar); y al aparcar una cuenta con clienta, la cuenta siguiente sale a su nombre y el hueco le ofrece su bono (sales#557)
+Estado: parcial — el servidor de Ventas da por pagada con bono la línea que diga el cobro, sin preguntar a Servicios, así que por el asistente o la API una línea se cobra a 0 sin sesión detrás (SALES-F27, sales#539); si la cuenta se divide o se une a otra, la sesión retenida se queda en la cuenta original hasta que vuelve sola al cabo de un día (ver Si falla, sales#540, leído en el código, sin ejecutar); y al eliminar una cuenta con clienta («Eliminarla y abrir»), la cuenta siguiente se cobra a su nombre (sales#567)
 Actor: cajero, empleado, responsable
 Pantalla: Ventas: Cobro
 Pasos:
