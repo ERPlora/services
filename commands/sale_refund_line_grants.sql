@@ -31,8 +31,8 @@
 WITH returned AS (
     SELECT l.value ->> 'line_id'    AS line_id,
            l.value ->> 'product_id' AS package_id,
-           GREATEST(1, FLOOR(COALESCE(CAST(NULLIF(l.value ->> 'quantity', '') AS NUMERIC), 1000000)
-                             / 1000000)) AS units,
+           CAST(GREATEST(1, FLOOR(COALESCE(CAST(NULLIF(l.value ->> 'quantity', '') AS NUMERIC), 1000000)
+                                  / 1000000)) AS BIGINT) AS units,
            l.ord
       FROM jsonb_array_elements(CAST(COALESCE(CAST(:lines AS TEXT), '[]') AS jsonb))
            WITH ORDINALITY AS l(value, ord)
@@ -46,14 +46,17 @@ WITH returned AS (
        )
 ),
 wanted AS (
-    SELECT r.line_id,
+    SELECT CAST(:hub_id AS TEXT) AS hub_id,
+           r.line_id,
            r.package_id,
            r.units,
-           SUM(r.units) OVER (PARTITION BY r.package_id ORDER BY r.ord) - r.units AS taken_before
+           CAST(SUM(r.units) OVER (PARTITION BY r.package_id ORDER BY r.ord) AS BIGINT)
+               - r.units AS taken_before
       FROM returned r
 ),
 candidates AS (
     SELECT g.id,
+           g.hub_id,
            g.package_id,
            ROW_NUMBER() OVER (
                PARTITION BY g.package_id
@@ -77,7 +80,8 @@ picked AS (
     SELECT c.id, w.line_id
       FROM candidates c
       JOIN wanted w
-        ON w.package_id = c.package_id
+        ON w.hub_id = c.hub_id
+       AND w.package_id = c.package_id
        AND c.slot > w.taken_before
        AND c.slot <= w.taken_before + w.units
 )
