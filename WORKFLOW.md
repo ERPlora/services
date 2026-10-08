@@ -115,9 +115,9 @@ en Bonos sin cliente) cuando hay más:
 Menú → **Servicios** → pestaña **Ajustes**, que el hub añade sola porque el módulo declara sus
 ajustes. Título «Servicios». Campos: «Duración por defecto (min)», «Tiempo de margen por defecto
 (min)», «Tipo de IVA por defecto» (texto libre), «Mostrar precios», «Mostrar duración», «Permitir
-reserva online», «Precios con IVA incluido» y «Moneda»; botón **Guardar**. La ve todo el que entra
-en Servicios; quien no es administrador la ve en solo lectura con «Solo un administrador puede
-cambiar estos ajustes.». Cargando: «Cargando ajustes…» · Error: «No se pudieron cargar los
+reserva online», «Precios con IVA incluido» y «Moneda»; botón **Guardar**. Solo la ve quien tiene
+el permiso de cambiarlos (`services.manage_settings`; de fábrica, solo el administrador): a los
+demás el hub no les enseña la pestaña (HUB_SHELL-F43, hub#2588). Cargando: «Cargando ajustes…» · Error: «No se pudieron cargar los
 ajustes.» o «No se pudieron guardar los ajustes.» · Guardado: «Ajustes guardados.».
 
 ### Hueco del bono en el cobro
