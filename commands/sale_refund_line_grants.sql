@@ -41,7 +41,6 @@ WITH returned AS (
            SELECT 1
              FROM services_package_grant d
             WHERE d.hub_id = :hub_id
-              AND d.sale_id = CAST(:sale_id AS TEXT)
               AND d.void_refund_id = CAST(:refund_id AS TEXT)
               AND d.void_sale_item_id = l.value ->> 'line_id'
        )

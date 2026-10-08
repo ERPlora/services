@@ -694,6 +694,17 @@ def returned_line_voids_its_voucher(
         ),
     )
     check(
+        "… and redelivering it, with three vouchers still live, voids none of them",
+        0,
+        refund_sale(
+            db,
+            sale2,
+            fully_refunded=False,
+            lines=[line("li-two", pkg, units=2)],
+            refund_id="ref-line-2a",
+        ),
+    )
+    check(
         "two lines of the same package in one refund void two DIFFERENT vouchers",
         2,
         refund_sale(
@@ -767,7 +778,78 @@ def returned_line_voids_its_voucher(
     )
     check("… and their voucher stays live", 0, grant_trail(db, theirs)["is_deleted"])
 
-    print("\n6g · a till holding a session of that voucher at the same instant: the refund waits")
+    print("\n6f-bis · … not even a neighbour's row that names this hub's package and sorts first")
+    # Only a row written by hand can name another hub's package (the package id is the table's
+    # key and `_grant` checks the package's hub). This one also sorts before this hub's voucher, so
+    # it would take the first slot of the line if the candidates were not read from this hub only.
+    sale5 = "sale-line-cross"
+    ours = grant(db, pkg, "cus-line-cross", sale_id=sale5)
+    stray = grant(db, other_pkg, "cus-line-cross", sale_id=sale5, hub=OTHER_HUB)
+    db.psql(
+        [
+            "-c",
+            f"UPDATE services_package_grant SET package_id = '{pkg}', "
+            f"granted_at = '2000-01-01T00:00:00+00:00' WHERE id = '{stray}'",
+        ],
+        db=db.name,
+    )
+    check(
+        "the refund voids this hub's voucher of the line",
+        1,
+        refund_sale(
+            db,
+            sale5,
+            fully_refunded=False,
+            lines=[line("li-cross", pkg)],
+            refund_id="ref-line-cross",
+        ),
+    )
+    check(
+        "… this hub's, not the neighbour's stray row",
+        [1, 0],
+        [grant_trail(db, ours)["is_deleted"], grant_trail(db, stray)["is_deleted"]],
+    )
+    print("\n6g · the neighbour hub answering the same refund line does not stop this hub's void")
+    sale6 = "sale-line-twin"
+    mine = grant(db, pkg, "cus-line-twin", sale_id=sale6)
+    twin = grant(db, other_pkg, "cus-line-twin", sale_id=sale6, hub=OTHER_HUB)
+    twin_lines = [line("li-twin", other_pkg)]
+    run(
+        db,
+        *refund_body(sale6, fully_refunded=False, lines=twin_lines, refund_id="ref-twin"),
+        hub=OTHER_HUB,
+    )
+    check("the neighbour's voucher is voided in its own hub", 1, grant_trail(db, twin)["is_deleted"])
+    check(
+        "… and this hub's refund with the same ids still voids its own",
+        1,
+        refund_sale(
+            db,
+            sale6,
+            fully_refunded=False,
+            lines=[line("li-twin", pkg)],
+            refund_id="ref-twin",
+        ),
+    )
+    check("… so this hub's voucher is voided", 1, grant_trail(db, mine)["is_deleted"])
+
+    print("\n6h · a returned line that names no line id voids nothing: it could not be answered once")
+    sale7 = "sale-line-noid"
+    anonymous = grant(db, pkg, "cus-line-noid", sale_id=sale7)
+    check(
+        "a line without its id voids nothing",
+        0,
+        refund_sale(
+            db,
+            sale7,
+            fully_refunded=False,
+            lines=[{"product_id": pkg, "quantity": 1_000_000}],
+            refund_id="ref-noid",
+        ),
+    )
+    check("… and the voucher stays live", 0, grant_trail(db, anonymous)["is_deleted"])
+
+    print("\n6i · a till holding a session of that voucher at the same instant: the refund waits")
     sale5 = "sale-line-race"
     raced = grant(db, pkg, "cus-line-race", sale_id=sale5)
     waited = race(
