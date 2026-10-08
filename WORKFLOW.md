@@ -212,7 +212,7 @@ gramática y el mismo prefijo. Antes de tocar código, lee el fichero del flujo 
 | Bono de N sesiones de servicios concretos | parcial — el límite es «Usos» para el bono entero; las «Sesiones» de cada servicio no limitan nada | SERVICES-F12 |
 | Vender el bono a una clienta en el TPV | parcial — el TPV no ofrece bonos; solo por el asistente o la API, con la línea marcada como servicio | SERVICES-F14 |
 | Caducidad que cuenta desde la compra | hecho | SERVICES-F20 |
-| Gastar en el cobro con vista previa del saldo y del bono elegido | parcial — tras dividir o juntar la cuenta, la sesión retenida se queda en la de origen un día (sales#540); al recargar hay que volver a asignar la clienta (customers#135) | SERVICES-F22, SERVICES-F24 |
+| Gastar en el cobro con vista previa del saldo y del bono elegido | parcial — tras dividir o juntar la cuenta, la sesión retenida se queda en la de origen un día (sales#540); al aparcar una cuenta con clienta, la siguiente sale a su nombre (sales#557) | SERVICES-F22, SERVICES-F24 |
 | Deshacer el canje antes de cobrar | hecho | SERVICES-F22, SERVICES-F23 |
 | Saldo de bonos visible en la ficha de la clienta | parcial — solo en el cobro, servicio a servicio, y por el asistente | SERVICES-F15 |
 | La sesión vuelve al devolver la venta | parcial — solo junto con una devolución de dinero: no en un tique pagado entero con bono (0,00 €) ni si ya se devolvió todo el dinero; entonces, anulando la venta si aún se puede o con Ajustar | SERVICES-F26, SERVICES-F27, SERVICES-F18 |
