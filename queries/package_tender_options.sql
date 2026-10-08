@@ -92,11 +92,15 @@ WITH candidate AS (
            ON adj.grant_id = g.id AND adj.hub_id = g.hub_id
     JOIN services_package p ON p.id = g.package_id AND p.hub_id = g.hub_id
     WHERE g.hub_id = :hub_id AND g.is_deleted = 0 AND g.customer_id = :customer_id
-      AND p.is_deleted = 0 AND p.is_active = 1
+      -- 🔴 NO catalogue-state filter on `p` (services#153): deleting or deactivating a package stops
+      -- SELLING it (`_grant_insert.sql`), it does not take back what was sold. The JOIN stays — it is
+      -- what keeps a grant pointing at another hub's package id out of reach.
       AND EXISTS (
         SELECT 1 FROM services_packageitem i
          WHERE i.hub_id = :hub_id AND i.package_id = g.package_id
-           AND i.service_id = :service_id AND i.is_deleted = 0
+           AND i.service_id = :service_id
+           -- No `i.is_deleted` (services#153): deleting the package cascades the soft-delete to its
+           -- lines, and a voucher already sold keeps covering what it was sold with.
       )
 ),
 priced AS (

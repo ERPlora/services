@@ -50,8 +50,14 @@ interface Package {
   discount_amount_cents: number | null;
   fixed_price: number | null;
   is_active: number;
+  /** The query's own word (services#153): `retired` = deleted from the catalogue, `inactive` =
+   *  deactivated, `active`. `is_active` alone cannot tell a deleted package from a live one. */
+  status: 'active' | 'inactive' | 'retired' | string;
   items: number;
 }
+
+/** The `status` that is not in the default answer of `services.packages.list` (services#153). */
+const RETIRED_STATUS = 'retired';
 
 /**
  * Row of `services.packages.redemption_history` — one MOVEMENT of the voucher (services#71).
@@ -306,6 +312,8 @@ export class ErpServicesPackages extends LitElement {
   @state() pageError = '';
   /** Package being edited (header only); `null` = create mode. */
   @state() editingId: string | null = null;
+  /** The table shows the DELETED packages that still have sold vouchers (services#153). */
+  @state() showingRetired = false;
 
   /** pm#450: whether the table's panel HEADER already carries the editing title (OutfitKit
    *  ≥ 0.1.94, outfitkit#150). Set only after checking the rendered dialog — never assumed — so
@@ -385,19 +393,26 @@ export class ErpServicesPackages extends LitElement {
       },
       { key: 'items', header: t('ui.colItems'), align: 'right', sortable: true },
       {
-        key: 'is_active',
+        key: 'status',
         header: t('ui.colStatus'),
         sortable: true,
         filterable: true,
         filterType: 'select',
-        options: [{ value: '1', label: t('ui.status.active') }, { value: '0', label: t('ui.status.inactive') }],
-        format: (r) => (Number(r.is_active) ? t('ui.status.active') : t('ui.status.inactive')),
+        options: ['active', 'inactive', RETIRED_STATUS].map((value) => ({ value, label: t(`ui.status.${value}`) })),
+        format: (r) => t(`ui.status.${String(r.status ?? 'active')}`),
       },
     ];
   }
 
   get actions(): DataTableAction[] {
     const t = (k: string): string => erplora().t(CATALOG, k);
+    // A deleted package (services#153) can no longer be edited or sold, but the vouchers sold from
+    // it are still being spent: what is left on its row is looking at them.
+    const looking: DataTableAction[] = [
+      ...(can('services.view_package_balance') ? [{ id: 'movements', label: t('ui.actionMovements'), icon: 'time-outline' }] : []),
+      ...(can('services.view_package_balance') ? [{ id: 'grants', label: t('ui.actionGrants'), icon: 'people-outline' }] : []),
+    ];
+    if (this.showingRetired) return looking;
     return [
       ...(can('services.change_package') ? [{ id: 'edit', label: t('ui.actionEdit'), icon: 'create-outline' }] : []),
       // The voucher's ledger. Gated by the same permission as the balance, because that is what
@@ -409,6 +424,27 @@ export class ErpServicesPackages extends LitElement {
       ...(can('services.view_package_balance') ? [{ id: 'grants', label: t('ui.actionGrants'), icon: 'people-outline' }] : []),
       ...(can('services.delete_package') ? [{ id: 'delete', label: t('ui.actionDelete'), icon: 'trash-outline', color: 'danger' }] : []),
     ];
+  }
+
+  /** Filter change of the table. `status = retired` is not one filter more: the deleted packages
+   *  are NOT in the default answer of `services.packages.list` at all (the `sale.completed` listener
+   *  reads that very query to know which ticket lines are vouchers being SOLD), so picking it has to
+   *  widen the SCOPE too — otherwise the filter would only ever paint an empty table. The scope is
+   *  written straight into the controller's context and the reload is left to `setFilter`, so one
+   *  tap is one round trip (same pattern as the archived services, services#44). */
+  onFilterChange(col: string, value: unknown): void {
+    if (col === 'status') {
+      this.showingRetired = String(value ?? '') === RETIRED_STATUS;
+      this.ctrl.state.context = this.showingRetired ? { include_retired: 1 } : {};
+    }
+    this.ctrl.setFilter(col, value);
+  }
+
+  /** Tapping a row edits it — except a deleted package, which has nothing to edit: it opens the
+   *  vouchers sold from it, which is what the row is still there for (services#153). */
+  async onRowClick(row: Record<string, unknown>): Promise<void> {
+    const actionId = row.status === RETIRED_STATUS ? 'grants' : 'edit';
+    await this.onRowAction({ detail: { actionId, row } } as CustomEvent<{ actionId: string; row: Record<string, unknown> }>);
   }
 
   private readonly onLocaleChange = (): void => this.requestUpdate();
@@ -501,6 +537,8 @@ export class ErpServicesPackages extends LitElement {
   async onRowAction(ev: CustomEvent<{ actionId: string; row: Record<string, unknown> }>): Promise<void> {
     const { actionId, row } = ev.detail;
     const p = row as unknown as Package;
+    // A deleted package is not edited nor deleted again, whatever event arrives (services#153).
+    if (p.status === RETIRED_STATUS && (actionId === 'edit' || actionId === 'delete')) return;
     if (actionId === 'edit' && can('services.change_package')) {
       const seq = ++this.editSeq;
       this.formError = '';
@@ -1352,8 +1390,8 @@ export class ErpServicesPackages extends LitElement {
             <ion-icon slot="start" name="person-remove-outline"></ion-icon>${t('ui.openOrphans')}
           </ion-button>`
         : nothing}
-      <ok-data-table testid="services-packages-table" .labels=${{ add: t('ui.btnNewPackage'), newRecord: t('ui.btnNewPackage') }} .error=${this.ctrl?.error ?? ''} @retry=${() => Promise.all([this.ctrl?.load(), this.loadServices()])} .serverSide=${true} .fill=${true} .views=${true} .addable=${can('services.add_package')} .cardTitle=${(row: Record<string, unknown>) => String(row.name ?? '')} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? 'asc'} .searchable=${true} .searchPlaceholder=${t('ui.searchPackagePlaceholder')} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t('ui.loading') : t('ui.emptyPackages')} @rowAction=${(e: CustomEvent<{ actionId: string; row: Record<string, unknown> }>) => this.onRowAction(e)} @rowClick=${(e: CustomEvent<{ row: Record<string, unknown> }>) => this.onRowAction({ detail: { actionId: 'edit', row: e.detail.row } } as CustomEvent<{ actionId: string; row: Record<string, unknown> }>)}
- @pageChange=${(e: CustomEvent<number>) => this.ctrl.setPage(e.detail)} @pageSizeChange=${(e: CustomEvent<number>) => this.ctrl.setPageSize(e.detail)} @sortChange=${(e: CustomEvent<{ sort: string; dir: 'asc' | 'desc' }>) => this.ctrl.setSort(e.detail.sort, e.detail.dir)} @searchChange=${(e: CustomEvent<string>) => this.ctrl.setSearch(e.detail)} @filterChange=${(e: CustomEvent<{ col: string; value: unknown }>) => this.ctrl.setFilter(e.detail.col, e.detail.value)}>
+      <ok-data-table testid="services-packages-table" .labels=${{ add: t('ui.btnNewPackage'), newRecord: t('ui.btnNewPackage') }} .error=${this.ctrl?.error ?? ''} @retry=${() => Promise.all([this.ctrl?.load(), this.loadServices()])} .serverSide=${true} .fill=${true} .views=${true} .addable=${can('services.add_package')} .cardTitle=${(row: Record<string, unknown>) => String(row.name ?? '')} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? 'asc'} .searchable=${true} .searchPlaceholder=${t('ui.searchPackagePlaceholder')} .actions=${this.actions} .rowClickable=${true} .emptyMessage=${this.ctrl?.loading ? t('ui.loading') : t('ui.emptyPackages')} @rowAction=${(e: CustomEvent<{ actionId: string; row: Record<string, unknown> }>) => this.onRowAction(e)} @rowClick=${(e: CustomEvent<{ row: Record<string, unknown> }>) => this.onRowClick(e.detail.row)}
+ @pageChange=${(e: CustomEvent<number>) => this.ctrl.setPage(e.detail)} @pageSizeChange=${(e: CustomEvent<number>) => this.ctrl.setPageSize(e.detail)} @sortChange=${(e: CustomEvent<{ sort: string; dir: 'asc' | 'desc' }>) => this.ctrl.setSort(e.detail.sort, e.detail.dir)} @searchChange=${(e: CustomEvent<string>) => this.ctrl.setSearch(e.detail)} @filterChange=${(e: CustomEvent<{ col: string; value: unknown }>) => this.onFilterChange(e.detail.col, e.detail.value)}>
         <form slot="create" class="form" data-testid="services-packages-form" @submit=${(e: Event) => this.save(e)}>
           ${this.editingId && !this.editTitleInHeader
             ? html`<ok-inline-feedback data-testid="services-packages-editing" tone="info" icon="create-outline">

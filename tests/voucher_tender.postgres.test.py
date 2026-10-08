@@ -455,20 +455,25 @@ def main() -> int:
             ],
         )
 
-        print("\nC. an archived or expired voucher is NOT a tender")
+        print("\nC. an expired voucher is NOT a tender; a deactivated one still is")
         archived = seed_package(
             db, HUB, "Bono archivado", max_uses=5, validity_days=None
         )
         seed_item(db, HUB, archived, colour)
-        # Sold FIRST and archived afterwards: the interesting case is a customer who paid for a
-        # voucher the salon has since stopped offering, not one that was never on sale.
-        seed_grant(db, archived, "cus-2")
+        # Sold FIRST and deactivated afterwards: a customer who paid for a voucher the salon has
+        # since stopped offering. Retiring stops SELLING it, not spending it (services#153); until
+        # then this check pinned the bug — the paid voucher vanished from the till.
+        archived_grant = seed_grant(db, archived, "cus-2")
         db.psql(
             [],
             db=db.name,
             stdin=f"UPDATE services_package SET is_active = 0 WHERE id = '{archived}';",
         )
-        check("an archived voucher is not offered", [], options(db, "cus-2", colour))
+        check(
+            "a deactivated voucher already sold is still offered",
+            [archived_grant],
+            [o["grant_id"] for o in options(db, "cus-2", colour)],
+        )
 
         expiring = seed_package(db, HUB, "Bono caduca", max_uses=None, validity_days=30)
         seed_item(db, HUB, expiring, colour)

@@ -289,7 +289,9 @@ Slugs are unique per hub, for both categories and services.
 Services, categories and packages are marked deleted, never erased, so history and past sales stay
 readable.
 
-Note a known gap: deleting a package does not currently cascade the soft-delete to its lines.
+Deleting a package soft-deletes its lines with it. A voucher already SOLD from it is unaffected: it
+is still spent, covered by the lines it was sold with (deleted or not), until it runs out or expires.
+Retiring a package only stops new sales of it.
 
 ## Variants and add-ons exist in the data, not in the product
 

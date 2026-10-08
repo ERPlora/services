@@ -97,7 +97,14 @@ Bundles of services with a discount (`services.packages.list`, 50 rows per page)
 
 **Edit** (row menu) changes the header — name, discount, closed price, validity, uses. The services
 included are the package's identity and cannot be changed once created: delete it and create a new
-one (vouchers already sold keep their balance). **Delete** asks for confirmation first.
+one. **Delete** asks for confirmation first.
+
+Deleting a package stops SELLING it; the vouchers already sold are still the customers'. They are
+offered at checkout and spent as before, only on the services they were sold with, until they run
+out or expire. To look at them, set the **Status** filter to **Deleted**: the table switches to the
+deleted packages somebody bought, each with **Movements** and **Sold vouchers** (tapping the row opens
+**Sold vouchers**) and no edit or delete. A deleted package nobody bought is gone from every view.
+The same applies to a package deactivated through the API.
 
 The package header and all its lines are written together, and a service repeated in the list is
 de-duplicated. Requires `services.add_package`.

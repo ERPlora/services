@@ -240,6 +240,66 @@ def test_4_spending_a_session_announces_it(hub: Hub) -> None:
     )
 
 
+def test_5_a_sold_voucher_outlives_its_catalogue_row(hub: Hub) -> None:
+    print(
+        "\n5 · deleting a voucher from the catalogue stops SELLING it, not spending it (services#153)"
+    )
+    customer = tag("cust-retired")
+    service = catalog_service(hub)
+    name = tag("Bono retirado")
+    package = create_package(hub, name, max_uses=3, validity_days=None, service_id=service)
+    grant_id = grant(hub, package, customer)
+
+    hub.run("services.packages.delete", {"package_id": package})
+
+    # The till's door: the hold of a session against a checkout line, through the WASM handler
+    # that checks the grant against `tender_options` before the gated statements run.
+    held = hub.run(
+        "services.packages.hold_for_line",
+        {
+            "grant_id": grant_id,
+            "customer_id": customer,
+            "service_id": service,
+            "checkout_ref": tag("chk-retired"),
+            "line_ref": "l1",
+        },
+    )
+    hub.check_true(
+        "the till holds a session of the deleted voucher",
+        bool((held.get("result") or {}).get("redemption_id")),
+        f"{held}",
+    )
+    # The chair's door.
+    out = hub.run("services.packages.redeem", {"grant_id": grant_id})
+    hub.check("a use at the chair goes through", out["result"]["grant_id"], grant_id)
+    left = balance_of(hub, customer, grant_id)
+    hub.check("…and the balance counts both", (left["used"], left["remaining"]), (2, 1))
+
+    # Selling it again is what retiring stops.
+    status, body = hub.command(
+        "services.packages.grant", {"package_id": package, "customer_id": tag("cust-new")}
+    )
+    hub.check_true(
+        "a new sale of the deleted voucher is refused",
+        status != 200 or not (body or {}).get("ok"),
+        f"{status}: {body}",
+    )
+
+    # The catalogue keeps the row «Bonos vendidos» and «Movimientos» hang from — only when asked.
+    by_default = [r for r in hub.query("services.packages.list") if r.get("id") == package]
+    hub.check("the default catalogue no longer lists it", by_default, [])
+    retired = [
+        r
+        for r in hub.query("services.packages.list", {"include_retired": 1})
+        if r.get("id") == package
+    ]
+    hub.check(
+        "asked for, it is listed as retired with the line it was sold with",
+        [(r.get("status"), r.get("items")) for r in retired],
+        [("retired", 1)],
+    )
+
+
 def main() -> int:
     hub = Hub("package_redeem.hub", needs=("taxes", "services"))
     print(
@@ -253,6 +313,7 @@ def main() -> int:
     test_2_sessions_decrement_and_max_uses_blocks(hub)
     test_3_the_validity_clock_starts_at_the_purchase(hub)
     test_4_spending_a_session_announces_it(hub)
+    test_5_a_sold_voucher_outlives_its_catalogue_row(hub)
     return hub.finish(
         "a session is spent only against a purchase that has one left and has not run out, "
         "and every refusal reaches the caller as its own code with nothing written"
