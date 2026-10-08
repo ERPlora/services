@@ -767,6 +767,22 @@ def returned_line_voids_its_voucher(
     )
     check("… and their voucher stays live", 0, grant_trail(db, theirs)["is_deleted"])
 
+    print("\n6g · a till holding a session of that voucher at the same instant: the refund waits")
+    sale5 = "sale-line-race"
+    raced = grant(db, pkg, "cus-line-race", sale_id=sale5)
+    waited = race(
+        db,
+        hold_body(raced, svc),
+        refund_body(
+            sale5,
+            fully_refunded=False,
+            lines=[line("li-race", pkg)],
+            refund_id="ref-line-race",
+        ),
+    )
+    check("the line refund waited for the till", True, waited)
+    check("… and then voided the voucher of the line", 1, grant_trail(db, raced)["is_deleted"])
+
 
 # ── main ─────────────────────────────────────────────────────────────────────
 

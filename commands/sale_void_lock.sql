@@ -1,6 +1,6 @@
 -- Queues the void of a PAID sale behind every door that decides on the vouchers it sold
 -- (`services._on_sale_voided`, statement 1 of 3, services#151; and its full refund,
--- `services._on_sale_refunded`, statement 1 of 2, services#154). Same lock and same order as
+-- `services._on_sale_refunded`, statement 1 of 3, services#154, services#158). Same lock and same order as
 -- `_grant_lock.sql`, which every till takes before it holds a session: the last statement voids
 -- every voucher this sale minted, used or not (services#157), and a till holding a session of one
 -- of them at the same instant must not slip a new hold onto a voucher that is being voided.

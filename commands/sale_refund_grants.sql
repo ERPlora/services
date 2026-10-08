@@ -1,14 +1,14 @@
 -- A voucher SOLD on a sale is voided when that sale is refunded IN FULL, used or not
--- (`services._on_sale_refunded`, statement 2 of 2, services#154, services#157 / SERVICES-F14).
+-- (`services._on_sale_refunded`, statement 2 of 3, services#154, services#157 / SERVICES-F14).
 --
--- `sales.refund` gives money back, not lines (SALES-F31): `sale.refunded` says how much went back
--- and whether the sale is now refunded in full (`fully_refunded`), never which line. So the only
--- refund that says «the voucher went back» is the one that returns the WHOLE ticket — the same as
--- voiding it, and the voucher goes the same way as in `sale_void_grants.sql`: the void an operator
--- does by hand in **Bonos vendidos**, stamped with who refunded the sale, when and the refund's
--- reason. A partial refund cannot name the voucher's line and voids nothing (services#158); the
--- refund that gives back the last cent is the one that does. The kernel binds a JSON bool as 0/1,
--- and an event that does not carry the flag binds NULL: neither is a full refund.
+-- `sale.refunded` says how much went back, whether the sale is now refunded in full
+-- (`fully_refunded`) and which lines went back with the money (`lines`, SALES-F31). The refund that
+-- returns the WHOLE ticket is the same as voiding it, and every voucher sold on it goes the same way
+-- as in `sale_void_grants.sql`: the void an operator does by hand in **Bonos vendidos**, stamped
+-- with who refunded the sale, when and the refund's reason. A partial refund voids only the
+-- vouchers of the lines it names, in statement 3 (`sale_refund_line_grants.sql`, services#158); one
+-- that names no line voids nothing. The kernel binds a JSON bool as 0/1, and an event that does not
+-- carry the flag binds NULL: neither is a full refund.
 --
 -- 🔴 Used or not (services#157), as in the void: the visits already made stay made — no session is
 -- touched here, a session held at a till right now included — and what was left is lost. The till
