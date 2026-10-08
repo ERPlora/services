@@ -21,7 +21,9 @@ expires). The rule this battery pins:
      (`include_retired`), with `status = 'retired'`, and only those with something sold — the
      `sale.completed` listener reads this very query with no params and must not see them;
   F. the «Bonos vendidos» and «Movimientos» of a retired package still answer;
-  G. none of it crosses hubs.
+  G. none of it crosses hubs;
+  H. the refusal statement on its own names a retired package's covered line as covered: if a
+     hold of it is ever refused, the reason is not «does not cover this service».
 
 Usage: tests/retired_package.postgres.test.py   (exit 0 = green; SKIPPED without the container)
 """
@@ -32,9 +34,14 @@ import uuid
 
 from pg_harness import (
     HUB,
+    MODULE_DIR,
+    NOW,
     OTHER_HUB,
+    USER,
     ScratchDb,
+    bind,
     container_available,
+    lower_bridges,
     query_sql,
     script_for,
 )
@@ -375,6 +382,38 @@ def main() -> int:
             offered(db, "cus-alice", foreign_cut),
         )
         check("…nor redeemable from here", (0, "no_grant"), precheck(db, neighbour))
+
+        print("\nH. the refusal statement on its own: a retired package's line still covers")
+        # `alice` has sessions left, no deadline passed and her package's lines were deleted with
+        # it. Every rule says yes, yet the statement runs alone (the INSERT «wrote nothing»): the
+        # closed fallback names it. Reading coverage through the DELETED lines as missing would
+        # tell the cashier «this voucher does not cover the cut» about a voucher of cuts.
+        def refusal_alone(service_id: str) -> None:
+            sql = (MODULE_DIR / "commands/_redeem_refusal.sql").read_text()
+            params = {
+                "redemption_id": str(uuid.uuid4()),
+                "grant_id": alice,
+                "service_id": service_id,
+                "hub_id": HUB,
+                "current_user_id": USER,
+                "now": NOW,
+            }
+            db.psql(
+                [],
+                db=db.name,
+                stdin="BEGIN;\n" + lower_bridges(bind(sql, params)) + "\nROLLBACK;",
+            )
+
+        refused(
+            "an unexplained refusal of the cut it was sold with",
+            lambda: refusal_alone(cut),
+            "services_redeem_not_redeemable",
+        )
+        refused(
+            "…while a colour it never included is still «does not cover»",
+            lambda: refusal_alone(colour),
+            "services_redeem_does_not_cover_service",
+        )
     except (RuntimeError, KeyError, IndexError) as exc:
         failures.append(f"the run aborted: {exc}")
         print(f"\n  ABORTED: {exc}")
