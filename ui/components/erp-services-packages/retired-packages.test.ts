@@ -13,7 +13,11 @@
 //   3. the first load does NOT widen it, and clearing the filter puts it back;
 //   4. in that view the row offers only what still makes sense — «Bonos vendidos» and
 //      «Movimientos» — and never Edit or Delete;
-//   5. tapping a retired row opens its «Bonos vendidos», not the editor of a package that is gone.
+//   5. tapping a retired row opens its «Bonos vendidos», not the editor of a package that is gone;
+//   6. an Edit or Delete that still reaches a retired row (an action list painted before the
+//      filter changed) does nothing.
+// The filter and the tap go through the events of the table itself (`filterChange`, `rowClick`),
+// the way a person reaches them — calling the handlers directly would not see the wiring.
 import { beforeEach, describe, expect, it } from 'vitest';
 
 const RETIRED = {
@@ -65,8 +69,8 @@ type Mounted = HTMLElement & {
   columns: { key: string; options?: { value: string }[]; format?: (r: Record<string, unknown>) => string }[];
   grantsOf: { id: string; name: string } | null;
   editingId: string | null;
-  onFilterChange(col: string, value: unknown): void;
-  onRowClick(row: Record<string, unknown>): Promise<void>;
+  deleteTarget: { id: string } | null;
+  onRowAction(ev: CustomEvent<{ actionId: string; row: Record<string, unknown> }>): Promise<void>;
 };
 
 async function mount(): Promise<Mounted> {
@@ -86,10 +90,17 @@ const settle = async (el: Mounted) => {
 
 const catalogueLoads = () => pages.filter((p) => p.name === 'services.packages.list');
 
-const showRetired = async (el: Mounted) => {
-  el.onFilterChange('status', 'retired');
+/** What the table emits; the component only ever hears it through the table. */
+const fromTable = async (el: Mounted, event: string, detail: unknown) => {
+  const table = el.shadowRoot.querySelector('ok-data-table');
+  expect(table, 'the catalogue table is rendered').not.toBe(null);
+  table!.dispatchEvent(new CustomEvent(event, { detail }));
   await settle(el);
 };
+
+const filterStatus = (el: Mounted, value: string) => fromTable(el, 'filterChange', { col: 'status', value });
+const tapRow = (el: Mounted, row: Record<string, unknown>) => fromTable(el, 'rowClick', { row });
+const showRetired = (el: Mounted) => filterStatus(el, 'retired');
 
 describe('a deleted voucher with sales is reachable, and only on purpose', () => {
   it('the Estado filter offers active, inactive and retired, from the query `status`', async () => {
@@ -119,8 +130,7 @@ describe('a deleted voucher with sales is reachable, and only on purpose', () =>
   it('clearing the filter puts the scope back', async () => {
     const el = await mount();
     await showRetired(el);
-    el.onFilterChange('status', '');
-    await settle(el);
+    await filterStatus(el, '');
     const loads = catalogueLoads();
     expect(loads[loads.length - 1].params.params ?? {}).toEqual({});
   });
@@ -137,17 +147,24 @@ describe('what a retired row offers', () => {
   it('tapping the row opens its «Bonos vendidos», not the editor', async () => {
     const el = await mount();
     await showRetired(el);
-    await el.onRowClick(RETIRED);
-    await settle(el);
+    await tapRow(el, RETIRED);
     expect(el.grantsOf).toEqual({ id: 'p-old', name: 'Bono 5 cortes' });
     expect(el.editingId ?? null).toBe(null);
   });
 
   it('a live row still opens the editor', async () => {
     const el = await mount();
-    await el.onRowClick({ ...RETIRED, id: 'p-live', status: 'active', is_active: 1 });
-    await settle(el);
+    await tapRow(el, { ...RETIRED, id: 'p-live', status: 'active', is_active: 1 });
     expect(el.grantsOf).toBe(null);
     expect(el.editingId).toBe('p-live');
+  });
+
+  it('an Edit or Delete that still reaches a retired row does nothing', async () => {
+    const el = await mount();
+    await fromTable(el, 'rowAction', { actionId: 'edit', row: RETIRED });
+    await fromTable(el, 'rowAction', { actionId: 'delete', row: RETIRED });
+    expect(el.editingId ?? null, 'no editor for a package that is gone').toBe(null);
+    expect(el.deleteTarget ?? null, 'no second delete').toBe(null);
+    expect(commands.filter((c) => c.name.startsWith('services.packages.')), 'nothing written').toEqual([]);
   });
 });
