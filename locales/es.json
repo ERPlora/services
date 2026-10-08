@@ -63,7 +63,8 @@
     "status": {
       "active": "Activo",
       "inactive": "Archivado",
-      "unconfigured": "Sin configurar"
+      "unconfigured": "Sin configurar",
+      "retired": "Eliminado"
     },
     "statusReason": {
       "unconfigured": "Sin categoría fiscal: no se puede cobrar"
@@ -140,7 +141,7 @@
     "emptyPackages": "No hay paquetes.",
     "editingPackageTitle": "Editando paquete",
     "deletePackageTitle": "Eliminar paquete",
-    "deletePackageHint": "el paquete y sus {count} línea(s) desaparecen del catálogo; los bonos ya vendidos conservan su saldo.",
+    "deletePackageHint": "el paquete y sus {count} línea(s) salen del catálogo y ya no se pueden vender; los bonos ya vendidos se siguen pudiendo gastar y los encuentras filtrando Estado por Eliminado.",
     "errorPackageNoLines": "Añade al menos un servicio: un paquete sin líneas no se puede canjear.",
     "errorSavePackage": "No se pudo guardar el paquete",
     "errorDeletePackage": "No se pudo eliminar el paquete",

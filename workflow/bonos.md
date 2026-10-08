@@ -31,7 +31,7 @@ Implicados: REC_PELUQUERIA-F04, REC_PELUQUERIA-F13
 QA: BD-05, B-08
 
 ### SERVICES-F13 Editar o eliminar un bono
-Estado: parcial — eliminar un bono del catálogo deja sus bonos vendidos sin poder gastarse en el cobro y sin poder abrir sus «Bonos vendidos» ni sus «Movimientos», aunque el aviso dice que «conservan su saldo» (services#153); el texto de edición manda «archivar» un bono y no hay archivar, solo **Eliminar**; un bono no se puede desactivar desde la pantalla
+Estado: parcial — el texto de edición manda «archivar» un bono y no hay archivar, solo **Eliminar**; un bono no se puede desactivar desde la pantalla
 Actor: responsable, administrador
 Pantalla: Bonos y paquetes
 Pasos:
@@ -39,15 +39,22 @@ Pasos:
    Precio cerrado, Vigencia (días) o Usos; las líneas no se pueden cambiar («Los servicios incluidos
    no se cambian una vez creado: archiva este paquete y crea uno nuevo.»). Pulsa **Guardar cambios**.
 2. Para quitarlo del catálogo (administrador), pulsa **Eliminar** en la fila y confirma en «Eliminar
-   paquete».
+   paquete» («… salen del catálogo y ya no se pueden vender; los bonos ya vendidos se siguen pudiendo
+   gastar y los encuentras filtrando Estado por Eliminado.»).
+3. Para ver después lo vendido de un bono eliminado, pon el filtro de Estado en **Eliminado**: salen
+   los bonos eliminados que alguien compró, con **Movimientos** y **Bonos vendidos** (tocar la fila
+   abre **Bonos vendidos**); ni **Editar** ni **Eliminar**. Quitar el filtro vuelve al catálogo.
 Entra: el bono del catálogo.
 Sale: al editar, el bono cambiado (`services.package.updated`); «Usos» y «Vigencia (días)» solo
 valen para las ventas futuras: los bonos ya vendidos conservan lo que se vendió. El nombre nuevo se
 ve también en los bonos ya vendidos. Al eliminar, el bono y sus líneas salen del catálogo
-(`services.package.deleted`); sus bonos vendidos dejan de ofrecerse en el cobro, gastarlos se
-rechaza con «Ese paquete no existe en este negocio.» y solo siguen visibles en **Bonos sin cliente**
-(si su clienta se eliminó) y cuando se le pregunta al asistente por los bonos de la clienta
-(SERVICES-F15).
+(`services.package.deleted`) y ya no se pueden vender (ni en un tique ni concediéndolo a mano,
+SERVICES-F14). Sus bonos ya vendidos siguen siendo de sus clientas, como en Square, Fresha, Booksy,
+Mindbody o Vagaro: se ofrecen en el cobro y se gastan igual (SERVICES-F21, SERVICES-F22), solo en los
+servicios con que se vendieron, hasta que se agoten o caduquen; se devuelven, anulan y ajustan igual
+(SERVICES-F17, SERVICES-F18, SERVICES-F26, SERVICES-F27; leído en el código: ninguna de esas órdenes
+mira el estado del catálogo). Lo mismo vale para un bono desactivado por
+la API. Un bono eliminado que nadie compró ya no sale en ninguna vista.
 Si falla: «No se pudo guardar el paquete» en el panel o «No se pudo eliminar el paquete» arriba. Si
 el bono ya se eliminó en otro dispositivo, **Eliminar** vuelve a responder bien y no avisa de nada, y
 **Guardar cambios** se rechaza con un texto técnico del validador («payload inválido para
@@ -101,7 +108,7 @@ Pantalla: asistente
 Pasos:
 1. Pregunta al asistente por los bonos de la clienta: responde una fila por compra, con el bono,
    cuándo se compró, lo pagado, las sesiones usadas y las que quedan, cuándo caduca y si ya caducó.
-   También salen los de un bono eliminado del catálogo, que ya no se pueden gastar (SERVICES-F13).
+   También salen los de un bono eliminado del catálogo, que se siguen gastando (SERVICES-F13).
 2. En el cobro, el hueco de cada línea de servicio enseña los bonos de esa clienta que cubren ese
    servicio, con las sesiones que quedan y la caducidad (SERVICES-F22).
 3. En **Bonos y paquetes → Bonos vendidos** se ve cada compra de un bono concreto (SERVICES-F16).
@@ -116,7 +123,8 @@ Estado: hecho
 Actor: empleado, cajero, responsable
 Pantalla: Bonos y paquetes
 Pasos:
-1. En la fila del bono pulsa **Bonos vendidos**.
+1. En la fila del bono pulsa **Bonos vendidos** (de un bono eliminado, con el filtro de Estado en
+   **Eliminado**, SERVICES-F13).
 2. Sale una fila por compra, la más reciente primero: **Activo** o **Anulado**, «Cliente: <nombre>»,
    fecha, importe, «{used} usadas · quedan {remaining}» (o «· sin límite»), la venta, «Caduca el …»
    o «No caduca» y, si se regaló o corrigió algo después, «Regalado después: …» o «Corregido después:
@@ -184,7 +192,8 @@ Estado: hecho
 Actor: empleado, cajero, responsable
 Pantalla: Bonos y paquetes
 Pasos:
-1. En la fila del bono pulsa **Movimientos**.
+1. En la fila del bono pulsa **Movimientos** (de un bono eliminado, con el filtro de Estado en
+   **Eliminado**, SERVICES-F13).
 2. Sale cada movimiento de ese bono, de todas sus clientas, el más reciente primero: **Reservada**
    (en un cobro sin cerrar), **Entregada**, **Liberada** (deshecha antes de cobrar), **Caducada**
    (reservada y nunca cobrada), **Devuelta** (con «Devuelta por {who} el {when}» y el documento de

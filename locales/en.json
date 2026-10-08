@@ -62,7 +62,8 @@
     "status": {
       "active": "Active",
       "inactive": "Archived",
-      "unconfigured": "Not configured"
+      "unconfigured": "Not configured",
+      "retired": "Deleted"
     },
     "statusReason": {
       "unconfigured": "No tax category: it cannot be charged"
@@ -139,7 +140,7 @@
     "emptyPackages": "No packages.",
     "editingPackageTitle": "Editing package",
     "deletePackageTitle": "Delete package",
-    "deletePackageHint": "the package and its {count} line(s) disappear from the catalogue; vouchers already sold keep their balance.",
+    "deletePackageHint": "the package and its {count} line(s) leave the catalogue and can no longer be sold; vouchers already sold can still be spent, and you find them filtering Status by Deleted.",
     "errorPackageNoLines": "Add at least one service: a package with no lines cannot be redeemed.",
     "errorSavePackage": "Could not save the package",
     "errorDeletePackage": "Could not delete the package",

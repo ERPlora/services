@@ -11,7 +11,8 @@ Pantalla: Ventas: Cobro
 Pasos:
 1. Con la clienta asignada a la cuenta, abre el cobro. En «Líneas pagadas de otra forma», cada línea
    de servicio enseña el hueco de Servicios con los bonos de esa clienta que cubren ese servicio,
-   tienen sesiones y no han caducado (una línea de varias unidades se separa antes, SALES-F27).
+   tienen sesiones y no han caducado, también los de un bono ya eliminado del catálogo (SERVICES-F13)
+   (una línea de varias unidades se separa antes, SALES-F27).
 2. Viene elegido el bono que se gasta primero, con el porqué: primero uno con sesiones contadas antes
    que uno ilimitado, después el que antes caduca, el ya empezado, al que le quedan menos sesiones y
    el comprado antes. Con dos o más dice «{count} bonos válidos». Toca otra tarjeta para gastar otro.

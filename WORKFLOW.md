@@ -79,8 +79,10 @@ categoría») o arriba de la tabla («No se pudo eliminar la categoría»).
 
 ### Bonos y paquetes
 Menú → **Servicios** → pestaña **Bonos y paquetes**. Arriba, **Bonos sin cliente** (solo
-responsable y administrador). Tabla con Nombre, Descuento, Precio cerrado, Líneas y Estado (Activo o
-Archivado). Buscador «Buscar paquete…». **Nuevo paquete** abre el panel con Nombre, Tipo de
+responsable y administrador). Tabla con Nombre, Descuento, Precio cerrado, Líneas y Estado (Activo,
+Archivado o Eliminado). Buscador «Buscar paquete…». El filtro de Estado en **Eliminado** cambia a la
+vista de los bonos eliminados del catálogo que alguien compró: por fila solo **Movimientos** y **Bonos
+vendidos**, y tocar la fila abre **Bonos vendidos**. **Nuevo paquete** abre el panel con Nombre, Tipo de
 descuento (Porcentaje o Importe fijo), Descuento (%) o Descuento (importe), Precio cerrado («Déjalo
 vacío para que valga la suma de sus líneas menos el descuento.»), Vigencia (días) («Días canjeable
 desde la COMPRA; vacío = no caduca.»), Usos («Usos que concede el bono; vacío = ilimitados.») y
@@ -88,7 +90,8 @@ desde la COMPRA; vacío = no caduca.»), Usos («Usos que concede el bono; vací
 servicio**; botón **Crear paquete**. Al editar, en lugar de las líneas sale «Los servicios incluidos
 no se cambian una vez creado: archiva este paquete y crea uno nuevo.». Por fila: **Editar**,
 **Movimientos**, **Bonos vendidos** y **Eliminar** (con «Eliminar paquete»: «<nombre> — el paquete y
-sus {count} línea(s) desaparecen del catálogo; los bonos ya vendidos conservan su saldo.»).
+sus {count} línea(s) salen del catálogo y ya no se pueden vender; los bonos ya vendidos se siguen
+pudiendo gastar y los encuentras filtrando Estado por Eliminado.»).
 Vacía: «No hay paquetes.» · Cargando: «Cargando…» · Rechazos en el panel («No se pudo guardar el
 paquete», «Añade al menos un servicio: un paquete sin líneas no se puede canjear.») o arriba («No se
 pudo eliminar el paquete»).
@@ -276,8 +279,9 @@ gramática y el mismo prefijo. Antes de tocar código, lee el fichero del flujo 
   SERVICES-F06); una lectura nunca cruza de negocio.
 - **Un nombre de categoría por negocio** (sin distinguir mayúsculas ni espacios).
 - **Solo se gasta un bono comprado** (sin compra no hay nada que gastar), en el cobro solo en los
-  servicios que incluye, y nunca agotado, caducado, anulado ni con su bono del catálogo eliminado o
-  desactivado.
+  servicios que incluye, y nunca agotado, caducado ni anulado. Eliminar o desactivar el bono del
+  catálogo deja de **venderlo**, no de gastarlo: lo vendido se sigue gastando, con los servicios con
+  que se vendió.
 - **Una línea, una sesión:** la misma línea de la misma cuenta no se cubre dos veces.
 - **Dos cajas sobre el mismo bono van en fila**, y la que llega tarde recibe el motivo real.
 - **Lo cobrado no se deshace:** una sesión de una venta cobrada no se suelta; solo vuelve por una
@@ -314,8 +318,6 @@ gramática y el mismo prefijo. Antes de tocar código, lee el fichero del flujo 
   formulario pide las dos cosas.
 - ¿Cómo se vende un bono en el TPV: como baldosa propia, a su precio cerrado o con su descuento? Hoy
   el TPV no lo ofrece y «Descuento» y «Precio cerrado» no se usan en ningún cobro.
-- ¿Eliminar o desactivar un bono del catálogo debe dejar de servir los ya vendidos? Hoy deja de
-  servirlos y el aviso de borrado dice lo contrario.
 - ¿Se ocultan los ajustes que no cambian nada o se hacen efectivos desde la pantalla?
 - ¿El paso «Tu catálogo de servicios» debe exigir un servicio con categoría fiscal?
 
@@ -323,7 +325,6 @@ gramática y el mismo prefijo. Antes de tocar código, lee el fichero del flujo 
 Contra el código de `origin/main` (v1.5.71), una línea por discrepancia:
 - `docs/screens.md` («Create a service»): describe tarifa, precio mínimo y máximo, márgenes, capacidad, reservable, confirmación, reserva online, SKU, código de barras, imagen y destacado en el alta; la pantalla solo pide Nombre, Precio, Duración (min), Categoría y Categoría fiscal (SERVICES-F01, SERVICES-F03).
 - `docs/screens.md` (ajustes): «Default tax category — the category used by services that do not set one», «Show prices, show duration — what the public-facing surfaces display», «Online booking», «Tax included»; nada lee la categoría por defecto, mostrar precios, mostrar duración, IVA incluido ni la moneda, y la duración, el margen y la reserva online por defecto solo cuentan en altas por el asistente o la API (SERVICES-F11).
-- `docs/screens.md` y la frase de `locales/es.json` del aviso de borrado de bono: «vouchers already sold keep their balance» / «los bonos ya vendidos conservan su saldo»; el saldo se conserva pero ya no se puede gastar en el cobro ni se ve en «Bonos vendidos» (SERVICES-F13).
 - `docs/screens.md` y `hand-book/modulos/services.md` («the voucher goes on the ticket like any other line», «En el TPV… añadir el bono al ticket»): el TPV no ofrece bonos; venderlo solo se puede por el asistente o la API (SERVICES-F14).
 - `docs/screens.md` («done once there is at least one sellable service»): el paso de arranque cuenta también los servicios sin categoría fiscal, que no se pueden cobrar.
 - `docs/screens.md` («a cashier who cannot refund never sees the hole»): el hub no filtra los huecos por el permiso que declara el módulo; con los perfiles de fábrica no se nota porque **Devolver** solo lo abren responsable y administrador.
@@ -332,7 +333,7 @@ Contra el código de `origin/main` (v1.5.71), una línea por discrepancia:
 - `docs/limits.md`, `docs/overview.md`, `docs/concepts.md` y `architecture/modules/services.md` dicen que el hub valida la categoría fiscal contra Impuestos al guardar; el alta y la edición solo exigen que no esté vacía (lo mismo dice TAXES-F19).
 - `docs/concepts.md` («Leave it empty and the service falls back to the hub's default tax category») y `architecture/modules/services.md` (categoría por defecto «para servicios sin categoría propia»): un servicio no se puede guardar sin categoría y nada lee la de los ajustes.
 - `docs/concepts.md` («Deleting one cascades to its descendants»): eliminar una categoría no toca sus subcategorías, que siguen vivas con un padre eliminado (SERVICES-F08).
-- `docs/concepts.md` («deleting a package does not currently cascade the soft-delete to its lines») y («Variants and add-ons exist in the data»): desactualizados; las líneas se borran con el bono y las variantes y extras se retiraron.
+- `docs/concepts.md` («Variants and add-ons exist in the data»): desactualizado; las variantes y extras se retiraron.
 - `docs/overview.md` («the clock runs from the customer's first live use, so returning the use that started it un-starts it»): la caducidad cuenta desde la compra (ADR-0390) y devolver una sesión no la mueve (SERVICES-F20).
 - `schemas/package_create.json` y `schemas/package_update.json` (`validity_days`: «after its first use»): la vigencia cuenta desde la compra, que es lo que lee el asistente al crear o editar un bono (SERVICES-F20).
 - `docs/overview.md` (eventos que escucha): solo nombra la venta cobrada, la anulada y la devuelta; también escucha quitar una línea y anular una cuenta de Ventas, y eliminar, anonimizar y unir fichas de Clientes.
