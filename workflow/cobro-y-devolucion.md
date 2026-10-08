@@ -148,7 +148,8 @@ Pasos:
 4. Cada bono vendido en ese tique se anula, se haya usado o no (services#157): como con **Anular** en
    **Bonos vendidos** (SERVICES-F17), con «Anulado por {who} el {when}» y el motivo de la anulación.
    Las sesiones ya usadas siguen usadas y las que quedaban se pierden: el dinero vuelve, así que el
-   bono se va con él. Lo mismo hace la devolución entera de la venta (SERVICES-F14).
+   bono se va con él. Lo mismo hace la devolución entera de la venta, o la de la línea del bono
+   (SERVICES-F14).
 Entra: la venta anulada, quién la anuló y el motivo (avisa Ventas: `sale.voided`); las sesiones
 gastadas en esa venta y los bonos vendidos en ella.
 Sale: las sesiones de vuelta en su bono y los bonos vendidos en esa venta anulados. Una sesión ya
