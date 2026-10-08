@@ -721,6 +721,25 @@ def returned_line_voids_its_voucher(
         ),
     )
     check(
+        "… each of its lines answered by its own voucher",
+        "li-a,li-b",
+        db.scalar(
+            "SELECT string_agg(void_sale_item_id, ',' ORDER BY void_sale_item_id) "
+            "FROM services_package_grant WHERE void_refund_id = 'ref-line-2b'"
+        ),
+    )
+    check(
+        "… so redelivering that two-line refund voids none of the live ones",
+        0,
+        refund_sale(
+            db,
+            sale2,
+            fully_refunded=False,
+            lines=[line("li-a", pkg), line("li-b", pkg)],
+            refund_id="ref-line-2b",
+        ),
+    )
+    check(
         "a later refund of another line takes the next voucher, not one already voided",
         1,
         refund_sale(
