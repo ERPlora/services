@@ -7,9 +7,11 @@ import esLocale from '../../../locales/es.json';
 import enLocale from '../../../locales/en.json';
 const CATALOG: Record<string, unknown> = { es: esLocale, en: enLocale };
 
-// What happens to a voucher when the sale that sold it is voided or refunded in full (services#157).
+// What happens to a voucher when the sale that sold it is voided or refunded (services#157,
+// services#158).
 //
-// Both void the voucher, used or not (`sale_void_grants.sql`, `sale_refund_grants.sql`): the money
+// Voiding the sale, refunding it in full, or refunding the voucher's line void the voucher, used or
+// not (`sale_void_grants.sql`, `sale_refund_grants.sql`, `sale_refund_line_grants.sql`): the money
 // goes back, so the voucher goes with it — the sessions already used stay used and what was left is
 // lost. That is the market's rule (MyTime, Square, Lightspeed void what is left; WooCommerce leaving
 // it live is the complaint), and the operator has to read it BEFORE confirming, not find it later
@@ -49,7 +51,7 @@ export class ErpServicesSaleReversal extends LitElement {
 
   /** The sale about to be voided or refunded. */
   @property({ type: String, attribute: 'sale-id' }) saleId = '';
-  /** Which door hosts the hole: 'void' or 'refund' (only a FULL refund voids the voucher). */
+  /** Which door hosts the hole: 'void' or 'refund' (a full refund, or one that returns the voucher's line, voids it). */
   @property({ type: String }) action = 'void';
 
   @state() vouchers: SoldVoucher[] = [];

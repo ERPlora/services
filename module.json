@@ -164,7 +164,8 @@
       "migrations/postgres/017_category_name_gate.sql",
       "migrations/postgres/018_grant_void.sql",
       "migrations/postgres/019_grant_adjustment.sql",
-      "migrations/postgres/020_redeem_refusal_gate.sql"
+      "migrations/postgres/020_redeem_refusal_gate.sql",
+      "migrations/postgres/021_grant_void_by_refund_line.sql"
     ]
   },
   "queries": {
@@ -1198,7 +1199,8 @@
       "transaction": true,
       "sql": [
         "commands/sale_void_lock.sql",
-        "commands/sale_refund_grants.sql"
+        "commands/sale_refund_grants.sql",
+        "commands/sale_refund_line_grants.sql"
       ]
     },
     "services._on_customer_deleted": {

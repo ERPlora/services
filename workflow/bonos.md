@@ -64,7 +64,7 @@ Implicados: SALES-F27
 QA: BD-05, B-08
 
 ### SERVICES-F14 Vender un bono a una clienta
-Estado: parcial — no hay pantalla: el TPV no ofrece los bonos como artículo y no hay botón de venta manual; solo con el asistente o la API (cobrando un tique con la línea del bono marcada como servicio, o con la concesión manual); y devolver solo una parte de la venta del bono no lo anula, aunque lo devuelto sea justo el bono: Ventas devuelve dinero, no líneas, así que solo la devolución que deja la venta **Devuelta** del todo dice que el bono ha vuelto (services#158)
+Estado: parcial — no hay pantalla: el TPV no ofrece los bonos como artículo y no hay botón de venta manual; solo con el asistente o la API (cobrando un tique con la línea del bono marcada como servicio, o con la concesión manual)
 Actor: cajero, responsable, asistente
 Pantalla: asistente
 Pasos:
@@ -76,7 +76,7 @@ Pasos:
    importe si los hay, para un bono entregado fuera del TPV.
 3. El bono aparece en **Bonos vendidos** de ese bono (SERVICES-F16) y en el hueco del cobro de esa
    clienta (SERVICES-F22).
-Entra: la venta cobrada con su clienta y sus líneas (Ventas) o la petición de concesión; el bono del catálogo, activo. Después, la anulación o la devolución de esa venta (avisa Ventas: `sale.voided`, `sale.refunded`).
+Entra: la venta cobrada con su clienta y sus líneas (Ventas) o la petición de concesión; el bono del catálogo, activo. Después, la anulación o la devolución de esa venta (avisa Ventas: `sale.voided`, `sale.refunded` con las líneas devueltas).
 Sale: un bono vendido por unidad, con la titular, la fecha, la venta, el importe y los «Usos» y la
 «Vigencia (días)» del catálogo congelados; la caducidad cuenta desde ese momento. La concesión manual
 avisa (`services.package.granted`); la que nace de la venta cobrada, no. Repetir el aviso de la
@@ -93,11 +93,14 @@ del bono lo anula solo, con quien anuló la venta, la hora y su motivo, **aunque
 sesiones usadas siguen usadas (también una retenida en una caja en ese momento) y las que quedaban se
 pierden, porque el dinero vuelve. Devolver la venta del bono **entera** hace lo mismo: cuando la
 devolución que deja la venta **Devuelta** llega a Servicios (`sale.refunded`), el bono se anula solo,
-con quien devolvió, la hora y el motivo de la devolución. Antes de confirmar, las ventanas **Anular
-venta** y **Devolver** dicen qué le pasará a cada bono (Aviso al anular o devolver la venta de un
-bono). Una devolución de solo una parte no lo anula (Ventas no dice qué líneas vuelven): hay que
-anularlo en **Bonos vendidos** si no se ha usado (SERVICES-F17) o corregirlo con **Ajustar**
-(SERVICES-F18).
+con quien devolvió, la hora y el motivo de la devolución. Devolver **solo la línea del bono** de un
+tique con más cosas (marcándola en «Qué se devuelve» de **Devolver**, SALES-F31) también lo anula,
+igual y aunque se haya usado: uno por unidad devuelta y, de dos bonos iguales vendidos en esa venta,
+primero el que no se ha usado; devolver otra línea (el corte) no lo toca, y repetir el aviso no anula
+otro (services#158). Antes de confirmar, las ventanas **Anular venta** y **Devolver** dicen qué le
+pasará a cada bono (Aviso al anular o devolver la venta de un bono). Una devolución de solo dinero,
+sin marcar ninguna línea, no lo anula: hay que anularlo en **Bonos vendidos** si no se ha usado
+(SERVICES-F17) o corregirlo con **Ajustar** (SERVICES-F18).
 Implicados: SALES-F01, SALES-F30, SALES-F31, REC_PELUQUERIA-F13, REC_PELUQUERIA-F14
 QA: B-08, BD-05 (discrepa)
 
@@ -144,7 +147,8 @@ Pantalla: Bonos y paquetes
 Pasos:
 1. En **Bonos vendidos**, en la compra equivocada (a otra clienta, otro bono, cobrado dos veces),
    pulsa **Anular**. Solo sale si no se ha gastado ni reservado ninguna sesión de ese bono (uno ya
-   usado se anula anulando o devolviendo entera su venta, SERVICES-F27, o se corrige con **Ajustar**).
+   usado se anula anulando su venta, devolviéndola entera o devolviendo la línea del bono, SERVICES-F27 y
+   SERVICES-F14, o se corrige con **Ajustar**).
 2. Lee «¿Anular este bono?»: «El bono del cliente {customer} ({amount}) deja de poder usarse y queda
    en la lista como anulado. El dinero no se devuelve aquí: si se cobró, devuelve la venta desde
    Ventas con una devolución.».

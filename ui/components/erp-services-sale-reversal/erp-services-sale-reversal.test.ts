@@ -1,7 +1,8 @@
-// services#157 — what the till says about a voucher BEFORE its sale is voided or refunded in full.
+// services#157 — what the till says about a voucher BEFORE its sale is voided or refunded.
 //
 // Voiding the sale, or refunding it in full, voids every voucher sold on it, used or not
-// (`sale_void_grants.sql`, `sale_refund_grants.sql`). `sales` cedes the hole
+// (`sale_void_grants.sql`, `sale_refund_grants.sql`); refunding the voucher's line voids that one
+// (`sale_refund_line_grants.sql`, services#158). `sales` cedes the hole
 // `sales.reversal.notice` in its void and refund windows and hands the filler two properties:
 // `saleId` and `action` ('void' | 'refund'). This element reads `services.packages.sold_on_sale`
 // and paints one warning per voucher.
@@ -88,7 +89,7 @@ describe('erp-services-sale-reversal — the voucher warning before a void or a 
     expect(notice(el, 'g-1')?.getAttribute('tone')).toBe('warning');
   });
 
-  it('refund: the same, worded for a refund (only a FULL one voids it)', async () => {
+  it('refund: the same, worded for a refund (a full one, or one returning its line)', async () => {
     rows = [INTACT, USED, UNLIMITED];
     const el = await mount({ action: 'refund' });
     expect(notice(el, 'g-1')?.textContent?.trim()).toBe('ui.saleReversal.refund.intact:{"name":"Bono 5 cortes"}');
@@ -185,6 +186,19 @@ describe('erp-services-sale-reversal — the voucher warning before a void or a 
       }
       expect(typeof r.loadFailed).toBe('string');
       expect(typeof r.btnRetry).toBe('string');
+    }
+  });
+
+  // services#158: returning the voucher's line voids it too, so the refund copy must not promise
+  // that a partial refund leaves it, and must point at the list where that line is marked.
+  it('refund copy: returning the voucher\'s line voids it too, in en AND es', () => {
+    const where = { en: 'What goes back', es: 'Qué se devuelve' };
+    for (const [lang, cat] of [['en', enLocale], ['es', esLocale]] as Array<[keyof typeof where, { ui: Record<string, unknown> }]>) {
+      const refund = (cat.ui.saleReversal as Record<string, Record<string, string>>).refund;
+      for (const k of ['intact', 'used', 'usedNoMore']) {
+        expect(refund[k], `${lang} refund.${k}`).not.toMatch(/partial refund leaves|devolución parcial no lo toca/i);
+        expect(refund[k], `${lang} refund.${k}`).toContain(where[lang]);
+      }
     }
   });
 });
