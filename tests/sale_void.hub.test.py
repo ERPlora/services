@@ -178,12 +178,36 @@ def charge(
     return order_id, order_line["id"], payload
 
 
+def charge_lines(hub: Hub, lines: list[dict], customer_id: str) -> dict:
+    """A check opened with several `lines`, charged whole by card: the `complete_sale` payload,
+    built as `charge` builds it for one line."""
+    order_id = hub.run("sales.order.open", {"items": lines})["new_ids"][0]
+    rows = hub.query("sales.order.lines", {"order_id": order_id})
+    _, _, payload = charge(hub, lines[0], customer_id)
+    template = payload["items"][0]
+    payload["order_id"] = order_id
+    payload["items"] = [
+        {
+            **template,
+            **{k: v for k, v in line.items() if k not in ("notes", "modifiers", "staff_id")},
+            "order_item_id": next(
+                r["id"] for r in rows if r.get("product_id") == line["product_id"]
+            ),
+        }
+        for line in lines
+    ]
+    return payload
+
+
 def complete(hub: Hub, payload: dict) -> str:
     return hub.run("sales.complete_sale", payload)["new_ids"][0]
 
 
-def refund(hub: Hub, sale_id: str, amount: int, reason: str) -> None:
-    """`sales.refund` of `amount` cents back to the card leg it was charged on (SALES-F31)."""
+def refund(
+    hub: Hub, sale_id: str, amount: int, reason: str, lines: list[str] | None = None
+) -> None:
+    """`sales.refund` of `amount` cents back to the card leg it was charged on (SALES-F31), giving
+    back the sale `lines` named (services#158)."""
     legs = hub.query("sales.refund_options", {"sale_id": sale_id})
     if not legs:
         raise AssertionError(f"sale {sale_id} has no leg to refund")
@@ -194,6 +218,7 @@ def refund(hub: Hub, sale_id: str, amount: int, reason: str) -> None:
             "reason": reason,
             "idempotency_key": f"services-154-{uuid.uuid4().hex[:8]}",
             "allocations": [{"payment_id": legs[0]["payment_id"], "amount": amount}],
+            **({"lines": [{"line_id": li} for li in lines]} if lines else {}),
         },
     )
 
@@ -592,9 +617,80 @@ def main() -> int:
         "… with the refund's reason", kept.get("void_reason"), f"Devuelta {run}"
     )
 
+    print(
+        "7 · a ticket with a haircut and a voucher: returning only the voucher's line voids the"
+        " voucher (services#158)"
+    )
+    line_buyer = tag("cust-line")
+    line_package = create_package(
+        hub, f"Bono por línea {run}", max_uses=5, validity_days=None, service_id=service_id
+    )
+    line_sale = complete(
+        hub,
+        charge_lines(
+            hub,
+            [
+                sale_line(service_id, "Corte", PRICE, is_service=True),
+                sale_line(line_package, f"Bono por línea {run}", 10000, is_service=True),
+            ],
+            line_buyer,
+        ),
+    )
+    line_rows = wait_until(
+        lambda: [
+            r
+            for r in hub.query("services.packages.grants", {"package_id": line_package})
+            if r.get("sale_id") == line_sale
+        ],
+        lambda rows: len(rows) == 1,
+    )
+    hub.check("the two-line ticket minted one voucher", len(line_rows), 1)
+    line_grant = line_rows[0]["grant_id"] if line_rows else ""
+    sold = {r["product_id"]: r["id"] for r in hub.query("sales.lines", {"sale_id": line_sale})}
+    refund(hub, line_sale, PRICE, f"Corte {run}", lines=[sold.get(service_id, "")])
+    hub.check(
+        "returning the haircut's line reached the listener",
+        wait_until(
+            lambda: deliveries_to(
+                hub, "services._on_sale_refunded", "sale.refunded", line_sale
+            ),
+            lambda n: n >= 1,
+        ),
+        1,
+    )
+    hub.check(
+        "… and leaves the voucher live: it was not the voucher's line",
+        (grant_row(hub, line_package, line_grant) or {}).get("status"),
+        "active",
+    )
+    line_reason = f"Devuelve el bono {run}"
+    refund(hub, line_sale, 5000, line_reason, lines=[sold.get(line_package, "")])
+    by_line = wait_until(
+        lambda: grant_row(hub, line_package, line_grant) or {},
+        lambda g: g.get("status") == "voided",
+    )
+    hub.check(
+        "returning the voucher's line voids it, with part of the money still on the sale",
+        by_line.get("status"),
+        "voided",
+    )
+    hub.check("… with that refund's reason", by_line.get("void_reason"), line_reason)
+    hub.check("… signed by whoever refunded it", by_line.get("voided_by"), hub.user)
+    hub.check_true(
+        "the customer cannot spend the returned voucher any more",
+        not any(
+            r.get("grant_id") == line_grant
+            for r in hub.query(
+                "services.packages.tender_options",
+                {"customer_id": line_buyer, "service_id": service_id},
+            )
+        ),
+    )
+
     return hub.finish(
         "a paid sale spends only the sessions of the lines the voucher paid; voiding it gives them"
-        " back and voids the vouchers it sold, used or not; refunding it in full voids them too"
+        " back and voids the vouchers it sold, used or not; refunding it in full, or returning the"
+        " voucher's line, voids them too"
     )
 
 
