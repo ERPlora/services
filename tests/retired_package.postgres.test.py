@@ -246,6 +246,30 @@ def catalogue(db: ScratchDb, hub: str = HUB, **params) -> dict[str, str]:
     }
 
 
+def lines_of(db: ScratchDb, hub: str = HUB, **params) -> dict[str, int]:
+    """`{name: items}` — the «Líneas» column of what `services.packages.list` answers."""
+    return {
+        r["name"]: int(r["items"])
+        for r in db.run_query("services.packages.list", params, hub=hub)
+    }
+
+
+def forge_foreign_line(db: ScratchDb, package_id: str, service_id: str) -> None:
+    """A LIVE line in OTHER_HUB that points at a package id of HUB — the only way a count read
+    without `hub_id` would answer differently from the one read with it."""
+    db.psql(
+        [],
+        db=db.name,
+        stdin=(
+            "CREATE TEMP TABLE forged AS SELECT * FROM services_packageitem "
+            f"WHERE package_id = '{package_id}' LIMIT 1;\n"
+            f"UPDATE forged SET id = '{uuid.uuid4()}', hub_id = '{OTHER_HUB}', "
+            f"service_id = '{service_id}', is_deleted = 0;\n"
+            "INSERT INTO services_packageitem SELECT * FROM forged;\n"
+        ),
+    )
+
+
 def main() -> int:
     if not container_available():
         print("SKIPPED — no Postgres test container")
@@ -346,7 +370,11 @@ def main() -> int:
             "retired",
             catalogue(db, include_retired="1").get("Bono 5 cortes"),
         )
-        _ = live
+        check(
+            "a retired package still counts the lines it was sold with (deleted with it)",
+            {"Bono vivo": 1, "Bono desactivado": 1, "Bono 5 cortes": 1},
+            lines_of(db, include_retired=1),
+        )
 
         print(
             "\nF. «Bonos vendidos» and «Movimientos» of a retired package still answer"
@@ -382,6 +410,17 @@ def main() -> int:
             offered(db, "cus-alice", foreign_cut),
         )
         check("…nor redeemable from here", (0, "no_grant"), precheck(db, neighbour))
+        forge_foreign_line(db, deleted, foreign_cut)
+        forge_foreign_line(db, live, foreign_cut)
+        check(
+            "a neighbour's line pointing at our packages is not counted as ours",
+            {"Bono vivo": 1, "Bono 5 cortes": 1},
+            {
+                k: v
+                for k, v in lines_of(db, include_retired=1).items()
+                if k in ("Bono vivo", "Bono 5 cortes")
+            },
+        )
 
         print("\nH. the refusal statement on its own: a retired package's line still covers")
         # `alice` has sessions left, no deadline passed and her package's lines were deleted with
