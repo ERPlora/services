@@ -270,6 +270,21 @@ def forge_foreign_line(db: ScratchDb, package_id: str, service_id: str) -> None:
     )
 
 
+def forge_foreign_grant(db: ScratchDb, grant_id: str, package_id: str) -> None:
+    """A copy of OTHER_HUB's `grant_id` that points at a package id of HUB — the only way a
+    «was it ever sold?» read without `hub_id` would answer differently from the one read with it."""
+    db.psql(
+        [],
+        db=db.name,
+        stdin=(
+            "CREATE TEMP TABLE forged_grant AS SELECT * FROM services_package_grant "
+            f"WHERE id = '{grant_id}';\n"
+            f"UPDATE forged_grant SET id = '{uuid.uuid4()}', package_id = '{package_id}';\n"
+            "INSERT INTO services_package_grant SELECT * FROM forged_grant;\n"
+        ),
+    )
+
+
 def main() -> int:
     if not container_available():
         print("SKIPPED — no Postgres test container")
@@ -421,8 +436,17 @@ def main() -> int:
                 if k in ("Bono vivo", "Bono 5 cortes")
             },
         )
+        forge_foreign_grant(db, neighbour, never_sold)
+        check(
+            "a neighbour's sale pointing at our never-sold deleted package does not list it",
+            None,
+            catalogue(db, include_retired=1).get("Bono nunca vendido", None),
+        )
 
-        print("\nH. the refusal statement on its own: a retired package's line still covers")
+        print(
+            "\nH. the refusal statement on its own: a retired package's line still covers"
+        )
+
         # `alice` has sessions left, no deadline passed and her package's lines were deleted with
         # it. Every rule says yes, yet the statement runs alone (the INSERT «wrote nothing»): the
         # closed fallback names it. Reading coverage through the DELETED lines as missing would
