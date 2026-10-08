@@ -5,7 +5,7 @@ Prefijo: SERVICES
 ## Flujos
 
 ### SERVICES-F22 Pagar una línea con un bono
-Estado: parcial — el servidor de Ventas da por pagada con bono la línea que diga el cobro, sin preguntar a Servicios, así que por el asistente o la API una línea se cobra a 0 sin sesión detrás (SALES-F27, sales#539); si la cuenta se divide o se une a otra, la sesión retenida se queda en la cuenta original hasta que vuelve sola al cabo de un día (ver Si falla, sales#540, leído en el código, sin ejecutar); y al recargar la pantalla la cuenta pierde la clienta, así que el hueco no sale hasta que se vuelve a asignar (customers#135; si se cobra antes, la línea se cobra con dinero y la sesión vuelve al bono: no se paga dos veces)
+Estado: parcial — el servidor de Ventas da por pagada con bono la línea que diga el cobro, sin preguntar a Servicios, así que por el asistente o la API una línea se cobra a 0 sin sesión detrás (SALES-F27, sales#539); si la cuenta se divide o se une a otra, la sesión retenida se queda en la cuenta original hasta que vuelve sola al cabo de un día (ver Si falla, sales#540, leído en el código, sin ejecutar); y al aparcar una cuenta con clienta, la cuenta siguiente sale a su nombre y el hueco le ofrece su bono (sales#557)
 Actor: cajero, empleado, responsable
 Pantalla: Ventas: Cobro
 Pasos:
@@ -21,10 +21,10 @@ Pasos:
 5. Cobra lo demás con su medio (SERVICES-F24). Si se cierra la hoja y se vuelve a abrir sin salir de
    la cuenta, la línea sigue cubierta. Si se aparca la cuenta y se vuelve a ella, el hueco enseña
    «{name}: sesión gastada. Quedan {after}.» con **Deshacer** y la línea vuelve a salir cubierta: el
-   cobro no la cobra. Si se recarga la pantalla, la cuenta pierde la clienta (CUSTOMERS-F17, customers#135) y el
-   hueco no sale: al volver a asignarla, el hueco recupera la sesión gastada y la línea vuelve a salir
-   cubierta. Si se cobra sin asignarla, la línea se cobra a su precio y esa sesión vuelve al bono en
-   vez de gastarse: la clienta nunca paga el servicio y la sesión a la vez.
+   cobro no la cobra. Si se recarga la pantalla, la cuenta vuelve con su clienta (CUSTOMERS-F17) y el
+   hueco recupera la sesión gastada: la línea vuelve a salir cubierta. Si se cobra sin clienta (no se
+   pudo leer o se quitó), la línea se cobra a su precio y esa sesión vuelve al bono en vez de
+   gastarse: la clienta nunca paga el servicio y la sesión a la vez.
 Entra: la clienta, la cuenta, la línea y su servicio (Ventas); los bonos comprados por la clienta (Servicios).
 Sale: una sesión **Reservada** para esa línea durante un día (`services.package.held`), que ya no
 se puede gastar en otra; el aviso al cobro de que la línea está cubierta. No emite documento fiscal:
@@ -43,7 +43,7 @@ de un día; mientras tanto cuenta como reservada en el saldo. Si se
 juntan dos cuentas, la absorbida se anula sin aviso y su sesión retenida no se gasta al cobrar la
 que queda: vuelve sola al bono al cabo de un día, y el hueco de la que queda ofrece gastar otra
 (leído en el código, sin ejecutar).
-Implicados: SALES-F17, SALES-F23, SALES-F24, SALES-F27, REC_PELUQUERIA-F10
+Implicados: CUSTOMERS-F17, SALES-F17, SALES-F23, SALES-F24, SALES-F27, REC_PELUQUERIA-F10
 QA: B-08
 
 ### SERVICES-F23 Soltar la sesión si la línea o la cuenta desaparecen
@@ -69,8 +69,8 @@ Pasos:
 1. Se cobra una cuenta con líneas pagadas por bono (Ventas).
 2. Servicios oye la venta cobrada y mira línea por línea: da por **Entregada**, enlazada a la venta,
    la sesión retenida de cada línea que el cobro dio por pagada con bono, y devuelve al bono
-   (**Liberada**) la de una línea que se cobró con dinero (por ejemplo, tras recargar la pantalla sin
-   volver a asignar la clienta, SERVICES-F22). Las líneas de la cuenta que no entran en este cobro
+   (**Liberada**) la de una línea que se cobró con dinero (por ejemplo, si se quitó la clienta antes de
+   cobrar, SERVICES-F22). Las líneas de la cuenta que no entran en este cobro
    conservan su sesión retenida para cuando se cobren (SALES-F22). En el mismo paso concede los bonos
    que se vendieran en ese tique (SERVICES-F14).
 3. Desde ese momento ya no se pueden deshacer: solo vuelven con una devolución (SERVICES-F26) o
