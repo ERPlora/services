@@ -370,7 +370,10 @@ def full_refund_voids(
     check(
         "… and its session spent on another visit stays spent",
         [0, None],
-        [session(db, used_session)["is_deleted"], session(db, used_session)["refunded_at"]],
+        [
+            session(db, used_session)["is_deleted"],
+            session(db, used_session)["refunded_at"],
+        ],
     )
     check("… with nothing left to spend", None, remaining(db, "cus-r2", used))
     check(
@@ -381,7 +384,10 @@ def full_refund_voids(
     check(
         "… and the till's session stays held on it",
         [0, None],
-        [session(db, held_session)["is_deleted"], session(db, held_session)["refunded_at"]],
+        [
+            session(db, held_session)["is_deleted"],
+            session(db, held_session)["refunded_at"],
+        ],
     )
     check(
         "a voucher whose only hold has lapsed counts as intact and is voided",
@@ -428,12 +434,15 @@ def full_refund_voids(
         0,
         grant_trail(db, theirs)["is_deleted"],
     )
-    check("exactly the seven vouchers sold on this sale and still live were touched", 7, touched)
+    check(
+        "exactly the seven vouchers sold on this sale and still live were touched",
+        7,
+        touched,
+    )
 
     print("\n1b · a redelivered `sale.refunded` touches nothing")
     check("the second delivery updates no row", 0, refund_sale(db, sale))
     check("… and the first trail stays as it was", trail, grant_trail(db, intact))
-
 
 
 # ── 2 · a partial refund voids nothing ────────────────────────────────────────
@@ -501,9 +510,7 @@ def sold_and_spent_on_the_same_sale(db: ScratchDb, svc: str, pkg: str) -> None:
         grant_trail(db, g2)["is_deleted"],
     )
 
-    print(
-        "\n3c · … and so is one spent at the chair that only names the sale"
-    )
+    print("\n3c · … and so is one spent at the chair that only names the sale")
     sale3 = "sale-same-3"
     g3 = grant(db, pkg, "cus-same-3", sale_id=sale3)
     chair_session(db, g3, sale3)
@@ -649,9 +656,7 @@ def returned_line_voids_its_voucher(
     check(
         "returning the voucher's line (and a haircut) voids exactly one voucher",
         1,
-        refund_sale(
-            db, sale, fully_refunded=False, lines=body_lines, refund_id=ref
-        ),
+        refund_sale(db, sale, fully_refunded=False, lines=body_lines, refund_id=ref),
     )
     trail = grant_trail(db, voucher)
     check(
@@ -673,13 +678,13 @@ def returned_line_voids_its_voucher(
     check(
         "the same refund delivered again updates no row",
         0,
-        refund_sale(
-            db, sale, fully_refunded=False, lines=body_lines, refund_id=ref
-        ),
+        refund_sale(db, sale, fully_refunded=False, lines=body_lines, refund_id=ref),
     )
     check("… and its trail stays as it was", trail, grant_trail(db, voucher))
 
-    print("\n6c · a line of N units voids N vouchers; two lines of one package, two vouchers")
+    print(
+        "\n6c · a line of N units voids N vouchers; two lines of one package, two vouchers"
+    )
     sale2 = "sale-line-2"
     g = [grant(db, pkg, "cus-line-2", sale_id=sale2) for _ in range(5)]
     check(
@@ -739,7 +744,9 @@ def returned_line_voids_its_voucher(
         ),
     )
 
-    print("\n6d · of two identical vouchers, the intact one goes back, not the used one")
+    print(
+        "\n6d · of two identical vouchers, the intact one goes back, not the used one"
+    )
     sale3 = "sale-line-3"
     used = grant(db, pkg, "cus-line-3", sale_id=sale3)
     spent_on(db, used, svc, "sale-next-visit-3")
@@ -751,7 +758,11 @@ def returned_line_voids_its_voucher(
         lines=[line("li-one", pkg)],
         refund_id="ref-line-3",
     )
-    check("the intact voucher is voided, the used one stays", [0, 1], live(db, [used, intact]))
+    check(
+        "the intact voucher is voided, the used one stays",
+        [0, 1],
+        live(db, [used, intact]),
+    )
     print("\n6e · … and a used one is voided too when it is the one that went back")
     refund_sale(
         db,
@@ -760,7 +771,11 @@ def returned_line_voids_its_voucher(
         lines=[line("li-two", pkg)],
         refund_id="ref-line-3b",
     )
-    check("the used voucher is voided, used or not (services#157)", 1, grant_trail(db, used)["is_deleted"])
+    check(
+        "the used voucher is voided, used or not (services#157)",
+        1,
+        grant_trail(db, used)["is_deleted"],
+    )
 
     print("\n6f · the neighbour hub's voucher of the named package is never touched")
     sale4 = "sale-line-4"
@@ -778,7 +793,9 @@ def returned_line_voids_its_voucher(
     )
     check("… and their voucher stays live", 0, grant_trail(db, theirs)["is_deleted"])
 
-    print("\n6f-bis · … not even a neighbour's row that names this hub's package and sorts first")
+    print(
+        "\n6f-bis · … not even a neighbour's row that names this hub's package and sorts first"
+    )
     # Only a row written by hand can name another hub's package (the package id is the table's
     # key and `_grant` checks the package's hub). This one also sorts before this hub's voucher, so
     # it would take the first slot of the line if the candidates were not read from this hub only.
@@ -809,17 +826,25 @@ def returned_line_voids_its_voucher(
         [1, 0],
         [grant_trail(db, ours)["is_deleted"], grant_trail(db, stray)["is_deleted"]],
     )
-    print("\n6g · the neighbour hub answering the same refund line does not stop this hub's void")
+    print(
+        "\n6g · the neighbour hub answering the same refund line does not stop this hub's void"
+    )
     sale6 = "sale-line-twin"
     mine = grant(db, pkg, "cus-line-twin", sale_id=sale6)
     twin = grant(db, other_pkg, "cus-line-twin", sale_id=sale6, hub=OTHER_HUB)
     twin_lines = [line("li-twin", other_pkg)]
     run(
         db,
-        *refund_body(sale6, fully_refunded=False, lines=twin_lines, refund_id="ref-twin"),
+        *refund_body(
+            sale6, fully_refunded=False, lines=twin_lines, refund_id="ref-twin"
+        ),
         hub=OTHER_HUB,
     )
-    check("the neighbour's voucher is voided in its own hub", 1, grant_trail(db, twin)["is_deleted"])
+    check(
+        "the neighbour's voucher is voided in its own hub",
+        1,
+        grant_trail(db, twin)["is_deleted"],
+    )
     check(
         "… and this hub's refund with the same ids still voids its own",
         1,
@@ -833,7 +858,9 @@ def returned_line_voids_its_voucher(
     )
     check("… so this hub's voucher is voided", 1, grant_trail(db, mine)["is_deleted"])
 
-    print("\n6h · a returned line that names no line id voids nothing: it could not be answered once")
+    print(
+        "\n6h · a returned line that names no line id voids nothing: it could not be answered once"
+    )
     sale7 = "sale-line-noid"
     anonymous = grant(db, pkg, "cus-line-noid", sale_id=sale7)
     check(
@@ -849,7 +876,9 @@ def returned_line_voids_its_voucher(
     )
     check("… and the voucher stays live", 0, grant_trail(db, anonymous)["is_deleted"])
 
-    print("\n6i · a till holding a session of that voucher at the same instant: the refund waits")
+    print(
+        "\n6i · a till holding a session of that voucher at the same instant: the refund waits"
+    )
     sale5 = "sale-line-race"
     raced = grant(db, pkg, "cus-line-race", sale_id=sale5)
     waited = race(
@@ -863,7 +892,39 @@ def returned_line_voids_its_voucher(
         ),
     )
     check("the line refund waited for the till", True, waited)
-    check("… and then voided the voucher of the line", 1, grant_trail(db, raced)["is_deleted"])
+    check(
+        "… and then voided the voucher of the line",
+        1,
+        grant_trail(db, raced)["is_deleted"],
+    )
+
+    print(
+        "\n6j · two vouchers of the line, a till holding a session of the first at the same instant:"
+        " the refund picks AFTER the till, so the intact one goes"
+    )
+    sale6 = "sale-line-race-2"
+    pair = [grant(db, pkg, "cus-line-race-2", sale_id=sale6) for _ in range(2)]
+    first = db.scalar(
+        "SELECT id FROM services_package_grant "
+        f"WHERE sale_id = '{sale6}' ORDER BY granted_at, sale_ref, id LIMIT 1"
+    )
+    other = next(g for g in pair if g != first)
+    waited = race(
+        db,
+        hold_body(first, svc),
+        refund_body(
+            sale6,
+            fully_refunded=False,
+            lines=[line("li-race-2", pkg)],
+            refund_id="ref-line-race-2",
+        ),
+    )
+    check("the line refund waited for the till", True, waited)
+    check(
+        "… and voided the intact voucher, not the one the till just used",
+        [0, 1],
+        live(db, [first, other]),
+    )
 
 
 # ── main ─────────────────────────────────────────────────────────────────────
