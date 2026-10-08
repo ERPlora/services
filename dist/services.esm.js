@@ -4819,9 +4819,9 @@ var es_default = {
         usedNoMore: "{name} se vendi\xF3 en esta venta y se anular\xE1 con ella: las {used} sesi\xF3n(es) ya usadas no vuelven y ya no se podr\xE1 usar."
       },
       refund: {
-        intact: "{name} se vendi\xF3 en esta venta. Si devuelves la venta entera, se anula; no se ha usado ninguna sesi\xF3n. Una devoluci\xF3n parcial no lo toca.",
-        used: "{name} se vendi\xF3 en esta venta. Si devuelves la venta entera, se anula: las {used} sesi\xF3n(es) ya usadas no vuelven y se pierden las {remaining} que quedan. Una devoluci\xF3n parcial no lo toca.",
-        usedNoMore: "{name} se vendi\xF3 en esta venta. Si devuelves la venta entera, se anula: las {used} sesi\xF3n(es) ya usadas no vuelven y ya no se podr\xE1 usar. Una devoluci\xF3n parcial no lo toca."
+        intact: "{name} se vendi\xF3 en esta venta. Si devuelves la venta entera, o marcas su l\xEDnea en \xABQu\xE9 se devuelve\xBB, se anula; no se ha usado ninguna sesi\xF3n.",
+        used: "{name} se vendi\xF3 en esta venta. Si devuelves la venta entera, o marcas su l\xEDnea en \xABQu\xE9 se devuelve\xBB, se anula: las {used} sesi\xF3n(es) ya usadas no vuelven y se pierden las {remaining} que quedan.",
+        usedNoMore: "{name} se vendi\xF3 en esta venta. Si devuelves la venta entera, o marcas su l\xEDnea en \xABQu\xE9 se devuelve\xBB, se anula: las {used} sesi\xF3n(es) ya usadas no vuelven y ya no se podr\xE1 usar."
       },
       loadFailed: "No se han podido leer los bonos vendidos en esta venta. Int\xE9ntalo otra vez antes de confirmar: se anulan con la venta.",
       btnRetry: "Reintentar"
@@ -5146,9 +5146,9 @@ var en_default = {
         usedNoMore: "{name} was sold on this sale and will be voided with it: the {used} session(s) already used stay used and it cannot be used any more."
       },
       refund: {
-        intact: "{name} was sold on this sale. Refunding the whole sale voids it; none of its sessions has been used. A partial refund leaves it as it is.",
-        used: "{name} was sold on this sale. Refunding the whole sale voids it: the {used} session(s) already used stay used and the {remaining} left are lost. A partial refund leaves it as it is.",
-        usedNoMore: "{name} was sold on this sale. Refunding the whole sale voids it: the {used} session(s) already used stay used and it cannot be used any more. A partial refund leaves it as it is."
+        intact: "{name} was sold on this sale. Refunding the whole sale, or marking its line in \xABWhat goes back\xBB, voids it; none of its sessions has been used.",
+        used: "{name} was sold on this sale. Refunding the whole sale, or marking its line in \xABWhat goes back\xBB, voids it: the {used} session(s) already used stay used and the {remaining} left are lost.",
+        usedNoMore: "{name} was sold on this sale. Refunding the whole sale, or marking its line in \xABWhat goes back\xBB, voids it: the {used} session(s) already used stay used and it cannot be used any more."
       },
       loadFailed: "The vouchers sold on this sale could not be read. Try again before confirming: they are voided with the sale.",
       btnRetry: "Try again"

@@ -278,9 +278,9 @@
         "usedNoMore": "{name} se vendió en esta venta y se anulará con ella: las {used} sesión(es) ya usadas no vuelven y ya no se podrá usar."
       },
       "refund": {
-        "intact": "{name} se vendió en esta venta. Si devuelves la venta entera, se anula; no se ha usado ninguna sesión. Una devolución parcial no lo toca.",
-        "used": "{name} se vendió en esta venta. Si devuelves la venta entera, se anula: las {used} sesión(es) ya usadas no vuelven y se pierden las {remaining} que quedan. Una devolución parcial no lo toca.",
-        "usedNoMore": "{name} se vendió en esta venta. Si devuelves la venta entera, se anula: las {used} sesión(es) ya usadas no vuelven y ya no se podrá usar. Una devolución parcial no lo toca."
+        "intact": "{name} se vendió en esta venta. Si devuelves la venta entera, o marcas su línea en «Qué se devuelve», se anula; no se ha usado ninguna sesión.",
+        "used": "{name} se vendió en esta venta. Si devuelves la venta entera, o marcas su línea en «Qué se devuelve», se anula: las {used} sesión(es) ya usadas no vuelven y se pierden las {remaining} que quedan.",
+        "usedNoMore": "{name} se vendió en esta venta. Si devuelves la venta entera, o marcas su línea en «Qué se devuelve», se anula: las {used} sesión(es) ya usadas no vuelven y ya no se podrá usar."
       },
       "loadFailed": "No se han podido leer los bonos vendidos en esta venta. Inténtalo otra vez antes de confirmar: se anulan con la venta.",
       "btnRetry": "Reintentar"
